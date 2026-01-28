@@ -1,0 +1,70 @@
+-- CONTENT TEMPLATES
+-- Run in Supabase SQL Editor
+
+-- Step 1: Create content_templates table
+CREATE TABLE content_templates (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name TEXT NOT NULL,
+  description TEXT,
+  icon TEXT DEFAULT '📄',
+  business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+  fields JSONB NOT NULL DEFAULT '[]',
+  created_by UUID REFERENCES users(id),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Step 2: Add template_id and custom_fields to content_items
+ALTER TABLE content_items ADD COLUMN IF NOT EXISTS template_id UUID REFERENCES content_templates(id) ON DELETE SET NULL;
+ALTER TABLE content_items ADD COLUMN IF NOT EXISTS custom_fields JSONB DEFAULT '{}';
+
+-- Step 3: Indexes
+CREATE INDEX IF NOT EXISTS idx_content_templates_business ON content_templates(business_id);
+CREATE INDEX IF NOT EXISTS idx_content_items_template ON content_items(template_id);
+
+-- Step 4: RLS
+ALTER TABLE content_templates ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "view_content_templates" ON content_templates FOR SELECT
+  USING (business_id IS NULL OR business_id IN (SELECT business_id FROM business_members WHERE user_id = auth.uid()));
+
+CREATE POLICY "manage_content_templates" ON content_templates FOR ALL
+  USING (business_id IS NULL OR business_id IN (SELECT business_id FROM business_members WHERE user_id = auth.uid()) OR created_by = auth.uid());
+
+-- Step 5: Default templates
+INSERT INTO content_templates (name, description, icon, business_id, fields) VALUES
+(
+  'Prayer',
+  'Prayer content for spiritual warfare',
+  '🙏',
+  NULL,
+  '[{"name":"prayer_type","type":"select","label":"Prayer Type","options":["Protection","Deliverance","Healing","Warfare","Blessing"]},{"name":"scripture","type":"text","label":"Scripture Reference"},{"name":"hook","type":"text","label":"Hook"},{"name":"script","type":"textarea","label":"Script"},{"name":"voice","type":"select","label":"Voice","options":["Male Deep","Female Warm","Male Authoritative","Female Gentle"]}]'
+),
+(
+  'Testimony',
+  'Personal testimony or story',
+  '✝️',
+  NULL,
+  '[{"name":"testimony_type","type":"select","label":"Type","options":["Deliverance","Healing","Salvation","Miracle","Transformation"]},{"name":"hook","type":"text","label":"Hook"},{"name":"source","type":"text","label":"Source"},{"name":"script","type":"textarea","label":"Script"},{"name":"actor_prompt","type":"textarea","label":"Actor Prompt"},{"name":"voice","type":"select","label":"Voice","options":["Male Deep","Female Warm","Male Authoritative","Female Gentle"]}]'
+),
+(
+  'Educational',
+  'Teaching or educational content',
+  '📚',
+  NULL,
+  '[{"name":"topic","type":"text","label":"Topic"},{"name":"hook","type":"text","label":"Hook"},{"name":"key_points","type":"textarea","label":"Key Points"},{"name":"script","type":"textarea","label":"Script"},{"name":"call_to_action","type":"text","label":"Call to Action"}]'
+),
+(
+  'Promotional',
+  'Product or book promotion',
+  '📣',
+  NULL,
+  '[{"name":"product","type":"text","label":"Product Name"},{"name":"hook","type":"text","label":"Hook"},{"name":"benefits","type":"textarea","label":"Key Benefits"},{"name":"script","type":"textarea","label":"Script"},{"name":"cta_link","type":"url","label":"CTA Link"},{"name":"discount_code","type":"text","label":"Discount Code"}]'
+),
+(
+  'Short Form',
+  'Quick TikTok/Reels content',
+  '⚡',
+  NULL,
+  '[{"name":"hook","type":"text","label":"Hook (first 3 sec)"},{"name":"script","type":"textarea","label":"Script"},{"name":"trend","type":"text","label":"Trend/Sound"},{"name":"hashtags","type":"text","label":"Hashtags"}]'
+);

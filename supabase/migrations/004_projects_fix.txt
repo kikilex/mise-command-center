@@ -1,0 +1,66 @@
+-- STEP 1: Run this first to clean up
+DROP TABLE IF EXISTS projects CASCADE;
+DROP TABLE IF EXISTS project_templates CASCADE;
+
+-- STEP 2: Create project_templates
+CREATE TABLE project_templates (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name TEXT NOT NULL,
+  description TEXT,
+  icon TEXT DEFAULT '📁',
+  business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+  fields JSONB NOT NULL DEFAULT '[]',
+  created_by UUID REFERENCES users(id),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- STEP 3: Create projects (now template_id will work)
+CREATE TABLE projects (
+  id UUID PRIMARY KEY DEFAULT uuid_generate_v4(),
+  name TEXT NOT NULL,
+  description TEXT,
+  template_id UUID REFERENCES project_templates(id) ON DELETE SET NULL,
+  business_id UUID REFERENCES businesses(id) ON DELETE CASCADE,
+  status TEXT DEFAULT 'active' CHECK (status IN ('active', 'completed', 'archived', 'on_hold')),
+  custom_fields JSONB DEFAULT '{}',
+  created_by UUID REFERENCES users(id),
+  created_at TIMESTAMPTZ DEFAULT NOW(),
+  updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- STEP 4: Add columns to existing tables
+ALTER TABLE tasks ADD COLUMN IF NOT EXISTS project_id UUID REFERENCES projects(id) ON DELETE SET NULL;
+ALTER TABLE content_items ADD COLUMN IF NOT EXISTS project_id UUID REFERENCES projects(id) ON DELETE SET NULL;
+
+-- STEP 5: Indexes
+CREATE INDEX idx_projects_business ON projects(business_id);
+CREATE INDEX idx_projects_template ON projects(template_id);
+CREATE INDEX idx_projects_status ON projects(status);
+CREATE INDEX idx_project_templates_business ON project_templates(business_id);
+CREATE INDEX idx_tasks_project ON tasks(project_id);
+CREATE INDEX idx_content_project ON content_items(project_id);
+
+-- STEP 6: RLS
+ALTER TABLE project_templates ENABLE ROW LEVEL SECURITY;
+ALTER TABLE projects ENABLE ROW LEVEL SECURITY;
+
+-- STEP 7: Policies
+CREATE POLICY "view_templates" ON project_templates FOR SELECT
+  USING (business_id IS NULL OR business_id IN (SELECT business_id FROM business_members WHERE user_id = auth.uid()));
+
+CREATE POLICY "manage_templates" ON project_templates FOR ALL
+  USING (business_id IS NULL OR business_id IN (SELECT business_id FROM business_members WHERE user_id = auth.uid()) OR created_by = auth.uid());
+
+CREATE POLICY "view_projects" ON projects FOR SELECT
+  USING ((business_id IS NULL AND created_by = auth.uid()) OR business_id IN (SELECT business_id FROM business_members WHERE user_id = auth.uid()));
+
+CREATE POLICY "manage_projects" ON projects FOR ALL
+  USING ((business_id IS NULL AND created_by = auth.uid()) OR business_id IN (SELECT business_id FROM business_members WHERE user_id = auth.uid()));
+
+-- STEP 8: Default templates
+INSERT INTO project_templates (name, description, icon, business_id, fields) VALUES
+('Goal', 'Personal or business goal', '🎯', NULL, '[{"name":"target_date","type":"date","label":"Target Date"},{"name":"progress","type":"number","label":"Progress (%)"},{"name":"milestones","type":"textarea","label":"Milestones"}]'),
+('Feature', 'Product feature', '🚀', NULL, '[{"name":"status","type":"select","label":"Status","options":["Planning","In Development","Testing","Launched"]},{"name":"priority","type":"select","label":"Priority","options":["Low","Medium","High","Critical"]},{"name":"launch_date","type":"date","label":"Target Launch"}]'),
+('Campaign', 'Marketing campaign', '📣', NULL, '[{"name":"start_date","type":"date","label":"Start Date"},{"name":"end_date","type":"date","label":"End Date"},{"name":"budget","type":"number","label":"Budget ($)"}]'),
+('Simple', 'Basic project', '📁', NULL, '[{"name":"due_date","type":"date","label":"Due Date"},{"name":"notes","type":"textarea","label":"Notes"}]');
