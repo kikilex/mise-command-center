@@ -267,6 +267,149 @@ export default function AIWorkspacePage() {
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Left Column - Agents & Queue */}
             <div className="lg:col-span-2 space-y-6">
+              {/* Autonomous Mode Controls */}
+              <Card className="bg-white shadow-sm border-2 border-violet-100">
+                <CardHeader className="px-6 pt-6 pb-2">
+                  <div className="flex items-center justify-between w-full">
+                    <div className="flex items-center gap-3">
+                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center">
+                        <span className="text-white text-xl">🤖</span>
+                      </div>
+                      <div>
+                        <h2 className="text-lg font-semibold text-slate-800">Autonomous Mode</h2>
+                        <p className="text-sm text-slate-500">Control AI autonomous operations</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-3">
+                      {savingSettings && (
+                        <span className="text-xs text-slate-400">Saving...</span>
+                      )}
+                      <Switch
+                        isSelected={autonomousSettings.enabled}
+                        onValueChange={(value) => updateAutonomousSetting('enabled', value)}
+                        color="warning"
+                        size="lg"
+                      >
+                        <span className={autonomousSettings.enabled ? 'text-amber-600 font-medium' : 'text-slate-400'}>
+                          {autonomousSettings.enabled ? 'Active' : 'Disabled'}
+                        </span>
+                      </Switch>
+                    </div>
+                  </div>
+                </CardHeader>
+                <CardBody className="px-6 pb-6">
+                  <div className={`space-y-6 ${!autonomousSettings.enabled ? 'opacity-50 pointer-events-none' : ''}`}>
+                    {/* Session Limits */}
+                    <div className="p-4 rounded-xl bg-slate-50">
+                      <h3 className="font-medium text-slate-700 mb-3">Session Limits</h3>
+                      <div className="flex items-center gap-4">
+                        <label className="text-sm text-slate-600 whitespace-nowrap">
+                          Max actions per session:
+                        </label>
+                        <Input
+                          type="number"
+                          min={1}
+                          max={100}
+                          value={autonomousSettings.maxActionsPerSession.toString()}
+                          onChange={(e) => {
+                            const val = parseInt(e.target.value) || 10
+                            updateAutonomousSetting('maxActionsPerSession', Math.min(100, Math.max(1, val)))
+                          }}
+                          className="w-24"
+                          size="sm"
+                        />
+                        <span className="text-xs text-slate-400">
+                          (1-100 actions before requiring human check-in)
+                        </span>
+                      </div>
+                    </div>
+
+                    {/* Approval Settings */}
+                    <div className="p-4 rounded-xl bg-slate-50">
+                      <h3 className="font-medium text-slate-700 mb-3">Approval Requirements</h3>
+                      <Switch
+                        isSelected={autonomousSettings.requireApprovalForExternal}
+                        onValueChange={(value) => updateAutonomousSetting('requireApprovalForExternal', value)}
+                        size="sm"
+                      >
+                        <div>
+                          <span className="text-sm text-slate-700">Require approval for external actions</span>
+                          <p className="text-xs text-slate-400 mt-1">
+                            AI will pause and request approval before sending emails, posting content, or making API calls
+                          </p>
+                        </div>
+                      </Switch>
+                    </div>
+
+                    {/* Notification Preferences */}
+                    <div className="p-4 rounded-xl bg-slate-50">
+                      <h3 className="font-medium text-slate-700 mb-4">Notification Preferences</h3>
+                      <div className="space-y-4">
+                        <div className="flex flex-wrap gap-6">
+                          <Checkbox
+                            isSelected={autonomousSettings.notifications.onTaskComplete}
+                            onValueChange={(value) => updateNotificationSetting('onTaskComplete', value)}
+                            size="sm"
+                          >
+                            <span className="text-sm text-slate-600">Task completed</span>
+                          </Checkbox>
+                          <Checkbox
+                            isSelected={autonomousSettings.notifications.onError}
+                            onValueChange={(value) => updateNotificationSetting('onError', value)}
+                            size="sm"
+                          >
+                            <span className="text-sm text-slate-600">Errors occurred</span>
+                          </Checkbox>
+                          <Checkbox
+                            isSelected={autonomousSettings.notifications.onApprovalNeeded}
+                            onValueChange={(value) => updateNotificationSetting('onApprovalNeeded', value)}
+                            size="sm"
+                          >
+                            <span className="text-sm text-slate-600">Approval needed</span>
+                          </Checkbox>
+                        </div>
+                        
+                        <Divider className="my-3" />
+                        
+                        <div className="flex items-center gap-4">
+                          <label className="text-sm text-slate-600">Delivery method:</label>
+                          <Select
+                            selectedKeys={[autonomousSettings.notifications.deliveryMethod]}
+                            onSelectionChange={(keys) => {
+                              const value = Array.from(keys)[0] as AutonomousSettings['notifications']['deliveryMethod']
+                              if (value) updateNotificationSetting('deliveryMethod', value)
+                            }}
+                            className="w-40"
+                            size="sm"
+                          >
+                            <SelectItem key="push">Push only</SelectItem>
+                            <SelectItem key="email">Email only</SelectItem>
+                            <SelectItem key="both">Push & Email</SelectItem>
+                            <SelectItem key="none">None</SelectItem>
+                          </Select>
+                        </div>
+                      </div>
+                    </div>
+
+                    {/* Status Banner */}
+                    {autonomousSettings.enabled && (
+                      <div className="p-4 rounded-xl bg-amber-50 border border-amber-200">
+                        <div className="flex items-center gap-3">
+                          <span className="text-2xl">⚡</span>
+                          <div>
+                            <p className="font-medium text-amber-800">Autonomous Mode Active</p>
+                            <p className="text-sm text-amber-600">
+                              AI can perform up to {autonomousSettings.maxActionsPerSession} actions per session
+                              {autonomousSettings.requireApprovalForExternal && ', with approval required for external actions'}
+                            </p>
+                          </div>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </CardBody>
+              </Card>
+
               {/* AI Agents */}
               <Card className="bg-white shadow-sm">
                 <CardHeader className="px-6 pt-6 pb-2">

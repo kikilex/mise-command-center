@@ -3,6 +3,7 @@ import { Inter } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
 import { Toaster } from "react-hot-toast";
+import { ErrorBoundary } from "@/components/ErrorBoundary";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -20,11 +21,13 @@ export default function RootLayout({
     <html lang="en" className="light" suppressHydrationWarning>
       <body className={`${inter.className} min-h-screen bg-white antialiased`}>
         <Providers>
-          {children}
+          <ErrorBoundary>
+            {children}
+          </ErrorBoundary>
           <Toaster 
             position="bottom-right"
             toastOptions={{
-              duration: 3000,
+              duration: 4000,
               style: {
                 background: '#1e293b',
                 color: '#f1f5f9',
@@ -36,6 +39,7 @@ export default function RootLayout({
                 },
               },
               error: {
+                duration: 5000,
                 iconTheme: {
                   primary: '#ef4444',
                   secondary: '#f1f5f9',
