@@ -20,15 +20,12 @@ interface NavbarProps {
 }
 
 const navItems = [
-  { href: '/', label: 'Dashboard' },
-  { href: '/tasks', label: 'Tasks' },
-  { href: '/notes', label: 'Notes' },
-  { href: '/content', label: 'Content' },
-  { href: '/calendar', label: 'Calendar' },
-  { href: '/business', label: 'Business' },
-  { href: '/ai', label: 'AI Workspace' },
-  { href: '/family', label: 'Family' },
-  { href: '/settings', label: 'Settings' },
+  { href: '/', label: 'Dashboard', icon: '🏠' },
+  { href: '/tasks', label: 'Tasks', icon: '✅' },
+  { href: '/content', label: 'Content', icon: '🎬' },
+  { href: '/calendar', label: 'Calendar', icon: '📅' },
+  { href: '/notes', label: 'Notes', icon: '📝' },
+  { href: '/settings', label: 'Settings', icon: '⚙️' },
 ]
 
 export default function Navbar({ user, actions }: NavbarProps) {
@@ -78,18 +75,19 @@ export default function Navbar({ user, actions }: NavbarProps) {
           </div>
 
           {/* Center: Desktop navigation */}
-          <nav className="hidden lg:flex items-center gap-1 bg-default-100 rounded-xl p-1 overflow-x-auto">
+          <nav className="hidden lg:flex items-center gap-1 bg-default-100 rounded-xl p-1">
             {navItems.map((item) => (
               <a 
                 key={item.href}
                 href={item.href} 
-                className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors whitespace-nowrap min-h-[36px] flex items-center ${
+                className={`px-3 py-2 text-sm font-medium rounded-lg transition-colors whitespace-nowrap min-h-[36px] flex items-center gap-1.5 ${
                   isActive(item.href)
                     ? 'bg-background shadow-sm text-foreground'
                     : 'text-default-600 hover:bg-background/50'
                 }`}
               >
-                {item.label}
+                <span className="text-base">{item.icon}</span>
+                <span className="hidden xl:inline">{item.label}</span>
               </a>
             ))}
           </nav>
@@ -127,19 +125,20 @@ export default function Navbar({ user, actions }: NavbarProps) {
             <BusinessSelector />
           </div>
           
-          <div className="flex flex-col gap-2">
+          <div className="flex flex-col gap-1">
             {navItems.map((item) => (
               <a 
                 key={item.href}
                 href={item.href} 
-                className={`w-full text-left px-4 py-3 rounded-lg font-medium transition-colors min-h-[44px] flex items-center ${
+                className={`w-full text-left px-4 py-3 rounded-lg font-medium transition-colors min-h-[44px] flex items-center gap-3 ${
                   isActive(item.href)
                     ? 'bg-primary-50 dark:bg-primary-900/30 text-primary'
                     : 'text-foreground hover:bg-primary-50 dark:hover:bg-primary-900/30 hover:text-primary'
                 }`}
                 onClick={() => setIsMenuOpen(false)}
               >
-                {item.label}
+                <span className="text-lg">{item.icon}</span>
+                <span>{item.label}</span>
               </a>
             ))}
           </div>
