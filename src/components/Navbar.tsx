@@ -43,18 +43,18 @@ export default function Navbar({ user, actions }: NavbarProps) {
   }
 
   return (
-    <header className="bg-white/80 backdrop-blur-sm border-b border-slate-100 sticky top-0 z-50">
+    <header className="bg-background/80 backdrop-blur-sm border-b border-divider sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <div className="flex items-center justify-between h-16">
           {/* Left: Hamburger (mobile) + Brand + Business Selector */}
           <div className="flex items-center gap-3">
             {/* Mobile hamburger */}
             <button 
-              className="lg:hidden p-2 rounded-lg hover:bg-slate-100"
+              className="lg:hidden p-2 rounded-lg hover:bg-default-100 min-w-[44px] min-h-[44px] flex items-center justify-center"
               onClick={() => setIsMenuOpen(!isMenuOpen)}
               aria-label="Toggle menu"
             >
-              <svg className="w-6 h-6 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="w-6 h-6 text-default-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 {isMenuOpen ? (
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
                 ) : (
@@ -65,10 +65,10 @@ export default function Navbar({ user, actions }: NavbarProps) {
             
             {/* Brand */}
             <a href="/" className="flex items-center gap-2">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
+              <div className="w-10 h-10 rounded-xl bg-violet-600 flex items-center justify-center">
                 <span className="text-white font-bold text-lg">M</span>
               </div>
-              <span className="font-semibold text-slate-800 text-lg hidden sm:block">Mise</span>
+              <span className="font-semibold text-foreground text-lg hidden sm:block">Mise</span>
             </a>
             
             {/* Business Selector - show on desktop */}
@@ -78,15 +78,15 @@ export default function Navbar({ user, actions }: NavbarProps) {
           </div>
 
           {/* Center: Desktop navigation */}
-          <nav className="hidden lg:flex items-center gap-1 bg-slate-100/50 rounded-xl p-1">
+          <nav className="hidden lg:flex items-center gap-1 bg-default-100 rounded-xl p-1 overflow-x-auto">
             {navItems.map((item) => (
               <a 
                 key={item.href}
                 href={item.href} 
-                className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors ${
+                className={`px-4 py-2 text-sm font-medium rounded-lg transition-colors whitespace-nowrap min-h-[36px] flex items-center ${
                   isActive(item.href)
-                    ? 'bg-white shadow-sm text-slate-800'
-                    : 'text-slate-600 hover:bg-white/50'
+                    ? 'bg-background shadow-sm text-foreground'
+                    : 'text-default-600 hover:bg-background/50'
                 }`}
               >
                 {item.label}
@@ -100,7 +100,7 @@ export default function Navbar({ user, actions }: NavbarProps) {
             {actions}
             
             {/* Notifications (hidden on small screens) */}
-            <Button isIconOnly variant="light" className="hidden sm:flex text-slate-500">
+            <Button isIconOnly variant="light" className="hidden sm:flex text-default-500 min-w-[44px] min-h-[44px]">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
               </svg>
@@ -120,10 +120,10 @@ export default function Navbar({ user, actions }: NavbarProps) {
 
       {/* Mobile menu dropdown */}
       {isMenuOpen && (
-        <div className="lg:hidden bg-white border-t border-slate-100 py-4 px-4 shadow-lg">
+        <div className="lg:hidden bg-background border-t border-divider py-4 px-4 shadow-lg">
           {/* Mobile Business Selector */}
-          <div className="mb-4 pb-4 border-b border-slate-100">
-            <p className="text-xs text-slate-500 mb-2 px-1">Current Context</p>
+          <div className="mb-4 pb-4 border-b border-divider">
+            <p className="text-xs text-default-500 mb-2 px-1">Current Context</p>
             <BusinessSelector />
           </div>
           
@@ -132,10 +132,10 @@ export default function Navbar({ user, actions }: NavbarProps) {
               <a 
                 key={item.href}
                 href={item.href} 
-                className={`w-full text-left px-4 py-3 rounded-lg font-medium transition-colors ${
+                className={`w-full text-left px-4 py-3 rounded-lg font-medium transition-colors min-h-[44px] flex items-center ${
                   isActive(item.href)
-                    ? 'bg-violet-50 text-violet-600'
-                    : 'text-slate-700 hover:bg-violet-50 hover:text-violet-600'
+                    ? 'bg-primary-50 dark:bg-primary-900/30 text-primary'
+                    : 'text-foreground hover:bg-primary-50 dark:hover:bg-primary-900/30 hover:text-primary'
                 }`}
                 onClick={() => setIsMenuOpen(false)}
               >

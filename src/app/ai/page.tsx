@@ -196,7 +196,7 @@ export default function AIWorkspacePage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-purple-50/30">
+    <div className="min-h-screen bg-background">
       <Navbar user={user} />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
@@ -225,7 +225,7 @@ export default function AIWorkspacePage() {
                     <div className="space-y-4">
                       {agents.map(agent => (
                         <div key={agent.id} className="flex items-center gap-4 p-4 rounded-xl bg-slate-50">
-                          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
+                          <div className="w-12 h-12 rounded-xl bg-violet-600 flex items-center justify-center">
                             <span className="text-white text-xl">⚡</span>
                           </div>
                           <div className="flex-1">
@@ -324,9 +324,9 @@ export default function AIWorkspacePage() {
               </Card>
 
               {/* Quick Stats */}
-              <Card className="bg-gradient-to-br from-violet-500 to-purple-600 text-white shadow-sm">
+              <Card className="bg-violet-600 text-white shadow-sm">
                 <CardBody className="p-6">
-                  <h3 className="font-semibold mb-4">Today's Activity</h3>
+                  <h3 className="font-semibold mb-4">Today&apos;s Activity</h3>
                   <div className="space-y-3">
                     <div className="flex justify-between">
                       <span className="text-violet-200">Tasks Completed</span>

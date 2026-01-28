@@ -268,7 +268,7 @@ export default function FamilyPage() {
   const checkedCount = items.filter(i => i.is_checked).length
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-purple-50/30">
+    <div className="min-h-screen bg-background">
       <Navbar user={user} />
 
       <main className="max-w-3xl mx-auto px-4 sm:px-6 py-8">
@@ -317,6 +317,7 @@ export default function FamilyPage() {
                 variant="flat" 
                 color="danger"
                 onPress={handleClearChecked}
+                className="min-h-[44px]"
               >
                 Clear Checked ({checkedCount})
               </Button>
@@ -324,7 +325,7 @@ export default function FamilyPage() {
             <Button 
               color="primary" 
               onPress={onOpen}
-              className="font-semibold"
+              className="font-semibold min-h-[44px]"
             >
               + Add Item
             </Button>

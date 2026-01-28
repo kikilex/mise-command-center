@@ -409,7 +409,7 @@ export default function BusinessHubPage() {
   ]
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-purple-50/30">
+    <div className="min-h-screen bg-background">
       <Navbar user={user} />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
@@ -425,11 +425,11 @@ export default function BusinessHubPage() {
           </div>
           
           {selectedBusinessId && (
-            <div className="flex gap-2">
-              <Button color="primary" variant="flat" onPress={handleNewProduct}>
+            <div className="flex gap-2 flex-wrap">
+              <Button color="primary" variant="flat" onPress={handleNewProduct} className="min-h-[44px]">
                 + Add Product
               </Button>
-              <Button color="primary" onPress={onSaleOpen}>
+              <Button color="primary" onPress={onSaleOpen} className="min-h-[44px]">
                 + Record Sale
               </Button>
             </div>
@@ -492,15 +492,20 @@ export default function BusinessHubPage() {
             )}
 
             {/* Tabs */}
-            <Tabs 
-              selectedKey={activeTab} 
-              onSelectionChange={(key) => setActiveTab(key as string)}
-              className="mb-6"
-            >
-              <Tab key="overview" title="Overview" />
-              <Tab key="products" title={`Products (${products.length})`} />
-              <Tab key="sales" title="Recent Sales" />
-            </Tabs>
+            <div className="overflow-x-auto pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 mb-6">
+              <Tabs 
+                selectedKey={activeTab} 
+                onSelectionChange={(key) => setActiveTab(key as string)}
+                classNames={{
+                  tabList: "flex-nowrap",
+                  tab: "min-h-[44px] whitespace-nowrap",
+                }}
+              >
+                <Tab key="overview" title="Overview" />
+                <Tab key="products" title={`Products (${products.length})`} />
+                <Tab key="sales" title="Recent Sales" />
+              </Tabs>
+            </div>
 
             {/* Tab Content */}
             {!loading && (

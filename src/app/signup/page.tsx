@@ -89,7 +89,7 @@ export default function SignupPage() {
 
   if (success) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 p-4">
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <Card className="w-full max-w-md shadow-xl">
           <CardBody className="p-8 text-center">
             <div className="w-16 h-16 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-4">
@@ -113,14 +113,14 @@ export default function SignupPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 to-slate-100 p-4">
+    <div className="min-h-screen flex items-center justify-center bg-background p-4">
       <Card className="w-full max-w-md shadow-xl">
         <CardHeader className="flex flex-col gap-1 items-center pt-8 pb-4">
-          <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-blue-500 to-violet-500 flex items-center justify-center mb-2">
+          <div className="w-12 h-12 rounded-xl bg-violet-600 flex items-center justify-center mb-2">
             <span className="text-white text-2xl font-bold">M</span>
           </div>
-          <h1 className="text-2xl font-bold text-slate-800">Create account</h1>
-          <p className="text-slate-500 text-sm">Join the Mise Command Center</p>
+          <h1 className="text-2xl font-bold text-foreground">Create account</h1>
+          <p className="text-default-500 text-sm">Join the Mise Command Center</p>
         </CardHeader>
         <CardBody className="px-8 pb-8">
           <form onSubmit={handleSignup} className="flex flex-col gap-4">

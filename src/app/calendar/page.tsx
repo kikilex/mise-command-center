@@ -222,7 +222,7 @@ export default function CalendarPage() {
   const availableCalendars = [...new Set(calendarEvents.map(e => e.calendar))]
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-purple-50/30">
+    <div className="min-h-screen bg-background">
       <Navbar user={user} />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
@@ -273,19 +273,22 @@ export default function CalendarPage() {
                   
                   {/* Calendar Filter (only show when calendar is enabled) */}
                   {enabledSources.includes('calendar') && availableCalendars.length > 0 && (
-                    <div>
-                      <h3 className="text-sm font-medium text-slate-700 mb-2">Calendars</h3>
+                    <div className="overflow-x-auto">
+                      <h3 className="text-sm font-medium text-default-700 mb-2">Calendars</h3>
                       <CheckboxGroup
                         orientation="horizontal"
                         value={enabledCalendars}
                         onValueChange={setEnabledCalendars}
                         size="sm"
+                        classNames={{
+                          wrapper: "flex-nowrap gap-3",
+                        }}
                       >
                         {availableCalendars.map(cal => {
                           const colors = getCalendarColor(cal)
                           return (
-                            <Checkbox key={cal} value={cal}>
-                              <span className="flex items-center gap-1">
+                            <Checkbox key={cal} value={cal} className="min-h-[44px]">
+                              <span className="flex items-center gap-1 whitespace-nowrap">
                                 <span className={`w-2 h-2 rounded ${colors.bg}`} />
                                 {cal}
                               </span>
@@ -304,11 +307,11 @@ export default function CalendarPage() {
               <CardBody className="p-6">
                 {/* Calendar Header */}
                 <div className="flex items-center justify-between mb-6">
-                  <Button variant="flat" onPress={prevMonth}>←</Button>
-                  <h2 className="text-xl font-semibold text-slate-800">
+                  <Button variant="flat" onPress={prevMonth} className="min-w-[44px] min-h-[44px]">←</Button>
+                  <h2 className="text-xl font-semibold text-foreground">
                     {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
                   </h2>
-                  <Button variant="flat" onPress={nextMonth}>→</Button>
+                  <Button variant="flat" onPress={nextMonth} className="min-w-[44px] min-h-[44px]">→</Button>
                 </div>
 
                 {/* Day Headers */}

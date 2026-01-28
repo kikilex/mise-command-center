@@ -174,18 +174,18 @@ export default function Home() {
 
   if (loadError && !loading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-white to-purple-50/30 p-4">
+      <div className="min-h-screen flex items-center justify-center bg-background p-4">
         <ErrorFallback error={loadError} resetError={loadData} />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-purple-50/30">
+    <div className="min-h-screen bg-background">
       <Navbar user={user} />
 
       {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-6 py-8">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
         
         {/* Stats Row */}
         {loading ? (
@@ -346,7 +346,7 @@ export default function Home() {
                 <Button 
                   as="a"
                   href="/tasks"
-                  className="w-full mt-4 bg-gradient-to-r from-emerald-400 to-emerald-500 text-white font-medium shadow-lg shadow-emerald-200"
+                  className="w-full mt-4 bg-emerald-500 text-white font-medium min-h-[44px]"
                 >
                   + Add New Task
                 </Button>
@@ -358,10 +358,10 @@ export default function Home() {
           <div className="space-y-6">
             
             {/* AI Assistant Card */}
-            <Card className="bg-gradient-to-br from-white to-violet-50/50 shadow-sm border-0">
+            <Card className="bg-content1 shadow-sm border-0">
               <CardBody className="p-6">
                 <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
+                  <div className="w-10 h-10 rounded-xl bg-violet-600 flex items-center justify-center">
                     <span className="text-white text-lg">⚡</span>
                   </div>
                   <div>
@@ -373,17 +373,17 @@ export default function Home() {
                 
                 <div className="grid grid-cols-2 gap-3 mb-4">
                   {[
-                    { icon: "📋", label: "Prioritize Tasks", color: "bg-amber-50" },
-                    { icon: "✍️", label: "Write Script", color: "bg-emerald-50" },
-                    { icon: "🔍", label: "Research Topic", color: "bg-blue-50" },
-                    { icon: "📊", label: "Run Analysis", color: "bg-purple-50" },
+                    { icon: "📋", label: "Prioritize Tasks", color: "bg-amber-50 dark:bg-amber-900/30" },
+                    { icon: "✍️", label: "Write Script", color: "bg-emerald-50 dark:bg-emerald-900/30" },
+                    { icon: "🔍", label: "Research Topic", color: "bg-blue-50 dark:bg-blue-900/30" },
+                    { icon: "📊", label: "Run Analysis", color: "bg-purple-50 dark:bg-purple-900/30" },
                   ].map((action, i) => (
                     <button 
                       key={i}
-                      className={`${action.color} p-3 rounded-xl text-left hover:scale-[1.02] transition-transform`}
+                      className={`${action.color} p-3 rounded-xl text-left hover:scale-[1.02] transition-transform min-h-[44px]`}
                     >
                       <span className="text-lg mb-1 block">{action.icon}</span>
-                      <span className="text-sm font-medium text-slate-700">{action.label}</span>
+                      <span className="text-sm font-medium text-foreground">{action.label}</span>
                     </button>
                   ))}
                 </div>
@@ -477,7 +477,7 @@ export default function Home() {
           href="/tasks"
           color="primary"
           size="lg"
-          className="rounded-full w-14 h-14 shadow-lg shadow-violet-300 hover:shadow-xl hover:shadow-violet-400 transition-all"
+          className="rounded-full w-14 h-14 min-w-[56px] min-h-[56px] shadow-lg transition-all"
           isIconOnly
         >
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">

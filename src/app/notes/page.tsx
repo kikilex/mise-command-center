@@ -435,7 +435,7 @@ export default function NotesPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-purple-50/30">
+    <div className="min-h-screen bg-background">
       <Navbar 
         user={user} 
         actions={
@@ -502,29 +502,33 @@ export default function NotesPage() {
         </div>
 
         {/* Folder Pills */}
-        <div className="flex gap-2 flex-wrap mb-6">
-          <Button 
-            size="sm" 
-            variant={selectedFolder === 'all' ? 'solid' : 'flat'}
-            color="primary"
-            onPress={() => setSelectedFolder('all')}
-          >
-            All ({notes.length})
-          </Button>
-          {allFolders.map(folder => {
-            const count = notes.filter(n => n.folder === folder.key).length
-            if (count === 0 && !defaultFolders.find(f => f.key === folder.key)) return null
-            return (
-              <Button
-                key={folder.key}
-                size="sm"
-                variant={selectedFolder === folder.key ? 'solid' : 'flat'}
-                onPress={() => setSelectedFolder(folder.key)}
-              >
-                {folder.label} ({count})
-              </Button>
-            )
-          })}
+        <div className="overflow-x-auto pb-2 -mx-4 px-4 sm:mx-0 sm:px-0 mb-6">
+          <div className="flex gap-2">
+            <Button 
+              size="sm" 
+              variant={selectedFolder === 'all' ? 'solid' : 'flat'}
+              color="primary"
+              onPress={() => setSelectedFolder('all')}
+              className="min-h-[44px] whitespace-nowrap"
+            >
+              All ({notes.length})
+            </Button>
+            {allFolders.map(folder => {
+              const count = notes.filter(n => n.folder === folder.key).length
+              if (count === 0 && !defaultFolders.find(f => f.key === folder.key)) return null
+              return (
+                <Button
+                  key={folder.key}
+                  size="sm"
+                  variant={selectedFolder === folder.key ? 'solid' : 'flat'}
+                  onPress={() => setSelectedFolder(folder.key)}
+                  className="min-h-[44px] whitespace-nowrap"
+                >
+                  {folder.label} ({count})
+                </Button>
+              )
+            })}
+          </div>
         </div>
 
         {/* Error State */}
