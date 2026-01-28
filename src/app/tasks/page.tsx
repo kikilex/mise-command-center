@@ -20,7 +20,8 @@ import {
 } from "@heroui/react"
 import { createClient } from '@/lib/supabase/client'
 import UserMenu from '@/components/UserMenu'
-import toast from 'react-hot-toast'
+import { showErrorToast, showSuccessToast, getErrorMessage } from '@/lib/errors'
+import { ErrorFallback } from '@/components/ErrorBoundary'
 
 interface Task {
   id: string
@@ -62,6 +63,8 @@ export default function TasksPage() {
   const [tasks, setTasks] = useState<Task[]>([])
   const [user, setUser] = useState<UserData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
   const [filter, setFilter] = useState<string>('all')
   const { isOpen, onOpen, onClose } = useDisclosure()
   const [editingTask, setEditingTask] = useState<Task | null>(null)
@@ -82,105 +85,171 @@ export default function TasksPage() {
   }, [])
 
   async function loadUser() {
-    const { data: { user: authUser } } = await supabase.auth.getUser()
-    if (authUser) {
-      const { data: profile } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', authUser.id)
-        .single()
+    try {
+      const { data: { user: authUser }, error: authError } = await supabase.auth.getUser()
       
-      setUser({
-        id: authUser.id,
-        email: authUser.email || '',
-        name: profile?.name || authUser.email?.split('@')[0],
-        avatar_url: profile?.avatar_url,
-      })
+      if (authError) {
+        console.error('Auth error:', authError)
+        return
+      }
+      
+      if (authUser) {
+        try {
+          const { data: profile, error: profileError } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', authUser.id)
+            .single()
+          
+          if (profileError) {
+            console.error('Profile fetch error:', profileError)
+          }
+          
+          setUser({
+            id: authUser.id,
+            email: authUser.email || '',
+            name: profile?.name || authUser.email?.split('@')[0],
+            avatar_url: profile?.avatar_url,
+          })
+        } catch (err) {
+          console.error('Failed to fetch profile:', err)
+          setUser({
+            id: authUser.id,
+            email: authUser.email || '',
+            name: authUser.email?.split('@')[0],
+          })
+        }
+      }
+    } catch (error) {
+      console.error('Load user error:', error)
+      showErrorToast(error, 'Failed to load user data')
     }
   }
 
   async function loadTasks() {
     setLoading(true)
-    const { data, error } = await supabase
-      .from('tasks')
-      .select('*')
-      .order('created_at', { ascending: false })
+    setLoadError(null)
     
-    if (data) setTasks(data)
-    setLoading(false)
+    try {
+      const { data, error } = await supabase
+        .from('tasks')
+        .select('*')
+        .order('created_at', { ascending: false })
+      
+      if (error) {
+        throw error
+      }
+      
+      setTasks(data || [])
+    } catch (error) {
+      console.error('Load tasks error:', error)
+      setLoadError(getErrorMessage(error))
+      showErrorToast(error, 'Failed to load tasks')
+    } finally {
+      setLoading(false)
+    }
   }
 
   async function handleSubmit() {
-    if (!user) return
+    if (!user) {
+      showErrorToast(null, 'Please sign in to manage tasks')
+      return
+    }
     
-    if (editingTask) {
-      // Update existing task
-      const { error } = await supabase
-        .from('tasks')
-        .update({
-          title: formData.title,
-          description: formData.description || null,
-          status: formData.status,
-          priority: formData.priority,
-          ai_flag: formData.ai_flag,
-          due_date: formData.due_date || null,
-        })
-        .eq('id', editingTask.id)
-      
-      if (!error) {
-        toast.success('Task updated')
+    if (!formData.title.trim()) {
+      showErrorToast(null, 'Please enter a task title')
+      return
+    }
+    
+    setSubmitting(true)
+    
+    try {
+      if (editingTask) {
+        // Update existing task
+        const { error } = await supabase
+          .from('tasks')
+          .update({
+            title: formData.title,
+            description: formData.description || null,
+            status: formData.status,
+            priority: formData.priority,
+            ai_flag: formData.ai_flag,
+            due_date: formData.due_date || null,
+          })
+          .eq('id', editingTask.id)
+        
+        if (error) {
+          throw error
+        }
+        
+        showSuccessToast('Task updated successfully')
         loadTasks()
         handleClose()
       } else {
-        toast.error('Failed to update task')
-      }
-    } else {
-      // Create new task
-      const { error } = await supabase
-        .from('tasks')
-        .insert({
-          title: formData.title,
-          description: formData.description || null,
-          status: formData.status,
-          priority: formData.priority,
-          ai_flag: formData.ai_flag,
-          created_by: user.id,
-          due_date: formData.due_date || null,
-        })
-      
-      if (!error) {
-        toast.success('Task created')
+        // Create new task
+        const { error } = await supabase
+          .from('tasks')
+          .insert({
+            title: formData.title,
+            description: formData.description || null,
+            status: formData.status,
+            priority: formData.priority,
+            ai_flag: formData.ai_flag,
+            created_by: user.id,
+            due_date: formData.due_date || null,
+          })
+        
+        if (error) {
+          throw error
+        }
+        
+        showSuccessToast('Task created successfully')
         loadTasks()
         handleClose()
-      } else {
-        toast.error('Failed to create task')
       }
+    } catch (error) {
+      console.error('Submit task error:', error)
+      showErrorToast(error, editingTask ? 'Failed to update task' : 'Failed to create task')
+    } finally {
+      setSubmitting(false)
     }
   }
 
   async function handleDelete(taskId: string) {
-    const { error } = await supabase
-      .from('tasks')
-      .delete()
-      .eq('id', taskId)
-    
-    if (!error) {
-      toast.success('Task deleted')
+    try {
+      const { error } = await supabase
+        .from('tasks')
+        .delete()
+        .eq('id', taskId)
+      
+      if (error) {
+        throw error
+      }
+      
+      showSuccessToast('Task deleted')
       loadTasks()
-    } else {
-      toast.error('Failed to delete task')
+    } catch (error) {
+      console.error('Delete task error:', error)
+      showErrorToast(error, 'Failed to delete task')
     }
   }
 
   async function handleStatusChange(taskId: string, newStatus: string) {
-    const { error } = await supabase
-      .from('tasks')
-      .update({ status: newStatus })
-      .eq('id', taskId)
-    
-    if (!error) {
-      toast.success('Status updated')
+    try {
+      const { error } = await supabase
+        .from('tasks')
+        .update({ status: newStatus })
+        .eq('id', taskId)
+      
+      if (error) {
+        throw error
+      }
+      
+      showSuccessToast('Status updated')
       loadTasks()
+    } catch (error) {
+      console.error('Status update error:', error)
+      showErrorToast(error, 'Failed to update status')
     }
   }
 
@@ -289,17 +358,24 @@ export default function TasksPage() {
           </Button>
         </div>
 
+        {/* Error State */}
+        {loadError && !loading && (
+          <div className="mb-6">
+            <ErrorFallback error={loadError} resetError={loadTasks} />
+          </div>
+        )}
+
         {/* Task List */}
         {loading ? (
           <div className="text-center py-12 text-slate-500">Loading tasks...</div>
-        ) : filteredTasks.length === 0 ? (
+        ) : !loadError && filteredTasks.length === 0 ? (
           <Card className="bg-white">
             <CardBody className="text-center py-12">
               <p className="text-slate-500 mb-4">No tasks yet</p>
               <Button color="primary" onPress={handleNew}>Create your first task</Button>
             </CardBody>
           </Card>
-        ) : (
+        ) : !loadError && (
           <div className="space-y-3">
             {filteredTasks.map(task => (
               <Card key={task.id} className="bg-white hover:shadow-md transition-shadow">
@@ -434,6 +510,7 @@ export default function TasksPage() {
               color="primary" 
               onPress={handleSubmit}
               isDisabled={!formData.title.trim()}
+              isLoading={submitting}
             >
               {editingTask ? 'Save Changes' : 'Create Task'}
             </Button>
