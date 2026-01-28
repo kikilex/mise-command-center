@@ -28,9 +28,17 @@ const BusinessContext = createContext<BusinessContextType | undefined>(undefined
 
 const STORAGE_KEY = 'mise-selected-business-id'
 
+// Read initial value from localStorage synchronously to prevent flash
+function getInitialBusinessId(): string | null {
+  if (typeof window === 'undefined') return null
+  const saved = localStorage.getItem(STORAGE_KEY)
+  if (saved === 'personal' || saved === null) return null
+  return saved // Will be validated against businesses list later
+}
+
 export function BusinessProvider({ children }: { children: ReactNode }) {
   const [businesses, setBusinesses] = useState<Business[]>([])
-  const [selectedBusinessId, setSelectedBusinessIdState] = useState<string | null>(null)
+  const [selectedBusinessId, setSelectedBusinessIdState] = useState<string | null>(getInitialBusinessId)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [initialized, setInitialized] = useState(false)
@@ -42,23 +50,19 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
     loadBusinesses()
   }, [])
 
-  // Load saved selection from localStorage after businesses are loaded
+  // Validate saved selection after businesses are loaded
   useEffect(() => {
-    if (!initialized && !loading) {
-      const saved = localStorage.getItem(STORAGE_KEY)
-      if (saved === 'personal' || saved === null) {
-        // User explicitly chose Personal mode or no selection saved
+    if (!initialized && !loading && businesses.length >= 0) {
+      const currentId = selectedBusinessId
+      // If we have a saved business ID, validate it exists
+      if (currentId && currentId !== 'personal' && !businesses.find(b => b.id === currentId)) {
+        // Invalid business ID - reset to Personal
         setSelectedBusinessIdState(null)
-      } else if (saved && businesses.find(b => b.id === saved)) {
-        // Valid business ID saved
-        setSelectedBusinessIdState(saved)
-      } else {
-        // No valid saved selection - default to Personal (null), not first business
-        setSelectedBusinessIdState(null)
+        localStorage.setItem(STORAGE_KEY, 'personal')
       }
       setInitialized(true)
     }
-  }, [businesses, loading, initialized])
+  }, [businesses, loading, initialized, selectedBusinessId])
 
   async function loadBusinesses() {
     setLoading(true)

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useMemo } from 'react'
+import Link from 'next/link'
 import { Button, Avatar } from "@heroui/react"
 import { usePathname } from 'next/navigation'
 import UserMenu from './UserMenu'
@@ -69,12 +70,12 @@ export default function Navbar({ user, actions }: NavbarProps) {
             </button>
             
             {/* Brand */}
-            <a href="/" className="flex items-center gap-2">
+            <Link href="/" className="flex items-center gap-2">
               <div className="w-10 h-10 rounded-xl bg-violet-600 flex items-center justify-center">
                 <span className="text-white font-bold text-lg">M</span>
               </div>
               <span className="font-semibold text-foreground text-lg hidden sm:block">Mise</span>
-            </a>
+            </Link>
             
             {/* Business Selector - show on desktop */}
             <div className="hidden md:block ml-2">
@@ -85,7 +86,7 @@ export default function Navbar({ user, actions }: NavbarProps) {
           {/* Center: Desktop navigation */}
           <nav className="hidden lg:flex items-center gap-1 bg-default-100 rounded-xl p-1">
             {navItems.map((item) => (
-              <a 
+              <Link 
                 key={item.key}
                 href={item.href} 
                 className={`px-3 py-2 text-sm font-medium rounded-lg transition-colors whitespace-nowrap min-h-[36px] flex items-center gap-1.5 ${
@@ -96,7 +97,7 @@ export default function Navbar({ user, actions }: NavbarProps) {
               >
                 <span className="text-base">{item.icon}</span>
                 <span className="hidden xl:inline">{item.label}</span>
-              </a>
+              </Link>
             ))}
           </nav>
 
@@ -135,7 +136,7 @@ export default function Navbar({ user, actions }: NavbarProps) {
           
           <div className="flex flex-col gap-1">
             {navItems.map((item) => (
-              <a 
+              <Link 
                 key={item.key}
                 href={item.href} 
                 className={`w-full text-left px-4 py-3 rounded-lg font-medium transition-colors min-h-[44px] flex items-center gap-3 ${
@@ -147,7 +148,7 @@ export default function Navbar({ user, actions }: NavbarProps) {
               >
                 <span className="text-lg">{item.icon}</span>
                 <span>{item.label}</span>
-              </a>
+              </Link>
             ))}
           </div>
         </div>
