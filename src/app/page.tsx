@@ -4,57 +4,84 @@ import {
   Button, 
   Card, 
   CardBody,
-  CardHeader,
   Chip,
-  Divider,
-  Avatar,
-  Progress,
+  Skeleton,
+  Modal,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
   Input,
-  Tabs,
-  Tab,
-  Skeleton
+  Textarea,
+  Select,
+  SelectItem,
+  useDisclosure,
 } from "@heroui/react";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { createClient } from '@/lib/supabase/client'
 import Navbar from '@/components/Navbar'
-import { showErrorToast } from '@/lib/errors'
+import { showErrorToast, showSuccessToast } from '@/lib/errors'
 import { ErrorFallback } from '@/components/ErrorBoundary'
 
 interface UserData {
+  id: string
   email: string
   name?: string
   avatar_url?: string
   role?: string
 }
 
-interface DashboardStats {
-  totalTasks: number
-  completedTasks: number
-  contentPipeline: number
-  readyToPost: number
-  aiAgents: number
-  recentTasks: Array<{
-    id: string
-    title: string
-    assignee: string
-    status: string
-    priority: string
-  }>
+interface Business {
+  id: string
+  name: string
+  color: string
 }
+
+interface Task {
+  id: string
+  title: string
+  description: string | null
+  status: string
+  priority: string
+  business_id: string | null
+  due_date: string | null
+  business?: Business | null
+}
+
+type FilterType = 'all' | 'personal' | 'business'
+
+const priorityOptions = [
+  { key: 'critical', label: 'Critical' },
+  { key: 'high', label: 'High' },
+  { key: 'medium', label: 'Medium' },
+  { key: 'low', label: 'Low' },
+]
 
 export default function Home() {
   const [user, setUser] = useState<UserData | null>(null);
-  const [stats, setStats] = useState<DashboardStats>({
-    totalTasks: 0,
-    completedTasks: 0,
-    contentPipeline: 0,
-    readyToPost: 0,
-    aiAgents: 1,
-    recentTasks: []
-  });
+  const [todaysTasks, setTodaysTasks] = useState<Task[]>([]);
+  const [businesses, setBusinesses] = useState<Business[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
+  const [filter, setFilter] = useState<FilterType>('all');
+  const [selectedBusiness, setSelectedBusiness] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+  
+  const { isOpen, onOpen, onClose } = useDisclosure();
+  const [formData, setFormData] = useState({
+    title: '',
+    description: '',
+    priority: 'medium',
+    business_id: '',
+  });
+  
   const supabase = createClient();
+
+  // Get today's date in YYYY-MM-DD format
+  const getTodayString = () => {
+    const today = new Date();
+    return today.toISOString().split('T')[0];
+  };
 
   async function loadData() {
     setLoading(true);
@@ -66,22 +93,18 @@ export default function Home() {
       
       if (authError) {
         console.error('Auth error:', authError);
-        // Non-fatal - user might not be logged in
       }
       
       if (authUser) {
         try {
-          const { data: profile, error: profileError } = await supabase
+          const { data: profile } = await supabase
             .from('users')
             .select('*')
             .eq('id', authUser.id)
             .single();
           
-          if (profileError) {
-            console.error('Profile fetch error:', profileError);
-          }
-          
           setUser({
+            id: authUser.id,
             email: authUser.email || '',
             name: profile?.name || authUser.user_metadata?.name || authUser.email?.split('@')[0],
             avatar_url: profile?.avatar_url,
@@ -89,75 +112,58 @@ export default function Home() {
           });
         } catch (err) {
           console.error('Failed to fetch profile:', err);
-          // Set basic user info even if profile fails
           setUser({
+            id: authUser.id,
             email: authUser.email || '',
             name: authUser.user_metadata?.name || authUser.email?.split('@')[0],
           });
         }
       }
 
-      // Get task stats
-      const { data: tasks, error: tasksError } = await supabase.from('tasks').select('*');
+      // Load businesses
+      const { data: businessData, error: businessError } = await supabase
+        .from('businesses')
+        .select('id, name, color');
+      
+      if (businessError) {
+        console.error('Businesses fetch error:', businessError);
+      } else {
+        setBusinesses(businessData || []);
+      }
+
+      // Load today's tasks (due today and not done)
+      const todayStr = getTodayString();
+      const { data: tasksData, error: tasksError } = await supabase
+        .from('tasks')
+        .select(`
+          id,
+          title,
+          description,
+          status,
+          priority,
+          business_id,
+          due_date,
+          businesses (
+            id,
+            name,
+            color
+          )
+        `)
+        .gte('due_date', `${todayStr}T00:00:00`)
+        .lt('due_date', `${todayStr}T23:59:59.999`)
+        .neq('status', 'done')
+        .order('priority', { ascending: true });
+
       if (tasksError) {
         console.error('Tasks fetch error:', tasksError);
         showErrorToast(tasksError, 'Failed to load tasks');
-      }
-      
-      const { data: content, error: contentError } = await supabase.from('content_items').select('*');
-      if (contentError) {
-        console.error('Content fetch error:', contentError);
-      }
-      
-      const { data: agents, error: agentsError } = await supabase.from('ai_agents').select('*').eq('is_active', true);
-      if (agentsError) {
-        console.error('Agents fetch error:', agentsError);
-      }
-      
-      const { data: users, error: usersError } = await supabase.from('users').select('id, name, email');
-      if (usersError) {
-        console.error('Users fetch error:', usersError);
-      }
-
-      const userMap = new Map(users?.map(u => [u.id, u.name || u.email?.split('@')[0]]) || []);
-
-      if (tasks) {
-        const completedCount = tasks.filter(t => t.status === 'done').length;
-        const recentTasks = tasks.slice(0, 4).map(t => ({
-          id: t.id,
-          title: t.title,
-          assignee: userMap.get(t.assignee_id) || userMap.get(t.created_by) || 'Unassigned',
-          status: t.status === 'in_progress' ? 'In Progress' : 
-                  t.status === 'todo' ? 'Todo' : 
-                  t.status === 'done' ? 'Done' :
-                  t.status === 'review' ? 'Review' : t.status,
-          priority: t.priority
+      } else {
+        // Transform the data to match our interface
+        const transformedTasks = (tasksData || []).map(task => ({
+          ...task,
+          business: task.businesses as unknown as Business | null
         }));
-
-        setStats(prev => ({
-          ...prev,
-          totalTasks: tasks.length,
-          completedTasks: completedCount,
-          recentTasks
-        }));
-      }
-
-      if (content) {
-        const readyCount = content.filter(c => 
-          c.status === 'approved' || c.status === 'scheduled'
-        ).length;
-        setStats(prev => ({
-          ...prev,
-          contentPipeline: content.length,
-          readyToPost: readyCount
-        }));
-      }
-
-      if (agents) {
-        setStats(prev => ({
-          ...prev,
-          aiAgents: agents.length || 1
-        }));
+        setTodaysTasks(transformedTasks);
       }
     } catch (error) {
       console.error('Dashboard load error:', error);
@@ -172,6 +178,133 @@ export default function Home() {
     loadData();
   }, []);
 
+  // Filter tasks based on selected filter
+  const filteredTasks = useMemo(() => {
+    let filtered = todaysTasks;
+
+    if (filter === 'personal') {
+      filtered = filtered.filter(t => !t.business_id);
+    } else if (filter === 'business') {
+      if (selectedBusiness) {
+        filtered = filtered.filter(t => t.business_id === selectedBusiness);
+      } else {
+        filtered = filtered.filter(t => t.business_id !== null);
+      }
+    }
+
+    return filtered;
+  }, [todaysTasks, filter, selectedBusiness]);
+
+  // Toggle task completion
+  async function toggleTaskDone(taskId: string) {
+    try {
+      const { error } = await supabase
+        .from('tasks')
+        .update({ status: 'done' })
+        .eq('id', taskId);
+
+      if (error) throw error;
+
+      // Remove from list
+      setTodaysTasks(prev => prev.filter(t => t.id !== taskId));
+      showSuccessToast('Task completed!');
+    } catch (error) {
+      console.error('Toggle task error:', error);
+      showErrorToast(error, 'Failed to update task');
+    }
+  }
+
+  // Quick add task
+  async function handleQuickAdd() {
+    if (!user) {
+      showErrorToast(null, 'Please sign in to add tasks');
+      return;
+    }
+
+    if (!formData.title.trim()) {
+      showErrorToast(null, 'Please enter a task title');
+      return;
+    }
+
+    setSubmitting(true);
+
+    try {
+      const todayStr = getTodayString();
+      const { error } = await supabase
+        .from('tasks')
+        .insert({
+          title: formData.title,
+          description: formData.description || null,
+          priority: formData.priority,
+          business_id: formData.business_id || null,
+          status: 'todo',
+          due_date: `${todayStr}T12:00:00`,
+          created_by: user.id,
+        });
+
+      if (error) throw error;
+
+      showSuccessToast('Task added!');
+      handleCloseModal();
+      loadData();
+    } catch (error) {
+      console.error('Add task error:', error);
+      showErrorToast(error, 'Failed to add task');
+    } finally {
+      setSubmitting(false);
+    }
+  }
+
+  function handleCloseModal() {
+    setFormData({
+      title: '',
+      description: '',
+      priority: 'medium',
+      business_id: '',
+    });
+    onClose();
+  }
+
+  // Get priority color
+  const getPriorityColor = (priority: string) => {
+    switch (priority) {
+      case 'critical': return 'bg-red-500';
+      case 'high': return 'bg-orange-500';
+      case 'medium': return 'bg-yellow-500';
+      case 'low': return 'bg-slate-400';
+      default: return 'bg-slate-400';
+    }
+  };
+
+  // Get context badge for a task
+  const getContextBadge = (task: Task) => {
+    if (task.business && task.business_id) {
+      return (
+        <Chip 
+          size="sm" 
+          variant="flat"
+          style={{ 
+            backgroundColor: `${task.business.color}20`,
+            color: task.business.color,
+            borderColor: task.business.color,
+          }}
+          className="border"
+        >
+          🏢 {task.business.name}
+        </Chip>
+      );
+    }
+    return (
+      <Chip 
+        size="sm" 
+        variant="flat"
+        className="bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300"
+      >
+        👤 Personal
+      </Chip>
+    );
+  };
+
   if (loadError && !loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
@@ -181,310 +314,261 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-background">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
       <Navbar user={user} />
 
-      {/* Main Content */}
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6 sm:py-8">
-        
-        {/* Stats Row */}
+      <main className="max-w-2xl mx-auto px-4 py-6">
+        {/* Header */}
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
+            Today
+          </h1>
+          <p className="text-slate-500 dark:text-slate-400 text-sm">
+            {new Date().toLocaleDateString('en-US', { 
+              weekday: 'long', 
+              month: 'long', 
+              day: 'numeric' 
+            })}
+          </p>
+        </div>
+
+        {/* Task List */}
         {loading ? (
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-            {[1, 2, 3, 4].map((i) => (
-              <Card key={i} className="bg-white shadow-sm border-0">
-                <CardBody className="p-5">
-                  <Skeleton className="w-20 h-4 rounded mb-2" />
-                  <Skeleton className="w-16 h-8 rounded mb-2" />
-                  <Skeleton className="w-32 h-3 rounded" />
+          <div className="space-y-3">
+            {[1, 2, 3].map((i) => (
+              <Card key={i} className="bg-white dark:bg-slate-800 shadow-sm">
+                <CardBody className="p-4">
+                  <div className="flex items-center gap-3">
+                    <Skeleton className="w-6 h-6 rounded" />
+                    <div className="flex-1">
+                      <Skeleton className="w-3/4 h-5 rounded mb-2" />
+                      <Skeleton className="w-24 h-5 rounded" />
+                    </div>
+                  </div>
                 </CardBody>
               </Card>
             ))}
           </div>
         ) : (
-        <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
-          <Card className="bg-white shadow-sm border-0 hover:shadow-md transition-shadow">
-            <CardBody className="p-5">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-slate-500 text-sm font-medium">Tasks</span>
-                {stats.totalTasks > 0 && (
-                  <Chip size="sm" className="bg-emerald-100 text-emerald-700 font-medium">
-                    {stats.completedTasks} done
-                  </Chip>
-                )}
-              </div>
-              <p className="text-3xl font-bold text-slate-800">{stats.totalTasks}</p>
-              <p className="text-slate-400 text-sm mt-1">
-                {stats.totalTasks === 0 ? 'No tasks yet' : `${stats.completedTasks} completed`}
-              </p>
-            </CardBody>
-          </Card>
+          <>
+            {/* Task Cards */}
+            <div className="space-y-2 mb-6">
+              {filteredTasks.length === 0 ? (
+                <Card className="bg-white dark:bg-slate-800 shadow-sm">
+                  <CardBody className="p-8 text-center">
+                    <div className="text-4xl mb-3">✨</div>
+                    <p className="text-slate-600 dark:text-slate-400 font-medium">
+                      {filter === 'all' 
+                        ? "No tasks due today" 
+                        : filter === 'personal'
+                        ? "No personal tasks due today"
+                        : "No business tasks due today"}
+                    </p>
+                    <p className="text-slate-400 dark:text-slate-500 text-sm mt-1">
+                      Add a task to get started
+                    </p>
+                  </CardBody>
+                </Card>
+              ) : (
+                filteredTasks.map((task) => (
+                  <Card 
+                    key={task.id} 
+                    className="bg-white dark:bg-slate-800 shadow-sm hover:shadow-md transition-shadow"
+                  >
+                    <CardBody className="p-4">
+                      <div className="flex items-start gap-3">
+                        {/* Checkbox */}
+                        <button
+                          onClick={() => toggleTaskDone(task.id)}
+                          className="mt-0.5 w-6 h-6 rounded-full border-2 border-slate-300 dark:border-slate-600 hover:border-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 transition-colors flex items-center justify-center flex-shrink-0"
+                          aria-label="Complete task"
+                        >
+                          <svg 
+                            className="w-3 h-3 text-transparent hover:text-emerald-500" 
+                            fill="none" 
+                            stroke="currentColor" 
+                            viewBox="0 0 24 24"
+                          >
+                            <path 
+                              strokeLinecap="round" 
+                              strokeLinejoin="round" 
+                              strokeWidth={3} 
+                              d="M5 13l4 4L19 7" 
+                            />
+                          </svg>
+                        </button>
 
-          <Card className="bg-white shadow-sm border-0 hover:shadow-md transition-shadow">
-            <CardBody className="p-5">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-slate-500 text-sm font-medium">Content Pipeline</span>
-                {stats.readyToPost > 0 && (
-                  <Chip size="sm" className="bg-blue-100 text-blue-700 font-medium">
-                    {stats.readyToPost} ready
-                  </Chip>
-                )}
-              </div>
-              <p className="text-3xl font-bold text-slate-800">{stats.contentPipeline}</p>
-              <p className="text-slate-400 text-sm mt-1">
-                {stats.contentPipeline === 0 ? 'No content yet' : `${stats.readyToPost} ready to post`}
-              </p>
-            </CardBody>
-          </Card>
-
-          <Card className="bg-white shadow-sm border-0 hover:shadow-md transition-shadow">
-            <CardBody className="p-5">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-slate-500 text-sm font-medium">Businesses</span>
-                <Chip size="sm" className="bg-purple-100 text-purple-700 font-medium">Active</Chip>
-              </div>
-              <p className="text-3xl font-bold text-slate-800">1</p>
-              <p className="text-slate-400 text-sm mt-1">Christian Content</p>
-            </CardBody>
-          </Card>
-
-          <Card className="bg-white shadow-sm border-0 hover:shadow-md transition-shadow">
-            <CardBody className="p-5">
-              <div className="flex items-center justify-between mb-2">
-                <span className="text-slate-500 text-sm font-medium">AI Agents</span>
-                <Chip size="sm" className="bg-emerald-100 text-emerald-700 font-medium">Online</Chip>
-              </div>
-              <p className="text-3xl font-bold text-slate-800">{stats.aiAgents}</p>
-              <p className="text-slate-400 text-sm mt-1">Ax (Umbrella CEO)</p>
-            </CardBody>
-          </Card>
-        </div>
-        )}
-
-        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          
-          {/* Left Column - Tasks & AI */}
-          <div className="lg:col-span-2 space-y-6">
-            
-            {/* Task Completion Card */}
-            <Card className="bg-white shadow-sm border-0">
-              <CardBody className="p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-semibold text-slate-800">Task Completion Rate</h3>
-                  <a href="/tasks" className="text-slate-400 hover:text-violet-600">→</a>
-                </div>
-                <div className="flex items-center gap-4 mb-3">
-                  <span className="text-4xl font-bold text-slate-800">
-                    {stats.totalTasks > 0 ? Math.round((stats.completedTasks / stats.totalTasks) * 100) : 0}%
-                  </span>
-                  <div className="flex -space-x-2">
-                    {user && <Avatar name={user.name} size="sm" className="ring-2 ring-white" />}
-                  </div>
-                </div>
-                <div className="flex gap-1 mb-2">
-                  {[...Array(Math.min(20, Math.max(stats.totalTasks, 1)))].map((_, i) => (
-                    <div 
-                      key={i} 
-                      className={`w-3 h-3 rounded-full ${
-                        stats.totalTasks > 0 && i < Math.round((stats.completedTasks / stats.totalTasks) * Math.min(20, stats.totalTasks))
-                          ? 'bg-emerald-400' 
-                          : 'bg-slate-200'
-                      }`}
-                    />
-                  ))}
-                </div>
-                <p className="text-slate-400 text-sm">
-                  {stats.totalTasks === 0 
-                    ? 'Create your first task to get started' 
-                    : `${stats.completedTasks} of ${stats.totalTasks} tasks completed`}
-                </p>
-              </CardBody>
-            </Card>
-
-            {/* Recent Tasks */}
-            <Card className="bg-white shadow-sm border-0">
-              <CardHeader className="px-6 pt-6 pb-0">
-                <div className="flex items-center justify-between w-full">
-                  <h3 className="font-semibold text-slate-800">Recent Tasks</h3>
-                  <a href="/tasks" className="text-sm text-violet-600 hover:text-violet-700 font-medium">
-                    View all →
-                  </a>
-                </div>
-              </CardHeader>
-              <CardBody className="px-6 pb-6">
-                <div className="space-y-3 mt-4">
-                  {stats.recentTasks.length === 0 ? (
-                    <p className="text-slate-400 text-center py-4">No tasks yet. Create your first task!</p>
-                  ) : (
-                    stats.recentTasks.map((task) => (
-                      <div key={task.id} className="flex items-center justify-between p-4 rounded-xl bg-slate-50/50 hover:bg-slate-100/50 transition-colors">
-                        <div className="flex items-center gap-4">
-                          <div className={`w-2 h-2 rounded-full ${
-                            task.priority === 'high' || task.priority === 'critical' ? 'bg-rose-400' : 
-                            task.priority === 'medium' ? 'bg-amber-400' : 'bg-slate-300'
-                          }`} />
-                          <div>
-                            <p className="font-medium text-slate-700">{task.title}</p>
-                            <p className="text-sm text-slate-400">Assigned to {task.assignee}</p>
+                        {/* Task Content */}
+                        <div className="flex-1 min-w-0">
+                          <div className="flex items-start justify-between gap-2 mb-1">
+                            <div className="flex items-center gap-2">
+                              <div className={`w-2 h-2 rounded-full flex-shrink-0 ${getPriorityColor(task.priority)}`} />
+                              <h3 className="font-medium text-slate-900 dark:text-slate-100 truncate">
+                                {task.title}
+                              </h3>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-2 flex-wrap">
+                            {getContextBadge(task)}
                           </div>
                         </div>
-                        <Chip 
-                          size="sm" 
-                          variant="flat"
-                          className={
-                            task.status === 'In Progress' ? 'bg-blue-100 text-blue-700' :
-                            task.status === 'Done' ? 'bg-emerald-100 text-emerald-700' :
-                            task.status === 'Review' ? 'bg-purple-100 text-purple-700' :
-                            'bg-slate-100 text-slate-600'
-                          }
-                        >
-                          {task.status}
-                        </Chip>
                       </div>
-                    ))
-                  )}
-                </div>
-                <Button 
-                  as="a"
-                  href="/tasks"
-                  className="w-full mt-4 bg-emerald-500 text-white font-medium min-h-[44px]"
-                >
-                  + Add New Task
-                </Button>
-              </CardBody>
-            </Card>
-          </div>
+                    </CardBody>
+                  </Card>
+                ))
+              )}
+            </div>
 
-          {/* Right Column - AI Assistant & Widgets */}
-          <div className="space-y-6">
-            
-            {/* AI Assistant Card */}
-            <Card className="bg-content1 shadow-sm border-0">
-              <CardBody className="p-6">
-                <div className="flex items-center gap-3 mb-4">
-                  <div className="w-10 h-10 rounded-xl bg-violet-600 flex items-center justify-center">
-                    <span className="text-white text-lg">⚡</span>
-                  </div>
-                  <div>
-                    <h3 className="font-semibold text-slate-800">How can I help you?</h3>
-                    <p className="text-xs text-slate-400">Ax • Online</p>
-                  </div>
-                  <span className="ml-auto text-slate-400">↗</span>
-                </div>
-                
-                <div className="grid grid-cols-2 gap-3 mb-4">
-                  {[
-                    { icon: "📋", label: "Prioritize Tasks", color: "bg-amber-50 dark:bg-amber-900/30" },
-                    { icon: "✍️", label: "Write Script", color: "bg-emerald-50 dark:bg-emerald-900/30" },
-                    { icon: "🔍", label: "Research Topic", color: "bg-blue-50 dark:bg-blue-900/30" },
-                    { icon: "📊", label: "Run Analysis", color: "bg-purple-50 dark:bg-purple-900/30" },
-                  ].map((action, i) => (
-                    <button 
-                      key={i}
-                      className={`${action.color} p-3 rounded-xl text-left hover:scale-[1.02] transition-transform min-h-[44px]`}
-                    >
-                      <span className="text-lg mb-1 block">{action.icon}</span>
-                      <span className="text-sm font-medium text-foreground">{action.label}</span>
-                    </button>
-                  ))}
-                </div>
-
-                <Input
-                  placeholder="Ask something..."
-                  variant="flat"
-                  classNames={{
-                    input: "bg-white",
-                    inputWrapper: "bg-white shadow-sm"
-                  }}
-                  endContent={
-                    <Button isIconOnly size="sm" variant="light" className="text-violet-500">
-                      <svg className="w-4 h-4" fill="currentColor" viewBox="0 0 20 20">
-                        <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.428a1 1 0 001.17-1.408l-7-14z" />
-                      </svg>
-                    </Button>
-                  }
-                />
-              </CardBody>
-            </Card>
-
-            {/* Content Pipeline Widget */}
-            <Card className="bg-white shadow-sm border-0">
-              <CardBody className="p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-semibold text-slate-800">Content Pipeline</h3>
-                  <span className="text-slate-400">→</span>
-                </div>
-                <div className="space-y-3">
-                  {[
-                    { stage: "Ideas", count: 8, color: "bg-slate-200" },
-                    { stage: "Script", count: 3, color: "bg-blue-400" },
-                    { stage: "Review", count: 2, color: "bg-amber-400" },
-                    { stage: "Ready", count: 4, color: "bg-emerald-400" },
-                  ].map((item, i) => (
-                    <div key={i} className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className={`w-3 h-3 rounded-full ${item.color}`} />
-                        <span className="text-slate-600">{item.stage}</span>
-                      </div>
-                      <span className="font-semibold text-slate-800">{item.count}</span>
-                    </div>
-                  ))}
-                </div>
-                <Divider className="my-4" />
-                <div className="flex gap-2">
-                  <Progress 
-                    value={47} 
-                    className="flex-1"
-                    classNames={{
-                      indicator: "bg-gradient-to-r from-emerald-400 to-teal-400"
-                    }}
-                  />
-                </div>
-                <p className="text-xs text-slate-400 mt-2">47% of pipeline ready to publish</p>
-              </CardBody>
-            </Card>
-
-            {/* AI Activity */}
-            <Card className="bg-white shadow-sm border-0">
-              <CardBody className="p-6">
-                <div className="flex items-center justify-between mb-4">
-                  <h3 className="font-semibold text-slate-800">AI Activity</h3>
-                  <Chip size="sm" className="bg-emerald-100 text-emerald-700">Live</Chip>
-                </div>
-                <div className="space-y-3">
-                  {[
-                    { action: "Deployed Command Center", time: "2m ago", icon: "🚀" },
-                    { action: "Reviewed project spec", time: "15m ago", icon: "📝" },
-                    { action: "Updated memory files", time: "1h ago", icon: "🧠" },
-                  ].map((activity, i) => (
-                    <div key={i} className="flex items-center gap-3 text-sm">
-                      <span>{activity.icon}</span>
-                      <span className="text-slate-600 flex-1">{activity.action}</span>
-                      <span className="text-slate-400">{activity.time}</span>
-                    </div>
-                  ))}
-                </div>
-              </CardBody>
-            </Card>
-
-          </div>
-        </div>
+            {/* Filter Buttons */}
+            <div className="flex gap-2 flex-wrap">
+              <Button
+                size="sm"
+                variant={filter === 'all' ? 'solid' : 'flat'}
+                color={filter === 'all' ? 'primary' : 'default'}
+                onPress={() => {
+                  setFilter('all');
+                  setSelectedBusiness(null);
+                }}
+                className="font-medium"
+              >
+                All ({todaysTasks.length})
+              </Button>
+              <Button
+                size="sm"
+                variant={filter === 'personal' ? 'solid' : 'flat'}
+                color={filter === 'personal' ? 'primary' : 'default'}
+                onPress={() => {
+                  setFilter('personal');
+                  setSelectedBusiness(null);
+                }}
+                className="font-medium"
+              >
+                👤 Personal ({todaysTasks.filter(t => !t.business_id).length})
+              </Button>
+              <Button
+                size="sm"
+                variant={filter === 'business' && !selectedBusiness ? 'solid' : 'flat'}
+                color={filter === 'business' && !selectedBusiness ? 'primary' : 'default'}
+                onPress={() => {
+                  setFilter('business');
+                  setSelectedBusiness(null);
+                }}
+                className="font-medium"
+              >
+                🏢 Business ({todaysTasks.filter(t => t.business_id).length})
+              </Button>
+              
+              {/* Individual business filters */}
+              {filter === 'business' && businesses.length > 1 && (
+                <>
+                  {businesses.map(biz => {
+                    const count = todaysTasks.filter(t => t.business_id === biz.id).length;
+                    return (
+                      <Button
+                        key={biz.id}
+                        size="sm"
+                        variant={selectedBusiness === biz.id ? 'solid' : 'flat'}
+                        style={selectedBusiness === biz.id ? {
+                          backgroundColor: biz.color,
+                          color: 'white',
+                        } : {
+                          borderColor: biz.color,
+                          color: biz.color,
+                        }}
+                        className={selectedBusiness !== biz.id ? 'border' : ''}
+                        onPress={() => setSelectedBusiness(biz.id)}
+                      >
+                        {biz.name} ({count})
+                      </Button>
+                    );
+                  })}
+                </>
+              )}
+            </div>
+          </>
+        )}
       </main>
 
       {/* Floating Quick Add Button */}
       <div className="fixed bottom-6 right-6 z-50">
         <Button
-          as="a"
-          href="/tasks"
           color="primary"
           size="lg"
-          className="rounded-full w-14 h-14 min-w-[56px] min-h-[56px] shadow-lg transition-all"
+          className="rounded-full w-14 h-14 min-w-[56px] min-h-[56px] shadow-lg"
           isIconOnly
+          onPress={onOpen}
+          aria-label="Add task"
         >
           <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
           </svg>
         </Button>
       </div>
+
+      {/* Quick Add Modal */}
+      <Modal isOpen={isOpen} onClose={handleCloseModal} size="lg">
+        <ModalContent>
+          <ModalHeader className="text-lg font-semibold">
+            Quick Add Task
+          </ModalHeader>
+          <ModalBody>
+            <div className="flex flex-col gap-4">
+              <Input
+                label="What needs to be done?"
+                placeholder="Task title"
+                value={formData.title}
+                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                autoFocus
+                isRequired
+              />
+              <Textarea
+                label="Description (optional)"
+                placeholder="Add details..."
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                minRows={2}
+              />
+              <div className="grid grid-cols-2 gap-4">
+                <Select
+                  label="Priority"
+                  selectedKeys={[formData.priority]}
+                  onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
+                >
+                  {priorityOptions.map(p => (
+                    <SelectItem key={p.key}>{p.label}</SelectItem>
+                  ))}
+                </Select>
+                <Select
+                  label="Context"
+                  selectedKeys={formData.business_id ? [formData.business_id] : []}
+                  onChange={(e) => setFormData({ ...formData, business_id: e.target.value })}
+                  placeholder="Personal"
+                >
+                  {businesses.map(biz => (
+                    <SelectItem key={biz.id}>🏢 {biz.name}</SelectItem>
+                  ))}
+                </Select>
+              </div>
+              <p className="text-sm text-slate-500 dark:text-slate-400">
+                Task will be due today
+              </p>
+            </div>
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="flat" onPress={handleCloseModal}>
+              Cancel
+            </Button>
+            <Button 
+              color="primary" 
+              onPress={handleQuickAdd}
+              isDisabled={!formData.title.trim()}
+              isLoading={submitting}
+            >
+              Add Task
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
     </div>
   );
 }

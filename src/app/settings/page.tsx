@@ -12,11 +12,16 @@ import {
   Spinner,
   RadioGroup,
   Radio,
+  useDisclosure,
 } from "@heroui/react"
-import { SunIcon, MoonIcon, ComputerDesktopIcon } from '@heroicons/react/24/outline'
+import { SunIcon, MoonIcon, ComputerDesktopIcon, PencilIcon, TrashIcon, PlusIcon } from '@heroicons/react/24/outline'
 import { createClient } from '@/lib/supabase/client'
 import Navbar from '@/components/Navbar'
 import { showErrorToast, showSuccessToast } from '@/lib/errors'
+import { useBusiness, Business } from '@/lib/business-context'
+import AddBusinessModal from '@/components/AddBusinessModal'
+import EditBusinessModal from '@/components/EditBusinessModal'
+import DeleteBusinessModal from '@/components/DeleteBusinessModal'
 
 interface UserData {
   id: string
