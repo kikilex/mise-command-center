@@ -16,7 +16,7 @@ import {
   ModalFooter,
 } from "@heroui/react"
 import { createClient } from '@/lib/supabase/client'
-import UserMenu from '@/components/UserMenu'
+import Navbar from '@/components/Navbar'
 import { showErrorToast, showSuccessToast, getErrorMessage } from '@/lib/errors'
 import { ErrorFallback } from '@/components/ErrorBoundary'
 
@@ -182,25 +182,7 @@ export default function BusinessHubPage() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-purple-50/30">
-      {/* Header */}
-      <header className="bg-white/80 backdrop-blur-sm border-b border-slate-100 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6">
-          <div className="flex items-center justify-between h-16">
-            <div className="flex items-center gap-3">
-              <a href="/" className="flex items-center gap-2">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
-                  <span className="text-white font-bold text-lg">M</span>
-                </div>
-                <span className="font-semibold text-slate-800 text-lg">Mise Command Center</span>
-              </a>
-            </div>
-            <h1 className="text-xl font-semibold text-slate-800">Business Hub</h1>
-            <div className="flex items-center gap-2">
-              {user && <UserMenu user={user} />}
-            </div>
-          </div>
-        </div>
-      </header>
+      <Navbar user={user} />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
         <h2 className="text-2xl font-bold text-slate-800 mb-6">Sales Overview</h2>
