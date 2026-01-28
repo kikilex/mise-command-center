@@ -177,8 +177,8 @@ export default function Home() {
               <a href="#" className="px-4 py-2 text-sm font-medium rounded-lg text-slate-600 hover:bg-white/50 transition-colors">
                 Businesses
               </a>
-              <a href="#" className="px-4 py-2 text-sm font-medium rounded-lg text-slate-600 hover:bg-white/50 transition-colors">
-                Analytics
+              <a href="/ai" className="px-4 py-2 text-sm font-medium rounded-lg text-slate-600 hover:bg-white/50 transition-colors">
+                AI Workspace
               </a>
             </nav>
 
@@ -217,8 +217,8 @@ export default function Home() {
               <a href="#" className="w-full text-left px-4 py-3 rounded-lg text-slate-700 hover:bg-violet-50 hover:text-violet-600 font-medium transition-colors">
                 Businesses
               </a>
-              <a href="#" className="w-full text-left px-4 py-3 rounded-lg text-slate-700 hover:bg-violet-50 hover:text-violet-600 font-medium transition-colors">
-                Analytics
+              <a href="/ai" className="w-full text-left px-4 py-3 rounded-lg text-slate-700 hover:bg-violet-50 hover:text-violet-600 font-medium transition-colors">
+                AI Workspace
               </a>
             </div>
           </div>
