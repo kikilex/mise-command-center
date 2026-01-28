@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useTheme } from 'next-themes'
 import {
   Button,
   Card,
@@ -9,7 +10,10 @@ import {
   Checkbox,
   Divider,
   Spinner,
+  RadioGroup,
+  Radio,
 } from "@heroui/react"
+import { SunIcon, MoonIcon, ComputerDesktopIcon } from '@heroicons/react/24/outline'
 import { createClient } from '@/lib/supabase/client'
 import Navbar from '@/components/Navbar'
 import { showErrorToast, showSuccessToast } from '@/lib/errors'
@@ -20,6 +24,8 @@ interface UserData {
   name?: string
   avatar_url?: string
 }
+
+type ThemeValue = 'light' | 'dark' | 'system'
 
 interface ReminderSettings {
   high: {
@@ -53,9 +59,16 @@ export default function SettingsPage() {
   const [user, setUser] = useState<UserData | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [savingTheme, setSavingTheme] = useState(false)
   const [reminderSettings, setReminderSettings] = useState<ReminderSettings>(DEFAULT_REMINDER_SETTINGS)
-
+  const [mounted, setMounted] = useState(false)
+  
+  const { theme, setTheme } = useTheme()
   const supabase = createClient()
+
+  useEffect(() => {
+    setMounted(true)
+  }, [])
 
   useEffect(() => {
     loadUserAndSettings()
@@ -96,6 +109,11 @@ export default function SettingsPage() {
           ...DEFAULT_REMINDER_SETTINGS,
           ...profile.settings.reminders,
         })
+      }
+
+      // Load theme setting from profile.settings.theme
+      if (profile?.settings?.theme) {
+        setTheme(profile.settings.theme)
       }
     } catch (error) {
       console.error('Load settings error:', error)

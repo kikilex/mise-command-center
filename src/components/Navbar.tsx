@@ -26,6 +26,7 @@ const navItems = [
   { href: '/calendar', label: 'Calendar' },
   { href: '/business', label: 'Business' },
   { href: '/ai', label: 'AI Workspace' },
+  { href: '/family', label: 'Family' },
   { href: '/settings', label: 'Settings' },
 ]
 

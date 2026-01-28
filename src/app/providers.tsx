@@ -11,8 +11,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <NextThemesProvider
       attribute="class"
-      defaultTheme="light"
-      enableSystem={false}
+      defaultTheme="dark"
+      enableSystem={true}
+      storageKey="mise-theme"
     >
       <HeroUIProvider navigate={router.push}>
         <BusinessProvider>

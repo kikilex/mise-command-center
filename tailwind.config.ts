@@ -13,7 +13,7 @@ export default {
   },
   darkMode: "class",
   plugins: [heroui({
-    defaultTheme: "light",
+    defaultTheme: "dark",
     themes: {
       light: {
         colors: {
@@ -35,6 +35,30 @@ export default {
           },
           secondary: {
             DEFAULT: "#8b5cf6",
+            foreground: "#ffffff",
+          },
+        },
+      },
+      dark: {
+        colors: {
+          background: "#0f172a",
+          foreground: "#f1f5f9",
+          primary: {
+            50: "#14532d",
+            100: "#166534",
+            200: "#15803d",
+            300: "#16a34a",
+            400: "#22c55e",
+            500: "#4ade80",
+            600: "#86efac",
+            700: "#bbf7d0",
+            800: "#dcfce7",
+            900: "#f0fdf4",
+            DEFAULT: "#22c55e",
+            foreground: "#ffffff",
+          },
+          secondary: {
+            DEFAULT: "#a78bfa",
             foreground: "#ffffff",
           },
         },
