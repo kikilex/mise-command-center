@@ -64,7 +64,7 @@ export default function UserMenu({ user }: UserMenuProps) {
           <p className="font-semibold">{user.name || 'User'}</p>
           <p className="text-sm text-slate-500">{user.email}</p>
         </DropdownItem>
-        <DropdownItem key="settings" textValue="settings">
+        <DropdownItem key="settings" textValue="settings" href="/settings">
           Settings
         </DropdownItem>
         <DropdownItem 

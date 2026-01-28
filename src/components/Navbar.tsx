@@ -25,6 +25,7 @@ const navItems = [
   { href: '/calendar', label: 'Calendar' },
   { href: '/business', label: 'Business' },
   { href: '/ai', label: 'AI Workspace' },
+  { href: '/settings', label: 'Settings' },
 ]
 
 export default function Navbar({ user, actions }: NavbarProps) {

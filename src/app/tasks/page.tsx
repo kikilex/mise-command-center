@@ -59,6 +59,14 @@ const priorityOptions = [
   { key: 'low', label: 'Low', color: 'bg-slate-400' },
 ]
 
+// Default reminder windows by priority
+const reminderWindowsByPriority: Record<string, string[]> = {
+  critical: ['24h before', '6h before', '1h before'],
+  high: ['24h before', '6h before', '1h before'],
+  medium: ['24h before'],
+  low: ['Morning of due date'],
+}
+
 export default function TasksPage() {
   const [tasks, setTasks] = useState<Task[]>([])
   const [user, setUser] = useState<UserData | null>(null)
@@ -482,6 +490,28 @@ export default function TasksPage() {
                 />
                 <span className="text-sm text-slate-700">🤖 Allow AI to work on this task</span>
               </label>
+              
+              {/* Reminder Preview */}
+              {formData.due_date && (
+                <div className="bg-violet-50 border border-violet-200 rounded-lg p-4">
+                  <div className="flex items-start gap-2">
+                    <span className="text-violet-500">🔔</span>
+                    <div>
+                      <p className="text-sm font-medium text-violet-700 mb-1">
+                        Reminders for this task:
+                      </p>
+                      <ul className="text-sm text-violet-600 list-disc list-inside">
+                        {reminderWindowsByPriority[formData.priority]?.map((window, i) => (
+                          <li key={i}>{window}</li>
+                        ))}
+                      </ul>
+                      <p className="text-xs text-violet-500 mt-2">
+                        Customize in <a href="/settings" className="underline hover:text-violet-700">Settings</a>
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              )}
             </div>
           </ModalBody>
           <ModalFooter>
