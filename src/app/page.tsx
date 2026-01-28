@@ -3,7 +3,7 @@
 import { 
   Button, 
   Card, 
-  CardBody, 
+  CardBody,
   CardHeader,
   Chip,
   Divider,
@@ -53,14 +53,6 @@ export default function Home() {
     getUser();
   }, [supabase]);
 
-  const menuItems = [
-    "Overview",
-    "Tasks",
-    "Content",
-    "Businesses",
-    "Analytics",
-  ];
-
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-purple-50/30">
       {/* Header - Custom responsive navbar */}
@@ -99,25 +91,24 @@ export default function Home() {
               </div>
             </div>
 
-            {/* Center: Desktop navigation tabs */}
-            <div className="hidden md:flex">
-              <Tabs 
-                aria-label="Navigation" 
-                variant="light" 
-                classNames={{
-                  tabList: "gap-2",
-                  tab: "px-4 py-2 text-sm font-medium",
-                  cursor: "bg-white shadow-md",
-                }}
-                defaultSelectedKey="overview"
-              >
-                <Tab key="overview" title="Overview" />
-                <Tab key="tasks" title="Tasks" />
-                <Tab key="content" title="Content" />
-                <Tab key="businesses" title="Businesses" />
-                <Tab key="analytics" title="Analytics" />
-              </Tabs>
-            </div>
+            {/* Center: Desktop navigation */}
+            <nav className="hidden md:flex items-center gap-1 bg-slate-100/50 rounded-xl p-1">
+              <a href="/" className="px-4 py-2 text-sm font-medium rounded-lg bg-white shadow-sm text-slate-800">
+                Overview
+              </a>
+              <a href="/tasks" className="px-4 py-2 text-sm font-medium rounded-lg text-slate-600 hover:bg-white/50 transition-colors">
+                Tasks
+              </a>
+              <a href="#" className="px-4 py-2 text-sm font-medium rounded-lg text-slate-600 hover:bg-white/50 transition-colors">
+                Content
+              </a>
+              <a href="#" className="px-4 py-2 text-sm font-medium rounded-lg text-slate-600 hover:bg-white/50 transition-colors">
+                Businesses
+              </a>
+              <a href="#" className="px-4 py-2 text-sm font-medium rounded-lg text-slate-600 hover:bg-white/50 transition-colors">
+                Analytics
+              </a>
+            </nav>
 
             {/* Right: Notifications + Avatar */}
             <div className="flex items-center gap-2">
@@ -142,15 +133,21 @@ export default function Home() {
         {isMenuOpen && (
           <div className="md:hidden bg-white border-t border-slate-100 py-4 px-4 shadow-lg">
             <div className="flex flex-col gap-2">
-              {menuItems.map((item) => (
-                <button
-                  key={item}
-                  className="w-full text-left px-4 py-3 rounded-lg text-slate-700 hover:bg-violet-50 hover:text-violet-600 font-medium transition-colors"
-                  onClick={() => setIsMenuOpen(false)}
-                >
-                  {item}
-                </button>
-              ))}
+              <a href="/" className="w-full text-left px-4 py-3 rounded-lg text-slate-700 hover:bg-violet-50 hover:text-violet-600 font-medium transition-colors">
+                Overview
+              </a>
+              <a href="/tasks" className="w-full text-left px-4 py-3 rounded-lg text-slate-700 hover:bg-violet-50 hover:text-violet-600 font-medium transition-colors">
+                Tasks
+              </a>
+              <a href="#" className="w-full text-left px-4 py-3 rounded-lg text-slate-700 hover:bg-violet-50 hover:text-violet-600 font-medium transition-colors">
+                Content
+              </a>
+              <a href="#" className="w-full text-left px-4 py-3 rounded-lg text-slate-700 hover:bg-violet-50 hover:text-violet-600 font-medium transition-colors">
+                Businesses
+              </a>
+              <a href="#" className="w-full text-left px-4 py-3 rounded-lg text-slate-700 hover:bg-violet-50 hover:text-violet-600 font-medium transition-colors">
+                Analytics
+              </a>
             </div>
           </div>
         )}
@@ -286,6 +283,8 @@ export default function Home() {
                   ))}
                 </div>
                 <Button 
+                  as="a"
+                  href="/tasks"
                   className="w-full mt-4 bg-gradient-to-r from-emerald-400 to-emerald-500 text-white font-medium shadow-lg shadow-emerald-200"
                 >
                   + Add New Task
