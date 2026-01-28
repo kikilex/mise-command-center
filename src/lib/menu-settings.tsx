@@ -14,21 +14,21 @@ export const DEFAULT_MENU_CONFIG: MenuConfig = {
 }
 
 export const PERSONAL_MENU_OPTIONS = [
-  { key: 'dashboard', label: 'Dashboard', icon: '🏠', href: '/' },
-  { key: 'tasks', label: 'Tasks', icon: '✅', href: '/tasks' },
-  { key: 'projects', label: 'Projects', icon: '📁', href: '/projects' },
-  { key: 'calendar', label: 'Calendar', icon: '📅', href: '/calendar' },
-  { key: 'notes', label: 'Notes', icon: '📝', href: '/notes' },
-  { key: 'family', label: 'Family', icon: '👨‍👩‍👧‍👦', href: '/family' },
+  { key: 'dashboard', label: 'Dashboard', icon: 'dashboard', href: '/' },
+  { key: 'tasks', label: 'Tasks', icon: 'tasks', href: '/tasks' },
+  { key: 'projects', label: 'Projects', icon: 'projects', href: '/projects' },
+  { key: 'calendar', label: 'Calendar', icon: 'calendar', href: '/calendar' },
+  { key: 'notes', label: 'Notes', icon: 'notes', href: '/notes' },
+  { key: 'family', label: 'Family', icon: 'family', href: '/family' },
 ]
 
 export const BUSINESS_MENU_OPTIONS = [
-  { key: 'dashboard', label: 'Dashboard', icon: '🏠', href: '/' },
-  { key: 'tasks', label: 'Tasks', icon: '✅', href: '/tasks' },
-  { key: 'projects', label: 'Projects', icon: '📁', href: '/projects' },
-  { key: 'content', label: 'Content', icon: '🎬', href: '/content' },
-  { key: 'calendar', label: 'Calendar', icon: '📅', href: '/calendar' },
-  { key: 'ai', label: 'AI Workspace', icon: '🤖', href: '/ai' },
+  { key: 'dashboard', label: 'Dashboard', icon: 'dashboard', href: '/' },
+  { key: 'tasks', label: 'Tasks', icon: 'tasks', href: '/tasks' },
+  { key: 'projects', label: 'Projects', icon: 'projects', href: '/projects' },
+  { key: 'content', label: 'Content', icon: 'content', href: '/content' },
+  { key: 'calendar', label: 'Calendar', icon: 'calendar', href: '/calendar' },
+  { key: 'ai', label: 'AI Workspace', icon: 'ai', href: '/ai' },
 ]
 
 interface MenuSettingsContextType {

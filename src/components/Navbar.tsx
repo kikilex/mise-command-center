@@ -8,6 +8,7 @@ import UserMenu from './UserMenu'
 import BusinessSelector from './BusinessSelector'
 import { useBusiness } from '@/lib/business-context'
 import { useMenuSettings } from '@/lib/menu-settings'
+import { navIcons, Menu, X, Bell } from '@/lib/icons'
 
 interface UserData {
   id?: string
@@ -31,7 +32,7 @@ export default function Navbar({ user, actions }: NavbarProps) {
   // Determine if we're in business mode (a business is selected)
   const isBusinessMode = selectedBusiness !== null
 
-  // Get nav items based on current mode from user settings (no settings in nav)
+  // Get nav items based on current mode from user settings
   const navItems = useMemo(() => {
     return getActiveNavItems(isBusinessMode).map(item => ({
       key: item.key,
@@ -48,6 +49,14 @@ export default function Navbar({ user, actions }: NavbarProps) {
     return pathname.startsWith(href)
   }
 
+  const renderIcon = (iconKey: string, className: string = "w-5 h-5") => {
+    const IconComponent = navIcons[iconKey]
+    if (IconComponent) {
+      return <IconComponent className={className} />
+    }
+    return null
+  }
+
   return (
     <header className="bg-background/80 backdrop-blur-sm border-b border-divider sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
@@ -60,13 +69,11 @@ export default function Navbar({ user, actions }: NavbarProps) {
               onClick={() => setIsMenuOpen(!isMenuOpen)}
               aria-label="Toggle menu"
             >
-              <svg className="w-6 h-6 text-default-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                {isMenuOpen ? (
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                ) : (
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-                )}
-              </svg>
+              {isMenuOpen ? (
+                <X className="w-6 h-6 text-default-600" />
+              ) : (
+                <Menu className="w-6 h-6 text-default-600" />
+              )}
             </button>
             
             {/* Brand */}
@@ -89,13 +96,13 @@ export default function Navbar({ user, actions }: NavbarProps) {
               <Link 
                 key={item.key}
                 href={item.href} 
-                className={`px-3 py-2 text-sm font-medium rounded-lg transition-colors whitespace-nowrap min-h-[36px] flex items-center gap-1.5 ${
+                className={`px-3 py-2 text-sm font-medium rounded-lg transition-colors whitespace-nowrap min-h-[36px] flex items-center gap-2 ${
                   isActive(item.href)
                     ? 'bg-background shadow-sm text-foreground'
                     : 'text-default-600 hover:bg-background/50'
                 }`}
               >
-                <span className="text-base">{item.icon}</span>
+                {renderIcon(item.icon, "w-4 h-4")}
                 <span className="hidden xl:inline">{item.label}</span>
               </Link>
             ))}
@@ -108,9 +115,7 @@ export default function Navbar({ user, actions }: NavbarProps) {
             
             {/* Notifications (hidden on small screens) */}
             <Button isIconOnly variant="light" className="hidden sm:flex text-default-500 min-w-[44px] min-h-[44px]">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-              </svg>
+              <Bell className="w-5 h-5" />
             </Button>
             
             {user ? (
@@ -146,7 +151,7 @@ export default function Navbar({ user, actions }: NavbarProps) {
                 }`}
                 onClick={() => setIsMenuOpen(false)}
               >
-                <span className="text-lg">{item.icon}</span>
+                {renderIcon(item.icon, "w-5 h-5")}
                 <span>{item.label}</span>
               </Link>
             ))}

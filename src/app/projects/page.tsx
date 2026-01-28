@@ -26,6 +26,7 @@ import Navbar from '@/components/Navbar'
 import { useBusiness } from '@/lib/business-context'
 import { showErrorToast, showSuccessToast, getErrorMessage } from '@/lib/errors'
 import { ErrorFallback } from '@/components/ErrorBoundary'
+import { Target, Rocket, Megaphone, Folder, Calendar, Plus } from '@/lib/icons'
 
 interface FieldDefinition {
   name: string
@@ -71,6 +72,19 @@ const statusOptions = [
   { key: 'completed', label: 'Completed', color: 'primary' },
   { key: 'archived', label: 'Archived', color: 'default' },
 ]
+
+// Map template names to Lucide icons
+const templateIconMap: Record<string, React.ComponentType<{ className?: string }>> = {
+  'goal': Target,
+  'feature': Rocket,
+  'campaign': Megaphone,
+  'simple': Folder,
+}
+
+function getTemplateIcon(templateName?: string | null) {
+  if (!templateName) return Folder
+  return templateIconMap[templateName.toLowerCase()] || Folder
+}
 
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([])
@@ -313,7 +327,7 @@ export default function ProjectsPage() {
     setFormData(prev => ({
       ...prev,
       template_id: templateId,
-      custom_fields: {}, // Reset custom fields when template changes
+      custom_fields: {},
     }))
   }
 
@@ -447,8 +461,9 @@ export default function ProjectsPage() {
             color="primary" 
             size="sm" 
             onPress={handleNew}
+            startContent={<Plus className="w-4 h-4" />}
           >
-            + New Project
+            New Project
           </Button>
         }
       />
@@ -518,85 +533,91 @@ export default function ProjectsPage() {
         ) : filteredProjects.length === 0 ? (
           <Card className="bg-white">
             <CardBody className="text-center py-12">
-              <div className="text-4xl mb-4">📁</div>
+              <Folder className="w-12 h-12 mx-auto mb-4 text-slate-300" />
               <h3 className="text-lg font-semibold text-slate-800 mb-2">No Projects Yet</h3>
               <p className="text-slate-500 mb-4">
                 Create your first project to start organizing your work.
               </p>
-              <Button color="primary" onPress={handleNew}>
+              <Button color="primary" onPress={handleNew} startContent={<Plus className="w-4 h-4" />}>
                 Create Project
               </Button>
             </CardBody>
           </Card>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredProjects.map(project => (
-              <Card 
-                key={project.id} 
-                className="bg-white hover:shadow-md transition-shadow cursor-pointer"
-                isPressable
-                onPress={() => handleEdit(project)}
-              >
-                <CardBody className="p-4">
-                  <div className="flex items-start justify-between mb-3">
-                    <div className="flex items-center gap-2">
-                      <span className="text-2xl">{project.template?.icon || '📁'}</span>
-                      <div>
-                        <h3 className="font-semibold text-slate-800">{project.name}</h3>
-                        {project.template && (
-                          <span className="text-xs text-slate-500">{project.template.name}</span>
-                        )}
+            {filteredProjects.map(project => {
+              const IconComponent = getTemplateIcon(project.template?.name)
+              return (
+                <Card 
+                  key={project.id} 
+                  className="bg-white hover:shadow-md transition-shadow cursor-pointer"
+                  isPressable
+                  onPress={() => handleEdit(project)}
+                >
+                  <CardBody className="p-4">
+                    <div className="flex items-start justify-between mb-3">
+                      <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-lg bg-primary-50 flex items-center justify-center">
+                          <IconComponent className="w-5 h-5 text-primary-600" />
+                        </div>
+                        <div>
+                          <h3 className="font-semibold text-slate-800">{project.name}</h3>
+                          {project.template && (
+                            <span className="text-xs text-slate-500">{project.template.name}</span>
+                          )}
+                        </div>
                       </div>
+                      <Chip 
+                        size="sm" 
+                        color={statusOptions.find(s => s.key === project.status)?.color as any}
+                        variant="flat"
+                      >
+                        {statusOptions.find(s => s.key === project.status)?.label}
+                      </Chip>
                     </div>
-                    <Chip 
-                      size="sm" 
-                      color={statusOptions.find(s => s.key === project.status)?.color as any}
-                      variant="flat"
-                    >
-                      {statusOptions.find(s => s.key === project.status)?.label}
-                    </Chip>
-                  </div>
-                  
-                  {project.description && (
-                    <p className="text-sm text-slate-600 mb-3 line-clamp-2">{project.description}</p>
-                  )}
-                  
-                  {/* Progress bar for goals */}
-                  {project.custom_fields?.progress !== undefined && (
-                    <div className="mb-3">
-                      <div className="flex justify-between text-xs text-slate-500 mb-1">
-                        <span>Progress</span>
-                        <span>{getProgress(project)}%</span>
+                    
+                    {project.description && (
+                      <p className="text-sm text-slate-600 mb-3 line-clamp-2">{project.description}</p>
+                    )}
+                    
+                    {/* Progress bar for goals */}
+                    {project.custom_fields?.progress !== undefined && (
+                      <div className="mb-3">
+                        <div className="flex justify-between text-xs text-slate-500 mb-1">
+                          <span>Progress</span>
+                          <span>{getProgress(project)}%</span>
+                        </div>
+                        <Progress 
+                          value={getProgress(project)} 
+                          size="sm"
+                          color={getProgress(project) >= 100 ? 'success' : 'primary'}
+                        />
                       </div>
-                      <Progress 
-                        value={getProgress(project)} 
-                        size="sm"
-                        color={getProgress(project) >= 100 ? 'success' : 'primary'}
-                      />
+                    )}
+                    
+                    {/* Custom fields preview */}
+                    <div className="flex flex-wrap gap-2">
+                      {project.custom_fields?.target_date && (
+                        <Chip size="sm" variant="flat" className="bg-blue-50 text-blue-600">
+                          <Calendar className="w-3 h-3 mr-1" />
+                          {new Date(project.custom_fields.target_date).toLocaleDateString()}
+                        </Chip>
+                      )}
+                      {project.custom_fields?.status && (
+                        <Chip size="sm" variant="flat" className="bg-violet-50 text-violet-600">
+                          {project.custom_fields.status}
+                        </Chip>
+                      )}
+                      {project.custom_fields?.priority && (
+                        <Chip size="sm" variant="flat" className="bg-orange-50 text-orange-600">
+                          {project.custom_fields.priority}
+                        </Chip>
+                      )}
                     </div>
-                  )}
-                  
-                  {/* Custom fields preview */}
-                  <div className="flex flex-wrap gap-2">
-                    {project.custom_fields?.target_date && (
-                      <Chip size="sm" variant="flat" className="bg-blue-50 text-blue-600">
-                        🎯 {new Date(project.custom_fields.target_date).toLocaleDateString()}
-                      </Chip>
-                    )}
-                    {project.custom_fields?.status && (
-                      <Chip size="sm" variant="flat" className="bg-violet-50 text-violet-600">
-                        {project.custom_fields.status}
-                      </Chip>
-                    )}
-                    {project.custom_fields?.priority && (
-                      <Chip size="sm" variant="flat" className="bg-orange-50 text-orange-600">
-                        {project.custom_fields.priority}
-                      </Chip>
-                    )}
-                  </div>
-                </CardBody>
-              </Card>
-            ))}
+                  </CardBody>
+                </Card>
+              )
+            })}
           </div>
         )}
       </main>
@@ -609,7 +630,7 @@ export default function ProjectsPage() {
               <span>{editingProject ? 'Edit Project' : 'New Project'}</span>
               {selectedTemplate && (
                 <Chip size="sm" variant="flat">
-                  {selectedTemplate.icon} {selectedTemplate.name}
+                  {selectedTemplate.name}
                 </Chip>
               )}
             </div>
@@ -623,23 +644,26 @@ export default function ProjectsPage() {
                     Project Type
                   </label>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
-                    {templates.map(template => (
-                      <Card
-                        key={template.id}
-                        isPressable
-                        className={`cursor-pointer transition-all ${
-                          formData.template_id === template.id 
-                            ? 'ring-2 ring-primary bg-primary-50' 
-                            : 'hover:bg-slate-50'
-                        }`}
-                        onPress={() => handleTemplateChange(template.id)}
-                      >
-                        <CardBody className="p-3 text-center">
-                          <div className="text-2xl mb-1">{template.icon}</div>
-                          <div className="text-sm font-medium">{template.name}</div>
-                        </CardBody>
-                      </Card>
-                    ))}
+                    {templates.map(template => {
+                      const IconComponent = getTemplateIcon(template.name)
+                      return (
+                        <Card
+                          key={template.id}
+                          isPressable
+                          className={`cursor-pointer transition-all ${
+                            formData.template_id === template.id 
+                              ? 'ring-2 ring-primary bg-primary-50' 
+                              : 'hover:bg-slate-50'
+                          }`}
+                          onPress={() => handleTemplateChange(template.id)}
+                        >
+                          <CardBody className="p-3 text-center">
+                            <IconComponent className="w-6 h-6 mx-auto mb-1 text-slate-600" />
+                            <div className="text-sm font-medium">{template.name}</div>
+                          </CardBody>
+                        </Card>
+                      )
+                    })}
                   </div>
                 </div>
               )}

@@ -25,6 +25,10 @@ import Navbar from '@/components/Navbar'
 import { useBusiness } from '@/lib/business-context'
 import { showErrorToast, showSuccessToast, getErrorMessage } from '@/lib/errors'
 import { ErrorFallback } from '@/components/ErrorBoundary'
+import { 
+  Heart, Cross, BookOpen, ShoppingBag, Zap, FileText, 
+  Plus, ChevronRight, Edit, Video
+} from '@/lib/icons'
 
 type ViewMode = 'board' | 'list'
 
@@ -83,6 +87,25 @@ const pipelineStages = [
   { key: 'scheduled', label: 'Scheduled', color: 'bg-cyan-200', textColor: 'text-cyan-700' },
   { key: 'posted', label: 'Posted', color: 'bg-green-200', textColor: 'text-green-700' },
 ]
+
+// Map template names to Lucide icons
+const contentIconMap: Record<string, React.ComponentType<{ className?: string }>> = {
+  'prayer': Heart,
+  'testimony': Cross,
+  'educational': BookOpen,
+  'promotional': ShoppingBag,
+  'short form': Zap,
+}
+
+function getContentIcon(templateName?: string | null, type?: string | null) {
+  if (templateName) {
+    return contentIconMap[templateName.toLowerCase()] || FileText
+  }
+  if (type) {
+    return contentIconMap[type.toLowerCase()] || FileText
+  }
+  return FileText
+}
 
 export default function ContentPage() {
   const [content, setContent] = useState<ContentItem[]>([])
@@ -177,7 +200,6 @@ export default function ContentPage() {
       
       if (templatesError) {
         console.error('Templates error:', templatesError)
-        // Don't fail completely if templates table doesn't exist yet
       } else {
         setTemplates(templatesData || [])
       }
@@ -222,7 +244,6 @@ export default function ContentPage() {
     setSubmitting(true)
     
     try {
-      // Extract common fields from custom_fields for backward compatibility
       const customFields = formData.custom_fields || {}
       
       if (editingItem) {
@@ -233,7 +254,6 @@ export default function ContentPage() {
             status: formData.status,
             template_id: formData.template_id || null,
             custom_fields: customFields,
-            // Keep legacy fields updated for backward compat
             script: customFields.script || null,
             hook: customFields.hook || null,
             source: customFields.source || null,
@@ -260,7 +280,6 @@ export default function ContentPage() {
             custom_fields: customFields,
             business_id: selectedBusinessId,
             created_by: user.id,
-            // Legacy fields
             script: customFields.script || null,
             hook: customFields.hook || null,
             source: customFields.source || null,
@@ -329,7 +348,6 @@ export default function ContentPage() {
     const template = templates.find(t => t.id === item.template_id) || null
     setSelectedTemplate(template)
     
-    // Merge legacy fields into custom_fields for editing
     const customFields = {
       ...item.custom_fields,
       script: item.custom_fields?.script || item.script || '',
@@ -396,7 +414,6 @@ export default function ContentPage() {
     }))
   }
 
-  // Render dynamic field
   function renderField(field: FieldDefinition) {
     const value = formData.custom_fields[field.name] || ''
     
@@ -514,75 +531,80 @@ export default function ContentPage() {
   }
 
   // Content card component
-  const ContentCard = ({ item, compact = false }: { item: ContentItem; compact?: boolean }) => (
-    <Card className="bg-white shadow-sm cursor-pointer hover:shadow-md transition-shadow">
-      <CardBody className={compact ? "p-3" : "p-4"}>
-        <div className="flex items-start justify-between mb-2">
-          <div className="flex items-center gap-2">
-            <span className="text-lg">{item.template?.icon || '📄'}</span>
-            <Chip size="sm" variant="flat" className="text-xs capitalize">
-              {item.template?.name || item.type}
-            </Chip>
-            {compact && (
-              <Chip 
-                size="sm" 
-                variant="flat" 
-                className={`text-xs ${pipelineStages.find(s => s.key === item.status)?.textColor}`}
-              >
-                {pipelineStages.find(s => s.key === item.status)?.label}
+  const ContentCard = ({ item, compact = false }: { item: ContentItem; compact?: boolean }) => {
+    const IconComponent = getContentIcon(item.template?.name, item.type)
+    return (
+      <Card className="bg-white shadow-sm cursor-pointer hover:shadow-md transition-shadow">
+        <CardBody className={compact ? "p-3" : "p-4"}>
+          <div className="flex items-start justify-between mb-2">
+            <div className="flex items-center gap-2">
+              <div className="w-8 h-8 rounded-lg bg-primary-50 flex items-center justify-center">
+                <IconComponent className="w-4 h-4 text-primary-600" />
+              </div>
+              <Chip size="sm" variant="flat" className="text-xs capitalize">
+                {item.template?.name || item.type}
               </Chip>
+              {compact && (
+                <Chip 
+                  size="sm" 
+                  variant="flat" 
+                  className={`text-xs ${pipelineStages.find(s => s.key === item.status)?.textColor}`}
+                >
+                  {pipelineStages.find(s => s.key === item.status)?.label}
+                </Chip>
+              )}
+            </div>
+            <button 
+              onClick={() => handleEdit(item)}
+              className="text-slate-400 hover:text-slate-600"
+            >
+              <Edit className="w-4 h-4" />
+            </button>
+          </div>
+          <h4 className="font-medium text-slate-800 text-sm mb-2">{item.title}</h4>
+          {(item.custom_fields?.hook || item.hook) && (
+            <p className="text-xs text-slate-500 line-clamp-2 mb-2">"{item.custom_fields?.hook || item.hook}"</p>
+          )}
+          <div className="flex gap-1 mt-2">
+            {item.status === 'script' && (
+              <Button 
+                size="sm" 
+                color="warning" 
+                variant="flat"
+                className="flex-1 text-xs"
+                onPress={() => handleStatusChange(item.id, 'review')}
+              >
+                Send for Review
+              </Button>
+            )}
+            {item.status === 'review' && (
+              <Button 
+                size="sm" 
+                color="success" 
+                variant="flat"
+                className="flex-1 text-xs"
+                onPress={() => handleStatusChange(item.id, 'approved')}
+              >
+                Approve
+              </Button>
+            )}
+            {item.status !== 'script' && item.status !== 'review' && (
+              <Select
+                size="sm"
+                selectedKeys={[item.status]}
+                className="w-full"
+                onChange={(e) => handleStatusChange(item.id, e.target.value)}
+              >
+                {pipelineStages.map(s => (
+                  <SelectItem key={s.key}>{s.label}</SelectItem>
+                ))}
+              </Select>
             )}
           </div>
-          <button 
-            onClick={() => handleEdit(item)}
-            className="text-slate-400 hover:text-slate-600"
-          >
-            ✏️
-          </button>
-        </div>
-        <h4 className="font-medium text-slate-800 text-sm mb-2">{item.title}</h4>
-        {(item.custom_fields?.hook || item.hook) && (
-          <p className="text-xs text-slate-500 line-clamp-2 mb-2">"{item.custom_fields?.hook || item.hook}"</p>
-        )}
-        <div className="flex gap-1 mt-2">
-          {item.status === 'script' && (
-            <Button 
-              size="sm" 
-              color="warning" 
-              variant="flat"
-              className="flex-1 text-xs"
-              onPress={() => handleStatusChange(item.id, 'review')}
-            >
-              Send for Review
-            </Button>
-          )}
-          {item.status === 'review' && (
-            <Button 
-              size="sm" 
-              color="success" 
-              variant="flat"
-              className="flex-1 text-xs"
-              onPress={() => handleStatusChange(item.id, 'approved')}
-            >
-              ✓ Approve
-            </Button>
-          )}
-          {item.status !== 'script' && item.status !== 'review' && (
-            <Select
-              size="sm"
-              selectedKeys={[item.status]}
-              className="w-full"
-              onChange={(e) => handleStatusChange(item.id, e.target.value)}
-            >
-              {pipelineStages.map(s => (
-                <SelectItem key={s.key}>{s.label}</SelectItem>
-              ))}
-            </Select>
-          )}
-        </div>
-      </CardBody>
-    </Card>
-  )
+        </CardBody>
+      </Card>
+    )
+  }
 
   return (
     <div className="min-h-screen bg-background">
@@ -594,8 +616,9 @@ export default function ContentPage() {
             size="sm" 
             onPress={handleNew}
             isDisabled={!selectedBusinessId}
+            startContent={<Plus className="w-4 h-4" />}
           >
-            + New Content
+            New Content
           </Button>
         }
       />
@@ -629,13 +652,13 @@ export default function ContentPage() {
                   className={viewMode === 'list' ? 'bg-primary-100 text-primary-700' : ''}
                   onPress={() => setViewMode('list')}
                 >
-                  <span className="mr-1">☰</span> List
+                  List
                 </Button>
                 <Button
                   className={viewMode === 'board' ? 'bg-primary-100 text-primary-700' : ''}
                   onPress={() => setViewMode('board')}
                 >
-                  <span className="mr-1">▦</span> Board
+                  Board
                 </Button>
               </ButtonGroup>
             )}
@@ -646,7 +669,7 @@ export default function ContentPage() {
         {!selectedBusinessId && (
           <Card className="bg-white">
             <CardBody className="text-center py-12">
-              <div className="text-4xl mb-4">📝</div>
+              <Video className="w-12 h-12 mx-auto mb-4 text-slate-300" />
               <h3 className="text-lg font-semibold text-slate-800 mb-2">Select a Business</h3>
               <p className="text-slate-500 mb-4">
                 Content is organized by business. Use the business selector in the navbar to choose a business.
@@ -682,15 +705,12 @@ export default function ContentPage() {
                     
                     return (
                       <div key={stage.key} className="rounded-xl overflow-hidden border border-slate-200">
-                        {/* Stage Header - Clickable to collapse */}
                         <button
                           onClick={() => toggleStageCollapse(stage.key)}
                           className={`w-full px-4 py-3 ${stage.color} flex items-center justify-between`}
                         >
                           <div className="flex items-center gap-3">
-                            <span className={`text-lg transition-transform ${isCollapsed ? '' : 'rotate-90'}`}>
-                              ▶
-                            </span>
+                            <ChevronRight className={`w-5 h-5 transition-transform ${isCollapsed ? '' : 'rotate-90'}`} />
                             <h3 className={`font-semibold ${stage.textColor}`}>{stage.label}</h3>
                           </div>
                           <Chip size="sm" variant="flat" className={stage.textColor}>
@@ -698,7 +718,6 @@ export default function ContentPage() {
                           </Chip>
                         </button>
                         
-                        {/* Stage Content - Collapsible */}
                         {!isCollapsed && (
                           <div className="bg-slate-50 p-3 space-y-3">
                             {stageItems.length > 0 ? (
@@ -767,7 +786,7 @@ export default function ContentPage() {
               )}
               {selectedTemplate && (
                 <Chip size="sm" variant="flat">
-                  {selectedTemplate.icon} {selectedTemplate.name}
+                  {selectedTemplate.name}
                 </Chip>
               )}
             </div>
@@ -781,23 +800,26 @@ export default function ContentPage() {
                     Content Type
                   </label>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
-                    {templates.map(template => (
-                      <Card
-                        key={template.id}
-                        isPressable
-                        className={`cursor-pointer transition-all ${
-                          formData.template_id === template.id 
-                            ? 'ring-2 ring-primary bg-primary-50' 
-                            : 'hover:bg-slate-50'
-                        }`}
-                        onPress={() => handleTemplateChange(template.id)}
-                      >
-                        <CardBody className="p-3 text-center">
-                          <div className="text-2xl mb-1">{template.icon}</div>
-                          <div className="text-sm font-medium">{template.name}</div>
-                        </CardBody>
-                      </Card>
-                    ))}
+                    {templates.map(template => {
+                      const IconComponent = getContentIcon(template.name)
+                      return (
+                        <Card
+                          key={template.id}
+                          isPressable
+                          className={`cursor-pointer transition-all ${
+                            formData.template_id === template.id 
+                              ? 'ring-2 ring-primary bg-primary-50' 
+                              : 'hover:bg-slate-50'
+                          }`}
+                          onPress={() => handleTemplateChange(template.id)}
+                        >
+                          <CardBody className="p-3 text-center">
+                            <IconComponent className="w-6 h-6 mx-auto mb-1 text-slate-600" />
+                            <div className="text-sm font-medium">{template.name}</div>
+                          </CardBody>
+                        </Card>
+                      )
+                    })}
                   </div>
                 </div>
               )}
