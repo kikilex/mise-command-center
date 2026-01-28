@@ -9,7 +9,13 @@ import {
   Chip,
   Avatar,
   Progress,
-  Divider
+  Divider,
+  Switch,
+  Input,
+  Select,
+  SelectItem,
+  Checkbox,
+  CheckboxGroup
 } from "@heroui/react"
 import { createClient } from '@/lib/supabase/client'
 import UserMenu from '@/components/UserMenu'
@@ -39,12 +45,40 @@ interface WorkLog {
   created_at: string
 }
 
+interface AutonomousSettings {
+  enabled: boolean
+  maxActionsPerSession: number
+  requireApprovalForExternal: boolean
+  notifications: {
+    onTaskComplete: boolean
+    onError: boolean
+    onApprovalNeeded: boolean
+    deliveryMethod: 'email' | 'push' | 'both' | 'none'
+  }
+}
+
 interface UserData {
   id: string
   email: string
   name?: string
   avatar_url?: string
   role?: string
+  settings?: {
+    autonomous?: AutonomousSettings
+    [key: string]: unknown
+  }
+}
+
+const defaultAutonomousSettings: AutonomousSettings = {
+  enabled: false,
+  maxActionsPerSession: 10,
+  requireApprovalForExternal: true,
+  notifications: {
+    onTaskComplete: true,
+    onError: true,
+    onApprovalNeeded: true,
+    deliveryMethod: 'push'
+  }
 }
 
 export default function AIWorkspacePage() {
@@ -53,6 +87,8 @@ export default function AIWorkspacePage() {
   const [aiTasks, setAiTasks] = useState<any[]>([])
   const [user, setUser] = useState<UserData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [autonomousSettings, setAutonomousSettings] = useState<AutonomousSettings>(defaultAutonomousSettings)
+  const [savingSettings, setSavingSettings] = useState(false)
   
   const supabase = createClient()
 
@@ -77,8 +113,17 @@ export default function AIWorkspacePage() {
         email: authUser.email || '',
         name: profile?.name || authUser.email?.split('@')[0],
         avatar_url: profile?.avatar_url,
-        role: profile?.role
+        role: profile?.role,
+        settings: profile?.settings
       })
+
+      // Load autonomous settings from user profile
+      if (profile?.settings?.autonomous) {
+        setAutonomousSettings({
+          ...defaultAutonomousSettings,
+          ...profile.settings.autonomous
+        })
+      }
     }
 
     // Get AI agents
@@ -109,6 +154,51 @@ export default function AIWorkspacePage() {
     if (tasksData) setAiTasks(tasksData)
 
     setLoading(false)
+  }
+
+  async function saveAutonomousSettings(newSettings: AutonomousSettings) {
+    if (!user) return
+    
+    setSavingSettings(true)
+    
+    // Merge with existing user settings
+    const updatedSettings = {
+      ...(user.settings || {}),
+      autonomous: newSettings
+    }
+    
+    const { error } = await supabase
+      .from('users')
+      .update({ settings: updatedSettings })
+      .eq('id', user.id)
+    
+    if (!error) {
+      setAutonomousSettings(newSettings)
+      setUser({ ...user, settings: updatedSettings })
+    }
+    
+    setSavingSettings(false)
+  }
+
+  function updateAutonomousSetting<K extends keyof AutonomousSettings>(
+    key: K,
+    value: AutonomousSettings[K]
+  ) {
+    const newSettings = { ...autonomousSettings, [key]: value }
+    setAutonomousSettings(newSettings)
+    saveAutonomousSettings(newSettings)
+  }
+
+  function updateNotificationSetting<K extends keyof AutonomousSettings['notifications']>(
+    key: K,
+    value: AutonomousSettings['notifications'][K]
+  ) {
+    const newSettings = {
+      ...autonomousSettings,
+      notifications: { ...autonomousSettings.notifications, [key]: value }
+    }
+    setAutonomousSettings(newSettings)
+    saveAutonomousSettings(newSettings)
   }
 
   function formatTime(dateStr: string) {

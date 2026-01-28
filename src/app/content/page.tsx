@@ -254,6 +254,15 @@ export default function ContentPage() {
   }
 
   const getItemsByStatus = (status: string) => content.filter(c => c.status === status)
+  
+  // Analytics calculations
+  const stageCounts = pipelineStages.map(stage => ({
+    ...stage,
+    count: getItemsByStatus(stage.key).length
+  }))
+  
+  const totalItems = content.length
+  const maxCount = Math.max(...stageCounts.map(s => s.count), 1)
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-purple-50/30">
@@ -282,7 +291,88 @@ export default function ContentPage() {
         {loading ? (
           <div className="text-center py-12 text-slate-500">Loading content pipeline...</div>
         ) : (
-          <div className="flex gap-4 overflow-x-auto pb-4">
+          <>
+            {/* Pipeline Analytics */}
+            <Card className="mb-6 bg-white shadow-sm border-0">
+              <CardHeader className="px-6 pt-5 pb-0">
+                <div className="flex items-center justify-between w-full">
+                  <h3 className="font-semibold text-slate-800 text-lg">Pipeline Analytics</h3>
+                  <Chip size="sm" className="bg-violet-100 text-violet-700 font-medium">
+                    {totalItems} Total Items
+                  </Chip>
+                </div>
+              </CardHeader>
+              <CardBody className="px-6 pb-6">
+                {/* Stage Count Cards */}
+                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3 mb-6">
+                  {stageCounts.map(stage => (
+                    <div 
+                      key={stage.key} 
+                      className={`rounded-xl p-3 ${stage.color} transition-transform hover:scale-105`}
+                    >
+                      <p className={`text-2xl font-bold ${stage.textColor}`}>{stage.count}</p>
+                      <p className={`text-xs font-medium ${stage.textColor} opacity-80`}>{stage.label}</p>
+                    </div>
+                  ))}
+                </div>
+                
+                {/* Bar Chart - Pipeline Distribution */}
+                <div className="space-y-3">
+                  <p className="text-sm font-medium text-slate-600 mb-3">Pipeline Distribution</p>
+                  {stageCounts.map(stage => (
+                    <div key={stage.key} className="flex items-center gap-3">
+                      <span className={`text-xs font-medium w-20 ${stage.textColor}`}>{stage.label}</span>
+                      <div className="flex-1 h-6 bg-slate-100 rounded-full overflow-hidden">
+                        <div 
+                          className={`h-full ${stage.color} rounded-full transition-all duration-500 flex items-center justify-end pr-2`}
+                          style={{ width: totalItems > 0 ? `${Math.max((stage.count / maxCount) * 100, stage.count > 0 ? 10 : 0)}%` : '0%' }}
+                        >
+                          {stage.count > 0 && (
+                            <span className={`text-xs font-bold ${stage.textColor}`}>{stage.count}</span>
+                          )}
+                        </div>
+                      </div>
+                      <span className="text-xs text-slate-400 w-12 text-right">
+                        {totalItems > 0 ? Math.round((stage.count / totalItems) * 100) : 0}%
+                      </span>
+                    </div>
+                  ))}
+                </div>
+                
+                {/* Quick Stats */}
+                {totalItems > 0 && (
+                  <div className="mt-6 pt-4 border-t border-slate-100 flex flex-wrap gap-4">
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-emerald-400"></div>
+                      <span className="text-sm text-slate-600">
+                        <span className="font-semibold">{stageCounts.find(s => s.key === 'posted')?.count || 0}</span> Published
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-cyan-400"></div>
+                      <span className="text-sm text-slate-600">
+                        <span className="font-semibold">{stageCounts.find(s => s.key === 'scheduled')?.count || 0}</span> Scheduled
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-amber-400"></div>
+                      <span className="text-sm text-slate-600">
+                        <span className="font-semibold">{stageCounts.find(s => s.key === 'review')?.count || 0}</span> In Review
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="w-3 h-3 rounded-full bg-slate-300"></div>
+                      <span className="text-sm text-slate-600">
+                        <span className="font-semibold">{stageCounts.find(s => s.key === 'idea')?.count || 0}</span> Ideas Backlog
+                      </span>
+                    </div>
+                  </div>
+                )}
+              </CardBody>
+            </Card>
+            
+            {/* Pipeline Kanban Board */}
+            <div className="flex gap-4 overflow-x-auto pb-4">
             {pipelineStages.map(stage => (
               <div key={stage.key} className="flex-shrink-0 w-72">
                 <div className={`rounded-t-xl px-4 py-2 ${stage.color}`}>
@@ -360,6 +450,7 @@ export default function ContentPage() {
               </div>
             ))}
           </div>
+          </>
         )}
       </main>
 
