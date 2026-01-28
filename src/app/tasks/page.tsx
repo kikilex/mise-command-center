@@ -27,6 +27,7 @@ import {
   SortDescriptor,
 } from "@heroui/react"
 import { createClient } from '@/lib/supabase/client'
+import { useBusiness } from '@/lib/business-context'
 import Navbar from '@/components/Navbar'
 import { showErrorToast, showSuccessToast, getErrorMessage } from '@/lib/errors'
 import { ErrorFallback } from '@/components/ErrorBoundary'
@@ -120,6 +121,7 @@ export default function TasksPage() {
   })
   
   const supabase = createClient()
+  const { selectedBusinessId } = useBusiness()
 
   // Load saved view from localStorage
   useEffect(() => {
@@ -137,8 +139,12 @@ export default function TasksPage() {
 
   useEffect(() => {
     loadUser()
-    loadTasks()
   }, [])
+
+  // Reload tasks when business context changes
+  useEffect(() => {
+    loadTasks()
+  }, [selectedBusinessId])
 
   async function loadUser() {
     try {
@@ -187,10 +193,18 @@ export default function TasksPage() {
     setLoadError(null)
     
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from('tasks')
         .select('*')
-        .order('created_at', { ascending: false })
+      
+      // Filter by business context
+      if (selectedBusinessId) {
+        query = query.eq('business_id', selectedBusinessId)
+      } else {
+        query = query.is('business_id', null)
+      }
+      
+      const { data, error } = await query.order('created_at', { ascending: false })
       
       if (error) {
         throw error
@@ -253,6 +267,7 @@ export default function TasksPage() {
             ai_flag: formData.ai_flag,
             created_by: user.id,
             due_date: formData.due_date || null,
+            business_id: selectedBusinessId, // null for Personal, business ID for business context
           })
         
         if (error) {
