@@ -564,11 +564,11 @@ export default function ContentPage() {
                 </div>
               )}
 
-              {/* Board View - Kanban Style */}
+              {/* Board View - Kanban Style (Stacked Grid) */}
               {viewMode === 'board' && (
-                <div className="flex gap-4 overflow-x-auto pb-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
                   {pipelineStages.map(stage => (
-                    <div key={stage.key} className="flex-shrink-0 w-72">
+                    <div key={stage.key} className="w-full">
                       <div className={`rounded-t-xl px-4 py-2 ${stage.color}`}>
                         <div className="flex items-center justify-between">
                           <h3 className={`font-semibold ${stage.textColor}`}>{stage.label}</h3>
@@ -577,7 +577,7 @@ export default function ContentPage() {
                           </Chip>
                         </div>
                       </div>
-                      <div className="bg-slate-100/50 rounded-b-xl p-2 min-h-[400px] space-y-2">
+                      <div className="bg-slate-100/50 rounded-b-xl p-2 min-h-[200px] space-y-2">
                         {getItemsByStatus(stage.key).map(item => (
                           <ContentCard key={item.id} item={item} compact={true} />
                         ))}

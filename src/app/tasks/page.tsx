@@ -559,37 +559,35 @@ export default function TasksPage() {
     </Card>
   )
 
-  // Render Kanban View
+  // Render Kanban View (Stacked Grid)
   const renderKanbanView = () => (
-    <div className="overflow-x-auto -mx-4 px-4 sm:mx-0 sm:px-0">
-      <div className="flex gap-4 min-w-max pb-4">
-        {statusOptions.map(status => (
-          <div key={status.key} className="w-[280px] flex-shrink-0">
-            <div className="flex items-center justify-between mb-3 px-1">
-              <div className="flex items-center gap-2">
-                <Chip 
-                  size="sm" 
-                  color={status.color as any}
-                  variant="flat"
-                >
-                  {status.label}
-                </Chip>
-                <span className="text-sm text-slate-500 dark:text-slate-400">
-                  ({tasksByStatus[status.key]?.length || 0})
-                </span>
-              </div>
-            </div>
-            <div className="space-y-2 min-h-[200px] bg-slate-100/80 dark:bg-slate-800/50 rounded-lg p-2 border border-slate-200/50 dark:border-slate-700/50">
-              {tasksByStatus[status.key]?.map(task => renderTaskCard(task, true))}
-              {tasksByStatus[status.key]?.length === 0 && (
-                <div className="text-center text-slate-400 dark:text-slate-500 text-sm py-8">
-                  No tasks
-                </div>
-              )}
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      {statusOptions.map(status => (
+        <div key={status.key} className="w-full">
+          <div className="flex items-center justify-between mb-3 px-1">
+            <div className="flex items-center gap-2">
+              <Chip 
+                size="sm" 
+                color={status.color as any}
+                variant="flat"
+              >
+                {status.label}
+              </Chip>
+              <span className="text-sm text-slate-500 dark:text-slate-400">
+                ({tasksByStatus[status.key]?.length || 0})
+              </span>
             </div>
           </div>
-        ))}
-      </div>
+          <div className="space-y-2 min-h-[150px] bg-slate-100/80 dark:bg-slate-800/50 rounded-lg p-2 border border-slate-200/50 dark:border-slate-700/50">
+            {tasksByStatus[status.key]?.map(task => renderTaskCard(task, true))}
+            {tasksByStatus[status.key]?.length === 0 && (
+              <div className="text-center text-slate-400 dark:text-slate-500 text-sm py-8">
+                No tasks
+              </div>
+            )}
+          </div>
+        </div>
+      ))}
     </div>
   )
 
