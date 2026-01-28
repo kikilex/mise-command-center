@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { Button, Avatar } from "@heroui/react"
 import { usePathname } from 'next/navigation'
 import UserMenu from './UserMenu'
+import BusinessSelector from './BusinessSelector'
 
 interface UserData {
   id?: string
@@ -43,7 +44,7 @@ export default function Navbar({ user, actions }: NavbarProps) {
     <header className="bg-white/80 backdrop-blur-sm border-b border-slate-100 sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <div className="flex items-center justify-between h-16">
-          {/* Left: Hamburger (mobile) + Brand */}
+          {/* Left: Hamburger (mobile) + Brand + Business Selector */}
           <div className="flex items-center gap-3">
             {/* Mobile hamburger */}
             <button 
@@ -67,6 +68,11 @@ export default function Navbar({ user, actions }: NavbarProps) {
               </div>
               <span className="font-semibold text-slate-800 text-lg hidden sm:block">Mise</span>
             </a>
+            
+            {/* Business Selector - show on desktop */}
+            <div className="hidden md:block ml-2">
+              <BusinessSelector />
+            </div>
           </div>
 
           {/* Center: Desktop navigation */}
@@ -113,6 +119,12 @@ export default function Navbar({ user, actions }: NavbarProps) {
       {/* Mobile menu dropdown */}
       {isMenuOpen && (
         <div className="lg:hidden bg-white border-t border-slate-100 py-4 px-4 shadow-lg">
+          {/* Mobile Business Selector */}
+          <div className="mb-4 pb-4 border-b border-slate-100">
+            <p className="text-xs text-slate-500 mb-2 px-1">Current Context</p>
+            <BusinessSelector />
+          </div>
+          
           <div className="flex flex-col gap-2">
             {navItems.map((item) => (
               <a 

@@ -14,24 +14,43 @@ import {
   ModalHeader,
   ModalBody,
   ModalFooter,
+  Chip,
+  Tabs,
+  Tab,
+  Textarea,
 } from "@heroui/react"
 import { createClient } from '@/lib/supabase/client'
 import Navbar from '@/components/Navbar'
+import { useBusiness } from '@/lib/business-context'
 import { showErrorToast, showSuccessToast, getErrorMessage } from '@/lib/errors'
 import { ErrorFallback } from '@/components/ErrorBoundary'
 
-interface SalesData {
-  id: string;
-  product_name: string;
-  amount: number;
-  date: string;
+interface Product {
+  id: string
+  name: string
+  description: string | null
+  price: number | null
+  sku: string | null
+  is_active: boolean
+  created_at: string
+}
+
+interface Sale {
+  id: string
+  product_id: string | null
+  amount: number
+  quantity: number
+  sale_date: string
+  source: string
+  notes: string | null
+  product?: Product
 }
 
 interface ProductPerformance {
-  product_id: string;
-  name: string;
-  total_revenue: number;
-  units_sold: number;
+  product_id: string
+  name: string
+  total_revenue: number
+  units_sold: number
 }
 
 export default function BusinessHubPage() {
@@ -39,25 +58,59 @@ export default function BusinessHubPage() {
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [activeTab, setActiveTab] = useState('overview')
+  
+  // Data states
+  const [products, setProducts] = useState<Product[]>([])
   const [salesStats, setSalesStats] = useState({
     today: 0,
     week: 0,
     month: 0,
   })
   const [productPerformance, setProductPerformance] = useState<ProductPerformance[]>([])
-  const { isOpen, onOpen, onClose } = useDisclosure()
-  const [formData, setFormData] = useState({
-    product_name: '',
+  const [recentSales, setRecentSales] = useState<Sale[]>([])
+  
+  // Modals
+  const { isOpen: isSaleOpen, onOpen: onSaleOpen, onClose: onSaleClose } = useDisclosure()
+  const { isOpen: isProductOpen, onOpen: onProductOpen, onClose: onProductClose } = useDisclosure()
+  
+  // Form data
+  const [saleFormData, setSaleFormData] = useState({
+    product_id: '',
     amount: '',
-    date: new Date().toISOString().split('T')[0], // YYYY-MM-DD
+    quantity: '1',
+    sale_date: new Date().toISOString().split('T')[0],
+    source: 'manual',
+    notes: '',
   })
+  
+  const [productFormData, setProductFormData] = useState({
+    name: '',
+    description: '',
+    price: '',
+    sku: '',
+  })
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null)
 
+  const { selectedBusinessId, selectedBusiness } = useBusiness()
   const supabase = createClient()
 
   useEffect(() => {
     loadUser()
-    loadBusinessData()
   }, [])
+
+  useEffect(() => {
+    if (selectedBusinessId) {
+      loadBusinessData()
+    } else {
+      // Personal mode - clear business data
+      setSalesStats({ today: 0, week: 0, month: 0 })
+      setProductPerformance([])
+      setProducts([])
+      setRecentSales([])
+      setLoading(false)
+    }
+  }, [selectedBusinessId])
 
   async function loadUser() {
     try {
@@ -102,24 +155,111 @@ export default function BusinessHubPage() {
   }
 
   async function loadBusinessData() {
+    if (!selectedBusinessId) return
+    
     setLoading(true)
     setLoadError(null)
     
     try {
-      // Placeholder for fetching sales stats and product performance from Supabase
-      // This would involve more complex SQL queries or Supabase functions
-      // For now, setting dummy data
+      // Load products
+      const { data: productsData, error: productsError } = await supabase
+        .from('products')
+        .select('*')
+        .eq('business_id', selectedBusinessId)
+        .order('name')
+      
+      if (productsError) throw productsError
+      setProducts(productsData || [])
+
+      // Calculate date ranges
+      const now = new Date()
+      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString()
+      const weekStart = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000).toISOString()
+      const monthStart = new Date(now.getFullYear(), now.getMonth(), 1).toISOString()
+
+      // Load sales stats - Today
+      const { data: todaySales, error: todayError } = await supabase
+        .from('sales')
+        .select('amount')
+        .eq('business_id', selectedBusinessId)
+        .gte('sale_date', todayStart)
+      
+      if (todayError) throw todayError
+      const todayTotal = (todaySales || []).reduce((sum, s) => sum + Number(s.amount), 0)
+
+      // Load sales stats - Week
+      const { data: weekSales, error: weekError } = await supabase
+        .from('sales')
+        .select('amount')
+        .eq('business_id', selectedBusinessId)
+        .gte('sale_date', weekStart)
+      
+      if (weekError) throw weekError
+      const weekTotal = (weekSales || []).reduce((sum, s) => sum + Number(s.amount), 0)
+
+      // Load sales stats - Month
+      const { data: monthSales, error: monthError } = await supabase
+        .from('sales')
+        .select('amount')
+        .eq('business_id', selectedBusinessId)
+        .gte('sale_date', monthStart)
+      
+      if (monthError) throw monthError
+      const monthTotal = (monthSales || []).reduce((sum, s) => sum + Number(s.amount), 0)
+
       setSalesStats({
-        today: 1250,
-        week: 8500,
-        month: 32000,
+        today: todayTotal,
+        week: weekTotal,
+        month: monthTotal,
       })
 
-      setProductPerformance([
-        { product_id: 'prod_1', name: 'Product A', total_revenue: 15000, units_sold: 300 },
-        { product_id: 'prod_2', name: 'Product B', total_revenue: 10000, units_sold: 200 },
-        { product_id: 'prod_3', name: 'Product C', total_revenue: 7000, units_sold: 150 },
-      ])
+      // Load product performance
+      const { data: perfData, error: perfError } = await supabase
+        .from('sales')
+        .select(`
+          product_id,
+          amount,
+          quantity,
+          products!inner(name)
+        `)
+        .eq('business_id', selectedBusinessId)
+        .not('product_id', 'is', null)
+      
+      if (perfError && perfError.code !== 'PGRST116') {
+        // Ignore "no rows" error
+        console.error('Performance query error:', perfError)
+      }
+
+      // Aggregate product performance
+      const perfMap = new Map<string, ProductPerformance>()
+      for (const sale of perfData || []) {
+        const productName = (sale as any).products?.name || 'Unknown'
+        const existing = perfMap.get(sale.product_id!)
+        if (existing) {
+          existing.total_revenue += Number(sale.amount)
+          existing.units_sold += sale.quantity
+        } else {
+          perfMap.set(sale.product_id!, {
+            product_id: sale.product_id!,
+            name: productName,
+            total_revenue: Number(sale.amount),
+            units_sold: sale.quantity,
+          })
+        }
+      }
+      setProductPerformance(Array.from(perfMap.values()).sort((a, b) => b.total_revenue - a.total_revenue))
+
+      // Load recent sales
+      const { data: recentData, error: recentError } = await supabase
+        .from('sales')
+        .select('*, products(name)')
+        .eq('business_id', selectedBusinessId)
+        .order('sale_date', { ascending: false })
+        .limit(10)
+      
+      if (recentError) throw recentError
+      setRecentSales(recentData || [])
+
     } catch (error) {
       console.error('Load business data error:', error)
       setLoadError(getErrorMessage(error))
@@ -129,22 +269,22 @@ export default function BusinessHubPage() {
     }
   }
 
-  async function handleSubmit() {
-    if (!user) {
-      showErrorToast(null, 'You must be logged in to submit data.')
+  async function handleSubmitSale() {
+    if (!user || !selectedBusinessId) {
+      showErrorToast(null, 'Please select a business first')
       return
     }
 
-    const { product_name, amount, date } = formData;
+    const { amount, sale_date, source, quantity, product_id, notes } = saleFormData
 
-    if (!product_name.trim() || !amount || !date) {
-      showErrorToast(null, 'Please fill in all fields.')
+    if (!amount || !sale_date) {
+      showErrorToast(null, 'Please fill in amount and date')
       return
     }
 
-    const parsedAmount = parseFloat(amount);
+    const parsedAmount = parseFloat(amount)
     if (isNaN(parsedAmount) || parsedAmount <= 0) {
-      showErrorToast(null, 'Please enter a valid amount.')
+      showErrorToast(null, 'Please enter a valid amount')
       return
     }
 
@@ -152,40 +292,162 @@ export default function BusinessHubPage() {
 
     try {
       const { error } = await supabase
-        .from('sales_data') // Assuming a 'sales_data' table
+        .from('sales')
         .insert({
-          product_name,
+          business_id: selectedBusinessId,
+          product_id: product_id || null,
           amount: parsedAmount,
-          date,
-          user_id: user.id, // Associate sales data with the current user
+          quantity: parseInt(quantity) || 1,
+          sale_date: new Date(sale_date).toISOString(),
+          source: source || 'manual',
+          notes: notes || null,
+          created_by: user.id,
         })
 
-      if (error) {
-        throw error
-      }
+      if (error) throw error
 
-      showSuccessToast('Sales data entered successfully!')
-      setFormData({
-        product_name: '',
+      showSuccessToast('Sale recorded successfully!')
+      setSaleFormData({
+        product_id: '',
         amount: '',
-        date: new Date().toISOString().split('T')[0],
+        quantity: '1',
+        sale_date: new Date().toISOString().split('T')[0],
+        source: 'manual',
+        notes: '',
       })
-      onClose()
-      loadBusinessData() // Refresh data after submission
+      onSaleClose()
+      loadBusinessData()
     } catch (error) {
-      console.error('Submit sales data error:', error)
-      showErrorToast(error, 'Failed to enter sales data')
+      console.error('Submit sale error:', error)
+      showErrorToast(error, 'Failed to record sale')
     } finally {
       setSubmitting(false)
     }
   }
+
+  async function handleSubmitProduct() {
+    if (!user || !selectedBusinessId) {
+      showErrorToast(null, 'Please select a business first')
+      return
+    }
+
+    const { name, description, price, sku } = productFormData
+
+    if (!name.trim()) {
+      showErrorToast(null, 'Please enter a product name')
+      return
+    }
+
+    setSubmitting(true)
+
+    try {
+      if (editingProduct) {
+        const { error } = await supabase
+          .from('products')
+          .update({
+            name: name.trim(),
+            description: description || null,
+            price: price ? parseFloat(price) : null,
+            sku: sku || null,
+          })
+          .eq('id', editingProduct.id)
+
+        if (error) throw error
+        showSuccessToast('Product updated!')
+      } else {
+        const { error } = await supabase
+          .from('products')
+          .insert({
+            business_id: selectedBusinessId,
+            name: name.trim(),
+            description: description || null,
+            price: price ? parseFloat(price) : null,
+            sku: sku || null,
+            is_active: true,
+          })
+
+        if (error) throw error
+        showSuccessToast('Product created!')
+      }
+
+      setProductFormData({ name: '', description: '', price: '', sku: '' })
+      setEditingProduct(null)
+      onProductClose()
+      loadBusinessData()
+    } catch (error) {
+      console.error('Submit product error:', error)
+      showErrorToast(error, 'Failed to save product')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  function handleEditProduct(product: Product) {
+    setEditingProduct(product)
+    setProductFormData({
+      name: product.name,
+      description: product.description || '',
+      price: product.price?.toString() || '',
+      sku: product.sku || '',
+    })
+    onProductOpen()
+  }
+
+  function handleNewProduct() {
+    setEditingProduct(null)
+    setProductFormData({ name: '', description: '', price: '', sku: '' })
+    onProductOpen()
+  }
+
+  const sourceOptions = [
+    { key: 'manual', label: 'Manual Entry' },
+    { key: 'shopify', label: 'Shopify' },
+    { key: 'amazon', label: 'Amazon' },
+    { key: 'tiktok', label: 'TikTok Shop' },
+    { key: 'etsy', label: 'Etsy' },
+    { key: 'other', label: 'Other' },
+  ]
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-purple-50/30">
       <Navbar user={user} />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
-        <h2 className="text-2xl font-bold text-slate-800 mb-6">Sales Overview</h2>
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-800">
+              {selectedBusiness ? selectedBusiness.name : 'Business Hub'}
+            </h1>
+            {selectedBusiness?.description && (
+              <p className="text-slate-500 text-sm mt-1">{selectedBusiness.description}</p>
+            )}
+          </div>
+          
+          {selectedBusinessId && (
+            <div className="flex gap-2">
+              <Button color="primary" variant="flat" onPress={handleNewProduct}>
+                + Add Product
+              </Button>
+              <Button color="primary" onPress={onSaleOpen}>
+                + Record Sale
+              </Button>
+            </div>
+          )}
+        </div>
+
+        {/* No business selected state */}
+        {!selectedBusinessId && (
+          <Card className="bg-white">
+            <CardBody className="text-center py-12">
+              <div className="text-4xl mb-4">🏢</div>
+              <h3 className="text-lg font-semibold text-slate-800 mb-2">Select a Business</h3>
+              <p className="text-slate-500">
+                Use the business selector in the navbar to choose a business and view its data.
+              </p>
+            </CardBody>
+          </Card>
+        )}
 
         {/* Error State */}
         {loadError && !loading && (
@@ -194,111 +456,331 @@ export default function BusinessHubPage() {
           </div>
         )}
 
-        {/* Sales Stats */}
-        {loading ? (
-          <div className="text-center py-8 text-slate-500">Loading sales data...</div>
-        ) : !loadError && (
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
-            <Card className="bg-white">
-              <CardBody className="p-5">
-                <p className="text-slate-500 text-sm mb-1">Revenue Today</p>
-                <p className="text-3xl font-bold text-slate-800">${salesStats.today.toLocaleString()}</p>
-              </CardBody>
-            </Card>
-            <Card className="bg-white">
-              <CardBody className="p-5">
-                <p className="text-slate-500 text-sm mb-1">Revenue This Week</p>
-                <p className="text-3xl font-bold text-slate-800">${salesStats.week.toLocaleString()}</p>
-              </CardBody>
-            </Card>
-            <Card className="bg-white">
-              <CardBody className="p-5">
-                <p className="text-slate-500 text-sm mb-1">Revenue This Month</p>
-                <p className="text-3xl font-bold text-slate-800">${salesStats.month.toLocaleString()}</p>
-              </CardBody>
-            </Card>
-          </div>
-        )}
+        {/* Business Content */}
+        {selectedBusinessId && !loadError && (
+          <>
+            {/* Sales Stats */}
+            {loading ? (
+              <div className="text-center py-8 text-slate-500">Loading sales data...</div>
+            ) : (
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+                <Card className="bg-white">
+                  <CardBody className="p-5">
+                    <p className="text-slate-500 text-sm mb-1">Revenue Today</p>
+                    <p className="text-3xl font-bold text-slate-800">
+                      ${salesStats.today.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </p>
+                  </CardBody>
+                </Card>
+                <Card className="bg-white">
+                  <CardBody className="p-5">
+                    <p className="text-slate-500 text-sm mb-1">Revenue This Week</p>
+                    <p className="text-3xl font-bold text-slate-800">
+                      ${salesStats.week.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </p>
+                  </CardBody>
+                </Card>
+                <Card className="bg-white">
+                  <CardBody className="p-5">
+                    <p className="text-slate-500 text-sm mb-1">Revenue This Month</p>
+                    <p className="text-3xl font-bold text-slate-800">
+                      ${salesStats.month.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    </p>
+                  </CardBody>
+                </Card>
+              </div>
+            )}
 
-        {/* Manual Sales Entry */}
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold text-slate-800">Product Performance</h2>
-          <Button color="primary" onPress={onOpen} className="font-semibold">
-            + Manual Sales Entry
-          </Button>
-        </div>
+            {/* Tabs */}
+            <Tabs 
+              selectedKey={activeTab} 
+              onSelectionChange={(key) => setActiveTab(key as string)}
+              className="mb-6"
+            >
+              <Tab key="overview" title="Overview" />
+              <Tab key="products" title={`Products (${products.length})`} />
+              <Tab key="sales" title="Recent Sales" />
+            </Tabs>
 
-        {/* Product Performance Cards */}
-        {loading ? (
-          <div className="text-center py-8 text-slate-500">Loading product performance...</div>
-        ) : !loadError && productPerformance.length === 0 ? (
-          <Card className="bg-white">
-            <CardBody className="text-center py-12">
-              <p className="text-slate-500">No product performance data available.</p>
-            </CardBody>
-          </Card>
-        ) : !loadError && (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-            {productPerformance.map((product) => (
-              <Card key={product.product_id} className="bg-white">
-                <CardBody className="p-5">
-                  <h3 className="font-semibold text-lg text-slate-800 mb-2">{product.name}</h3>
-                  <div className="flex justify-between items-center text-sm">
-                    <p className="text-slate-500">Total Revenue:</p>
-                    <p className="font-medium text-slate-700">${product.total_revenue.toLocaleString()}</p>
+            {/* Tab Content */}
+            {!loading && (
+              <>
+                {/* Overview Tab */}
+                {activeTab === 'overview' && (
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* Product Performance */}
+                    <Card className="bg-white">
+                      <CardBody className="p-5">
+                        <h3 className="font-semibold text-lg text-slate-800 mb-4">Top Products</h3>
+                        {productPerformance.length === 0 ? (
+                          <p className="text-slate-500 text-sm">No sales data yet</p>
+                        ) : (
+                          <div className="space-y-3">
+                            {productPerformance.slice(0, 5).map((product) => (
+                              <div key={product.product_id} className="flex items-center justify-between">
+                                <div>
+                                  <p className="font-medium text-slate-800">{product.name}</p>
+                                  <p className="text-xs text-slate-500">{product.units_sold} units sold</p>
+                                </div>
+                                <p className="font-semibold text-slate-700">
+                                  ${product.total_revenue.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </CardBody>
+                    </Card>
+
+                    {/* Recent Activity */}
+                    <Card className="bg-white">
+                      <CardBody className="p-5">
+                        <h3 className="font-semibold text-lg text-slate-800 mb-4">Recent Sales</h3>
+                        {recentSales.length === 0 ? (
+                          <p className="text-slate-500 text-sm">No sales recorded yet</p>
+                        ) : (
+                          <div className="space-y-3">
+                            {recentSales.slice(0, 5).map((sale) => (
+                              <div key={sale.id} className="flex items-center justify-between">
+                                <div>
+                                  <p className="font-medium text-slate-800">
+                                    {(sale as any).products?.name || 'General Sale'}
+                                  </p>
+                                  <p className="text-xs text-slate-500">
+                                    {new Date(sale.sale_date).toLocaleDateString()} via {sale.source}
+                                  </p>
+                                </div>
+                                <p className="font-semibold text-green-600">
+                                  +${Number(sale.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                </p>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </CardBody>
+                    </Card>
                   </div>
-                  <div className="flex justify-between items-center text-sm mt-1">
-                    <p className="text-slate-500">Units Sold:</p>
-                    <p className="font-medium text-slate-700">{product.units_sold.toLocaleString()}</p>
+                )}
+
+                {/* Products Tab */}
+                {activeTab === 'products' && (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                    {products.length === 0 ? (
+                      <Card className="bg-white col-span-full">
+                        <CardBody className="text-center py-12">
+                          <p className="text-slate-500 mb-4">No products yet</p>
+                          <Button color="primary" onPress={handleNewProduct}>Add Your First Product</Button>
+                        </CardBody>
+                      </Card>
+                    ) : (
+                      products.map((product) => (
+                        <Card key={product.id} className="bg-white hover:shadow-md transition-shadow">
+                          <CardBody className="p-5">
+                            <div className="flex items-start justify-between mb-2">
+                              <h4 className="font-semibold text-slate-800">{product.name}</h4>
+                              <Chip size="sm" color={product.is_active ? 'success' : 'default'} variant="flat">
+                                {product.is_active ? 'Active' : 'Inactive'}
+                              </Chip>
+                            </div>
+                            {product.description && (
+                              <p className="text-sm text-slate-500 mb-3 line-clamp-2">{product.description}</p>
+                            )}
+                            <div className="flex items-center justify-between">
+                              <div>
+                                {product.price && (
+                                  <p className="font-bold text-lg text-slate-800">${product.price.toFixed(2)}</p>
+                                )}
+                                {product.sku && (
+                                  <p className="text-xs text-slate-400">SKU: {product.sku}</p>
+                                )}
+                              </div>
+                              <Button size="sm" variant="flat" onPress={() => handleEditProduct(product)}>
+                                Edit
+                              </Button>
+                            </div>
+                          </CardBody>
+                        </Card>
+                      ))
+                    )}
                   </div>
-                </CardBody>
-              </Card>
-            ))}
-          </div>
+                )}
+
+                {/* Sales Tab */}
+                {activeTab === 'sales' && (
+                  <Card className="bg-white">
+                    <CardBody className="p-0">
+                      {recentSales.length === 0 ? (
+                        <div className="text-center py-12">
+                          <p className="text-slate-500 mb-4">No sales recorded yet</p>
+                          <Button color="primary" onPress={onSaleOpen}>Record Your First Sale</Button>
+                        </div>
+                      ) : (
+                        <div className="overflow-x-auto">
+                          <table className="w-full">
+                            <thead className="bg-slate-50 border-b">
+                              <tr>
+                                <th className="text-left px-4 py-3 text-sm font-medium text-slate-600">Date</th>
+                                <th className="text-left px-4 py-3 text-sm font-medium text-slate-600">Product</th>
+                                <th className="text-left px-4 py-3 text-sm font-medium text-slate-600">Source</th>
+                                <th className="text-right px-4 py-3 text-sm font-medium text-slate-600">Qty</th>
+                                <th className="text-right px-4 py-3 text-sm font-medium text-slate-600">Amount</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y">
+                              {recentSales.map((sale) => (
+                                <tr key={sale.id} className="hover:bg-slate-50">
+                                  <td className="px-4 py-3 text-sm text-slate-600">
+                                    {new Date(sale.sale_date).toLocaleDateString()}
+                                  </td>
+                                  <td className="px-4 py-3 text-sm text-slate-800">
+                                    {(sale as any).products?.name || '-'}
+                                  </td>
+                                  <td className="px-4 py-3">
+                                    <Chip size="sm" variant="flat">{sale.source}</Chip>
+                                  </td>
+                                  <td className="px-4 py-3 text-sm text-slate-600 text-right">
+                                    {sale.quantity}
+                                  </td>
+                                  <td className="px-4 py-3 text-sm font-medium text-green-600 text-right">
+                                    ${Number(sale.amount).toFixed(2)}
+                                  </td>
+                                </tr>
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      )}
+                    </CardBody>
+                  </Card>
+                )}
+              </>
+            )}
+          </>
         )}
       </main>
 
-      {/* Manual Sales Entry Modal */}
-      <Modal isOpen={isOpen} onClose={onClose} size="lg">
+      {/* Record Sale Modal */}
+      <Modal isOpen={isSaleOpen} onClose={onSaleClose} size="lg">
         <ModalContent>
-          <ModalHeader>Manual Sales Data Entry</ModalHeader>
+          <ModalHeader>Record Sale</ModalHeader>
           <ModalBody>
             <div className="flex flex-col gap-4">
-              <Input
-                label="Product Name"
-                placeholder="e.g., Premium Coffee Beans"
-                value={formData.product_name}
-                onChange={(e) => setFormData({ ...formData, product_name: e.target.value })}
-                isRequired
-              />
-              <Input
-                label="Amount"
-                type="number"
-                placeholder="e.g., 250.75"
-                value={formData.amount}
-                onChange={(e) => setFormData({ ...formData, amount: e.target.value })}
-                isRequired
-              />
-              <Input
-                label="Date"
-                type="date"
-                value={formData.date}
-                onChange={(e) => setFormData({ ...formData, date: e.target.value })}
-                isRequired
+              <Select
+                label="Product (Optional)"
+                placeholder="Select a product"
+                selectedKeys={saleFormData.product_id ? [saleFormData.product_id] : []}
+                onChange={(e) => setSaleFormData({ ...saleFormData, product_id: e.target.value })}
+              >
+                {products.map((p) => (
+                  <SelectItem key={p.id}>{p.name}</SelectItem>
+                ))}
+              </Select>
+              <div className="grid grid-cols-2 gap-4">
+                <Input
+                  label="Amount"
+                  type="number"
+                  step="0.01"
+                  placeholder="0.00"
+                  startContent={<span className="text-slate-400">$</span>}
+                  value={saleFormData.amount}
+                  onChange={(e) => setSaleFormData({ ...saleFormData, amount: e.target.value })}
+                  isRequired
+                />
+                <Input
+                  label="Quantity"
+                  type="number"
+                  min="1"
+                  value={saleFormData.quantity}
+                  onChange={(e) => setSaleFormData({ ...saleFormData, quantity: e.target.value })}
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <Input
+                  label="Date"
+                  type="date"
+                  value={saleFormData.sale_date}
+                  onChange={(e) => setSaleFormData({ ...saleFormData, sale_date: e.target.value })}
+                  isRequired
+                />
+                <Select
+                  label="Source"
+                  selectedKeys={[saleFormData.source]}
+                  onChange={(e) => setSaleFormData({ ...saleFormData, source: e.target.value })}
+                >
+                  {sourceOptions.map((s) => (
+                    <SelectItem key={s.key}>{s.label}</SelectItem>
+                  ))}
+                </Select>
+              </div>
+              <Textarea
+                label="Notes (Optional)"
+                placeholder="Any additional details..."
+                value={saleFormData.notes}
+                onChange={(e) => setSaleFormData({ ...saleFormData, notes: e.target.value })}
               />
             </div>
           </ModalBody>
           <ModalFooter>
-            <Button variant="flat" onPress={onClose}>
-              Cancel
-            </Button>
+            <Button variant="flat" onPress={onSaleClose}>Cancel</Button>
             <Button
               color="primary"
-              onPress={handleSubmit}
-              isDisabled={!formData.product_name.trim() || !formData.amount || !formData.date}
+              onPress={handleSubmitSale}
+              isDisabled={!saleFormData.amount || !saleFormData.sale_date}
               isLoading={submitting}
             >
-              Submit Sales Data
+              Record Sale
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+
+      {/* Product Modal */}
+      <Modal isOpen={isProductOpen} onClose={onProductClose} size="lg">
+        <ModalContent>
+          <ModalHeader>{editingProduct ? 'Edit Product' : 'Add Product'}</ModalHeader>
+          <ModalBody>
+            <div className="flex flex-col gap-4">
+              <Input
+                label="Product Name"
+                placeholder="e.g., Spiritual Warfare Prayer Guide"
+                value={productFormData.name}
+                onChange={(e) => setProductFormData({ ...productFormData, name: e.target.value })}
+                isRequired
+              />
+              <Textarea
+                label="Description"
+                placeholder="Brief description of the product..."
+                value={productFormData.description}
+                onChange={(e) => setProductFormData({ ...productFormData, description: e.target.value })}
+              />
+              <div className="grid grid-cols-2 gap-4">
+                <Input
+                  label="Price"
+                  type="number"
+                  step="0.01"
+                  placeholder="0.00"
+                  startContent={<span className="text-slate-400">$</span>}
+                  value={productFormData.price}
+                  onChange={(e) => setProductFormData({ ...productFormData, price: e.target.value })}
+                />
+                <Input
+                  label="SKU"
+                  placeholder="e.g., SWP-001"
+                  value={productFormData.sku}
+                  onChange={(e) => setProductFormData({ ...productFormData, sku: e.target.value })}
+                />
+              </div>
+            </div>
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="flat" onPress={onProductClose}>Cancel</Button>
+            <Button
+              color="primary"
+              onPress={handleSubmitProduct}
+              isDisabled={!productFormData.name.trim()}
+              isLoading={submitting}
+            >
+              {editingProduct ? 'Save Changes' : 'Add Product'}
             </Button>
           </ModalFooter>
         </ModalContent>
