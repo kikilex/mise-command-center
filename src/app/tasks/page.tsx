@@ -840,57 +840,64 @@ export default function TasksPage() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
         {/* View Tabs */}
         <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center mb-6">
-          <Tabs 
-            selectedKey={currentView} 
-            onSelectionChange={(key) => handleViewChange(key as ViewType)}
-            color="primary"
-            variant="solid"
-            size="md"
-          >
-            <Tab key="kanban" title={
-              <div className="flex items-center gap-2">
-                <span>📊</span>
-                <span>Kanban</span>
-              </div>
-            } />
-            <Tab key="list" title={
-              <div className="flex items-center gap-2">
-                <span>📋</span>
-                <span>List</span>
-              </div>
-            } />
-            <Tab key="calendar" title={
-              <div className="flex items-center gap-2">
-                <span>📅</span>
-                <span>Calendar</span>
-              </div>
-            } />
-            <Tab key="my-tasks" title={
-              <div className="flex items-center gap-2">
-                <span>👤</span>
-                <span>My Tasks</span>
-                {user && (
-                  <Chip size="sm" variant="flat">
-                    {tasks.filter(t => t.assignee_id === user.id).length}
+          {/* Scrollable tabs container for mobile */}
+          <div className="w-full sm:w-auto overflow-x-auto pb-2 sm:pb-0 -mx-4 px-4 sm:mx-0 sm:px-0">
+            <Tabs 
+              selectedKey={currentView} 
+              onSelectionChange={(key) => handleViewChange(key as ViewType)}
+              color="primary"
+              variant="solid"
+              size="md"
+              classNames={{
+                tabList: "flex-nowrap",
+                tab: "whitespace-nowrap",
+              }}
+            >
+              <Tab key="kanban" title={
+                <div className="flex items-center gap-2">
+                  <span>📊</span>
+                  <span>Kanban</span>
+                </div>
+              } />
+              <Tab key="list" title={
+                <div className="flex items-center gap-2">
+                  <span>📋</span>
+                  <span>List</span>
+                </div>
+              } />
+              <Tab key="calendar" title={
+                <div className="flex items-center gap-2">
+                  <span>📅</span>
+                  <span>Calendar</span>
+                </div>
+              } />
+              <Tab key="my-tasks" title={
+                <div className="flex items-center gap-2">
+                  <span>👤</span>
+                  <span>My Tasks</span>
+                  {user && (
+                    <Chip size="sm" variant="flat">
+                      {tasks.filter(t => t.assignee_id === user.id).length}
+                    </Chip>
+                  )}
+                </div>
+              } />
+              <Tab key="ai-queue" title={
+                <div className="flex items-center gap-2">
+                  <span>🤖</span>
+                  <span>AI Queue</span>
+                  <Chip size="sm" variant="flat" className="bg-violet-100 text-violet-700">
+                    {tasks.filter(t => t.ai_flag).length}
                   </Chip>
-                )}
-              </div>
-            } />
-            <Tab key="ai-queue" title={
-              <div className="flex items-center gap-2">
-                <span>🤖</span>
-                <span>AI Queue</span>
-                <Chip size="sm" variant="flat" className="bg-violet-100 text-violet-700">
-                  {tasks.filter(t => t.ai_flag).length}
-                </Chip>
-              </div>
-            } />
-          </Tabs>
+                </div>
+              } />
+            </Tabs>
+          </div>
           
           <Button 
             color="primary" 
             onPress={handleNew}
-            className="font-semibold"
+            className="font-semibold flex-shrink-0"
           >
             + New Task
           </Button>
