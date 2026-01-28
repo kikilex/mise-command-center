@@ -10,9 +10,8 @@ export function Providers({ children }: { children: React.ReactNode }) {
   return (
     <NextThemesProvider
       attribute="class"
-      defaultTheme="dark"
-      enableSystem
-      disableTransitionOnChange
+      defaultTheme="light"
+      enableSystem={false}
     >
       <HeroUIProvider navigate={router.push}>
         {children}
