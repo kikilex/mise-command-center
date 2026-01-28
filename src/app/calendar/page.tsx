@@ -9,6 +9,8 @@ import {
 } from "@heroui/react"
 import { createClient } from '@/lib/supabase/client'
 import UserMenu from '@/components/UserMenu'
+import { showErrorToast, getErrorMessage } from '@/lib/errors'
+import { ErrorFallback } from '@/components/ErrorBoundary'
 
 interface Task {
   id: string
@@ -37,6 +39,7 @@ export default function CalendarPage() {
   const [user, setUser] = useState<UserData | null>(null)
   const [currentDate, setCurrentDate] = useState(new Date())
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
   
   const supabase = createClient()
 
@@ -46,33 +49,56 @@ export default function CalendarPage() {
 
   async function loadData() {
     setLoading(true)
+    setLoadError(null)
     
-    const { data: { user: authUser } } = await supabase.auth.getUser()
-    if (authUser) {
-      setUser({
-        id: authUser.id,
-        email: authUser.email || '',
-        name: authUser.email?.split('@')[0],
-      })
+    try {
+      // Get user
+      const { data: { user: authUser }, error: authError } = await supabase.auth.getUser()
+      
+      if (authError) {
+        console.error('Auth error:', authError)
+      }
+      
+      if (authUser) {
+        setUser({
+          id: authUser.id,
+          email: authUser.email || '',
+          name: authUser.email?.split('@')[0],
+        })
+      }
+
+      // Get tasks with due dates
+      const { data: tasksData, error: tasksError } = await supabase
+        .from('tasks')
+        .select('id, title, status, priority, due_date')
+        .not('due_date', 'is', null)
+      
+      if (tasksError) {
+        console.error('Tasks fetch error:', tasksError)
+        throw tasksError
+      }
+      
+      setTasks(tasksData || [])
+
+      // Get content with scheduled dates
+      const { data: contentData, error: contentError } = await supabase
+        .from('content_items')
+        .select('id, title, status, scheduled_date')
+        .not('scheduled_date', 'is', null)
+      
+      if (contentError) {
+        console.error('Content fetch error:', contentError)
+        // Non-fatal - calendar can still show tasks
+      }
+      
+      setContent(contentData || [])
+    } catch (error) {
+      console.error('Load calendar data error:', error)
+      setLoadError(getErrorMessage(error))
+      showErrorToast(error, 'Failed to load calendar data')
+    } finally {
+      setLoading(false)
     }
-
-    // Get tasks with due dates
-    const { data: tasksData } = await supabase
-      .from('tasks')
-      .select('id, title, status, priority, due_date')
-      .not('due_date', 'is', null)
-    
-    if (tasksData) setTasks(tasksData)
-
-    // Get content with scheduled dates
-    const { data: contentData } = await supabase
-      .from('content_items')
-      .select('id, title, status, scheduled_date')
-      .not('scheduled_date', 'is', null)
-    
-    if (contentData) setContent(contentData)
-
-    setLoading(false)
   }
 
   const getDaysInMonth = (date: Date) => {
@@ -144,9 +170,16 @@ export default function CalendarPage() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+        {/* Error State */}
+        {loadError && !loading && (
+          <div className="mb-6">
+            <ErrorFallback error={loadError} resetError={loadData} />
+          </div>
+        )}
+        
         {loading ? (
           <div className="text-center py-12 text-slate-500">Loading calendar...</div>
-        ) : (
+        ) : !loadError && (
           <Card className="bg-white shadow-sm">
             <CardBody className="p-6">
               {/* Calendar Header */}

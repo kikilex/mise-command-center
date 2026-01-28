@@ -17,7 +17,8 @@ import {
 } from "@heroui/react"
 import { createClient } from '@/lib/supabase/client'
 import UserMenu from '@/components/UserMenu'
-import toast from 'react-hot-toast'
+import { showErrorToast, showSuccessToast, getErrorMessage } from '@/lib/errors'
+import { ErrorFallback } from '@/components/ErrorBoundary'
 
 interface SalesData {
   id: string;
@@ -36,6 +37,8 @@ interface ProductPerformance {
 export default function BusinessHubPage() {
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
   const [salesStats, setSalesStats] = useState({
     today: 0,
     week: 0,
@@ -57,72 +60,111 @@ export default function BusinessHubPage() {
   }, [])
 
   async function loadUser() {
-    const { data: { user: authUser } } = await supabase.auth.getUser()
-    if (authUser) {
-      const { data: profile } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', authUser.id)
-        .single()
+    try {
+      const { data: { user: authUser }, error: authError } = await supabase.auth.getUser()
+      
+      if (authError) {
+        console.error('Auth error:', authError)
+        return
+      }
+      
+      if (authUser) {
+        try {
+          const { data: profile, error: profileError } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', authUser.id)
+            .single()
 
-      setUser({
-        id: authUser.id,
-        email: authUser.email || '',
-        name: profile?.name || authUser.email?.split('@')[0],
-        avatar_url: profile?.avatar_url,
-      })
+          if (profileError) {
+            console.error('Profile fetch error:', profileError)
+          }
+
+          setUser({
+            id: authUser.id,
+            email: authUser.email || '',
+            name: profile?.name || authUser.email?.split('@')[0],
+            avatar_url: profile?.avatar_url,
+          })
+        } catch (err) {
+          console.error('Failed to fetch profile:', err)
+          setUser({
+            id: authUser.id,
+            email: authUser.email || '',
+            name: authUser.email?.split('@')[0],
+          })
+        }
+      }
+    } catch (error) {
+      console.error('Load user error:', error)
+      showErrorToast(error, 'Failed to load user data')
     }
   }
 
   async function loadBusinessData() {
     setLoading(true)
-    // Placeholder for fetching sales stats and product performance from Supabase
-    // This would involve more complex SQL queries or Supabase functions
-    // For now, setting dummy data
-    setSalesStats({
-      today: 1250,
-      week: 8500,
-      month: 32000,
-    })
+    setLoadError(null)
+    
+    try {
+      // Placeholder for fetching sales stats and product performance from Supabase
+      // This would involve more complex SQL queries or Supabase functions
+      // For now, setting dummy data
+      setSalesStats({
+        today: 1250,
+        week: 8500,
+        month: 32000,
+      })
 
-    setProductPerformance([
-      { product_id: 'prod_1', name: 'Product A', total_revenue: 15000, units_sold: 300 },
-      { product_id: 'prod_2', name: 'Product B', total_revenue: 10000, units_sold: 200 },
-      { product_id: 'prod_3', name: 'Product C', total_revenue: 7000, units_sold: 150 },
-    ])
-    setLoading(false)
+      setProductPerformance([
+        { product_id: 'prod_1', name: 'Product A', total_revenue: 15000, units_sold: 300 },
+        { product_id: 'prod_2', name: 'Product B', total_revenue: 10000, units_sold: 200 },
+        { product_id: 'prod_3', name: 'Product C', total_revenue: 7000, units_sold: 150 },
+      ])
+    } catch (error) {
+      console.error('Load business data error:', error)
+      setLoadError(getErrorMessage(error))
+      showErrorToast(error, 'Failed to load business data')
+    } finally {
+      setLoading(false)
+    }
   }
 
   async function handleSubmit() {
     if (!user) {
-      toast.error('You must be logged in to submit data.')
+      showErrorToast(null, 'You must be logged in to submit data.')
       return
     }
 
     const { product_name, amount, date } = formData;
 
     if (!product_name.trim() || !amount || !date) {
-      toast.error('Please fill in all fields.')
+      showErrorToast(null, 'Please fill in all fields.')
       return
     }
 
     const parsedAmount = parseFloat(amount);
     if (isNaN(parsedAmount) || parsedAmount <= 0) {
-      toast.error('Please enter a valid amount.')
+      showErrorToast(null, 'Please enter a valid amount.')
       return
     }
 
-    const { error } = await supabase
-      .from('sales_data') // Assuming a 'sales_data' table
-      .insert({
-        product_name,
-        amount: parsedAmount,
-        date,
-        user_id: user.id, // Associate sales data with the current user
-      })
+    setSubmitting(true)
 
-    if (!error) {
-      toast.success('Sales data entered successfully!')
+    try {
+      const { error } = await supabase
+        .from('sales_data') // Assuming a 'sales_data' table
+        .insert({
+          product_name,
+          amount: parsedAmount,
+          date,
+          user_id: user.id, // Associate sales data with the current user
+        })
+
+      if (error) {
+        throw error
+      }
+
+      showSuccessToast('Sales data entered successfully!')
       setFormData({
         product_name: '',
         amount: '',
@@ -130,8 +172,11 @@ export default function BusinessHubPage() {
       })
       onClose()
       loadBusinessData() // Refresh data after submission
-    } else {
-      toast.error('Failed to enter sales data: ' + error.message)
+    } catch (error) {
+      console.error('Submit sales data error:', error)
+      showErrorToast(error, 'Failed to enter sales data')
+    } finally {
+      setSubmitting(false)
     }
   }
 
@@ -160,10 +205,17 @@ export default function BusinessHubPage() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
         <h2 className="text-2xl font-bold text-slate-800 mb-6">Sales Overview</h2>
 
+        {/* Error State */}
+        {loadError && !loading && (
+          <div className="mb-6">
+            <ErrorFallback error={loadError} resetError={loadBusinessData} />
+          </div>
+        )}
+
         {/* Sales Stats */}
         {loading ? (
           <div className="text-center py-8 text-slate-500">Loading sales data...</div>
-        ) : (
+        ) : !loadError && (
           <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
             <Card className="bg-white">
               <CardBody className="p-5">
@@ -197,13 +249,13 @@ export default function BusinessHubPage() {
         {/* Product Performance Cards */}
         {loading ? (
           <div className="text-center py-8 text-slate-500">Loading product performance...</div>
-        ) : productPerformance.length === 0 ? (
+        ) : !loadError && productPerformance.length === 0 ? (
           <Card className="bg-white">
             <CardBody className="text-center py-12">
               <p className="text-slate-500">No product performance data available.</p>
             </CardBody>
           </Card>
-        ) : (
+        ) : !loadError && (
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {productPerformance.map((product) => (
               <Card key={product.product_id} className="bg-white">
@@ -262,6 +314,7 @@ export default function BusinessHubPage() {
               color="primary"
               onPress={handleSubmit}
               isDisabled={!formData.product_name.trim() || !formData.amount || !formData.date}
+              isLoading={submitting}
             >
               Submit Sales Data
             </Button>

@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardBody, CardHeader, Input, Button, Link, Divider } from '@heroui/react'
 import { createClient } from '@/lib/supabase/client'
+import { showErrorToast, getErrorMessage } from '@/lib/errors'
 
 export default function SignupPage() {
   const [name, setName] = useState('')
@@ -20,21 +21,68 @@ export default function SignupPage() {
     setLoading(true)
     setError('')
 
-    const { error } = await supabase.auth.signUp({
-      email,
-      password,
-      options: {
-        data: {
-          name: name,
-        },
-      },
-    })
-
-    if (error) {
-      setError(error.message)
+    // Validation
+    if (!name.trim()) {
+      setError('Please enter your name')
       setLoading(false)
-    } else {
+      return
+    }
+
+    if (!email.trim()) {
+      setError('Please enter your email address')
+      setLoading(false)
+      return
+    }
+
+    if (!password) {
+      setError('Please enter a password')
+      setLoading(false)
+      return
+    }
+
+    if (password.length < 6) {
+      setError('Password must be at least 6 characters')
+      setLoading(false)
+      return
+    }
+
+    try {
+      const { error: signUpError } = await supabase.auth.signUp({
+        email: email.trim(),
+        password,
+        options: {
+          data: {
+            name: name.trim(),
+          },
+        },
+      })
+
+      if (signUpError) {
+        // Provide user-friendly error messages
+        let friendlyMessage = getErrorMessage(signUpError)
+        
+        if (signUpError.message.includes('User already registered')) {
+          friendlyMessage = 'An account with this email already exists. Please sign in instead.'
+        } else if (signUpError.message.includes('Invalid email')) {
+          friendlyMessage = 'Please enter a valid email address.'
+        } else if (signUpError.message.includes('Password should be')) {
+          friendlyMessage = 'Password must be at least 6 characters.'
+        } else if (signUpError.message.includes('Too many requests')) {
+          friendlyMessage = 'Too many signup attempts. Please wait a moment and try again.'
+        }
+        
+        setError(friendlyMessage)
+        setLoading(false)
+        return
+      }
+
       setSuccess(true)
+      setLoading(false)
+    } catch (err) {
+      console.error('Signup error:', err)
+      const errorMessage = getErrorMessage(err)
+      setError(errorMessage)
+      showErrorToast(err, 'Signup failed')
       setLoading(false)
     }
   }
@@ -90,6 +138,7 @@ export default function SignupPage() {
               onChange={(e) => setName(e.target.value)}
               variant="bordered"
               isRequired
+              isDisabled={loading}
             />
             
             <Input
@@ -100,6 +149,7 @@ export default function SignupPage() {
               onChange={(e) => setEmail(e.target.value)}
               variant="bordered"
               isRequired
+              isDisabled={loading}
             />
             
             <Input
@@ -110,6 +160,7 @@ export default function SignupPage() {
               onChange={(e) => setPassword(e.target.value)}
               variant="bordered"
               isRequired
+              isDisabled={loading}
               description="At least 6 characters"
             />
             

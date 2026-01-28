@@ -17,6 +17,8 @@ import {
 import { useState, useEffect } from "react";
 import { createClient } from '@/lib/supabase/client'
 import UserMenu from '@/components/UserMenu'
+import { showErrorToast } from '@/lib/errors'
+import { ErrorFallback } from '@/components/ErrorBoundary'
 
 interface UserData {
   email: string
@@ -52,32 +54,71 @@ export default function Home() {
     recentTasks: []
   });
   const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
   const supabase = createClient();
 
-  useEffect(() => {
-    async function loadData() {
+  async function loadData() {
+    setLoading(true);
+    setLoadError(null);
+    
+    try {
       // Get user
-      const { data: { user: authUser } } = await supabase.auth.getUser();
+      const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+      
+      if (authError) {
+        console.error('Auth error:', authError);
+        // Non-fatal - user might not be logged in
+      }
+      
       if (authUser) {
-        const { data: profile } = await supabase
-          .from('users')
-          .select('*')
-          .eq('id', authUser.id)
-          .single();
-        
-        setUser({
-          email: authUser.email || '',
-          name: profile?.name || authUser.user_metadata?.name || authUser.email?.split('@')[0],
-          avatar_url: profile?.avatar_url,
-          role: profile?.role || 'member'
-        });
+        try {
+          const { data: profile, error: profileError } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', authUser.id)
+            .single();
+          
+          if (profileError) {
+            console.error('Profile fetch error:', profileError);
+          }
+          
+          setUser({
+            email: authUser.email || '',
+            name: profile?.name || authUser.user_metadata?.name || authUser.email?.split('@')[0],
+            avatar_url: profile?.avatar_url,
+            role: profile?.role || 'member'
+          });
+        } catch (err) {
+          console.error('Failed to fetch profile:', err);
+          // Set basic user info even if profile fails
+          setUser({
+            email: authUser.email || '',
+            name: authUser.user_metadata?.name || authUser.email?.split('@')[0],
+          });
+        }
       }
 
       // Get task stats
-      const { data: tasks } = await supabase.from('tasks').select('*');
-      const { data: content } = await supabase.from('content_items').select('*');
-      const { data: agents } = await supabase.from('ai_agents').select('*').eq('is_active', true);
-      const { data: users } = await supabase.from('users').select('id, name, email');
+      const { data: tasks, error: tasksError } = await supabase.from('tasks').select('*');
+      if (tasksError) {
+        console.error('Tasks fetch error:', tasksError);
+        showErrorToast(tasksError, 'Failed to load tasks');
+      }
+      
+      const { data: content, error: contentError } = await supabase.from('content_items').select('*');
+      if (contentError) {
+        console.error('Content fetch error:', contentError);
+      }
+      
+      const { data: agents, error: agentsError } = await supabase.from('ai_agents').select('*').eq('is_active', true);
+      if (agentsError) {
+        console.error('Agents fetch error:', agentsError);
+      }
+      
+      const { data: users, error: usersError } = await supabase.from('users').select('id, name, email');
+      if (usersError) {
+        console.error('Users fetch error:', usersError);
+      }
 
       const userMap = new Map(users?.map(u => [u.id, u.name || u.email?.split('@')[0]]) || []);
 
@@ -119,11 +160,26 @@ export default function Home() {
           aiAgents: agents.length || 1
         }));
       }
-
+    } catch (error) {
+      console.error('Dashboard load error:', error);
+      setLoadError('Failed to load dashboard data');
+      showErrorToast(error, 'Failed to load dashboard');
+    } finally {
       setLoading(false);
     }
+  }
+
+  useEffect(() => {
     loadData();
-  }, [supabase]);
+  }, []);
+
+  if (loadError && !loading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-50 via-white to-purple-50/30 p-4">
+        <ErrorFallback error={loadError} resetError={loadData} />
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-purple-50/30">

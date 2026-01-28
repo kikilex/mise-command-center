@@ -21,7 +21,8 @@ import {
 } from "@heroui/react"
 import { createClient } from '@/lib/supabase/client'
 import UserMenu from '@/components/UserMenu'
-import toast from 'react-hot-toast'
+import { showErrorToast, showSuccessToast, getErrorMessage } from '@/lib/errors'
+import { ErrorFallback } from '@/components/ErrorBoundary'
 
 interface ContentItem {
   id: string
@@ -68,6 +69,8 @@ export default function ContentPage() {
   const [content, setContent] = useState<ContentItem[]>([])
   const [user, setUser] = useState<UserData | null>(null)
   const [loading, setLoading] = useState(true)
+  const [loadError, setLoadError] = useState<string | null>(null)
+  const [submitting, setSubmitting] = useState(false)
   const [businessId, setBusinessId] = useState<string | null>(null)
   const { isOpen, onOpen, onClose } = useDisclosure()
   const [editingItem, setEditingItem] = useState<ContentItem | null>(null)
@@ -90,121 +93,189 @@ export default function ContentPage() {
 
   async function loadData() {
     setLoading(true)
+    setLoadError(null)
     
-    // Get user
-    const { data: { user: authUser } } = await supabase.auth.getUser()
-    if (authUser) {
-      const { data: profile } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', authUser.id)
-        .single()
+    try {
+      // Get user
+      const { data: { user: authUser }, error: authError } = await supabase.auth.getUser()
       
-      setUser({
-        id: authUser.id,
-        email: authUser.email || '',
-        name: profile?.name || authUser.email?.split('@')[0],
-        avatar_url: profile?.avatar_url,
-      })
-    }
+      if (authError) {
+        console.error('Auth error:', authError)
+      }
+      
+      if (authUser) {
+        try {
+          const { data: profile, error: profileError } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', authUser.id)
+            .single()
+          
+          if (profileError) {
+            console.error('Profile fetch error:', profileError)
+          }
+          
+          setUser({
+            id: authUser.id,
+            email: authUser.email || '',
+            name: profile?.name || authUser.email?.split('@')[0],
+            avatar_url: profile?.avatar_url,
+          })
+        } catch (err) {
+          console.error('Failed to fetch profile:', err)
+          setUser({
+            id: authUser.id,
+            email: authUser.email || '',
+            name: authUser.email?.split('@')[0],
+          })
+        }
+      }
 
-    // Get default business
-    const { data: businesses } = await supabase
-      .from('businesses')
-      .select('id')
-      .limit(1)
-    
-    if (businesses && businesses.length > 0) {
-      setBusinessId(businesses[0].id)
+      // Get default business
+      const { data: businesses, error: businessError } = await supabase
+        .from('businesses')
+        .select('id')
+        .limit(1)
       
-      // Get content items
-      const { data: contentData } = await supabase
-        .from('content_items')
-        .select('*')
-        .eq('business_id', businesses[0].id)
-        .order('created_at', { ascending: false })
+      if (businessError) {
+        console.error('Business fetch error:', businessError)
+        throw businessError
+      }
       
-      if (contentData) setContent(contentData)
+      if (businesses && businesses.length > 0) {
+        setBusinessId(businesses[0].id)
+        
+        // Get content items
+        const { data: contentData, error: contentError } = await supabase
+          .from('content_items')
+          .select('*')
+          .eq('business_id', businesses[0].id)
+          .order('created_at', { ascending: false })
+        
+        if (contentError) {
+          throw contentError
+        }
+        
+        setContent(contentData || [])
+      }
+    } catch (error) {
+      console.error('Load data error:', error)
+      setLoadError(getErrorMessage(error))
+      showErrorToast(error, 'Failed to load content')
+    } finally {
+      setLoading(false)
     }
-    
-    setLoading(false)
   }
 
   async function handleSubmit() {
-    if (!user || !businessId) return
+    if (!user) {
+      showErrorToast(null, 'Please sign in to manage content')
+      return
+    }
     
-    if (editingItem) {
-      const { error } = await supabase
-        .from('content_items')
-        .update({
-          title: formData.title,
-          type: formData.type,
-          status: formData.status,
-          script: formData.script || null,
-          hook: formData.hook || null,
-          source: formData.source || null,
-          actor_prompt: formData.actor_prompt || null,
-          voice: formData.voice || null,
-        })
-        .eq('id', editingItem.id)
-      
-      if (!error) {
-        toast.success('Content updated')
+    if (!businessId) {
+      showErrorToast(null, 'No business found. Please contact support.')
+      return
+    }
+    
+    if (!formData.title.trim()) {
+      showErrorToast(null, 'Please enter a title')
+      return
+    }
+    
+    setSubmitting(true)
+    
+    try {
+      if (editingItem) {
+        const { error } = await supabase
+          .from('content_items')
+          .update({
+            title: formData.title,
+            type: formData.type,
+            status: formData.status,
+            script: formData.script || null,
+            hook: formData.hook || null,
+            source: formData.source || null,
+            actor_prompt: formData.actor_prompt || null,
+            voice: formData.voice || null,
+          })
+          .eq('id', editingItem.id)
+        
+        if (error) {
+          throw error
+        }
+        
+        showSuccessToast('Content updated successfully')
         loadData()
         handleClose()
       } else {
-        toast.error('Failed to update content')
-      }
-    } else {
-      const { error } = await supabase
-        .from('content_items')
-        .insert({
-          title: formData.title,
-          type: formData.type,
-          status: formData.status,
-          script: formData.script || null,
-          hook: formData.hook || null,
-          source: formData.source || null,
-          actor_prompt: formData.actor_prompt || null,
-          voice: formData.voice || null,
-          business_id: businessId,
-          created_by: user.id,
-        })
-      
-      if (!error) {
-        toast.success('Content created')
+        const { error } = await supabase
+          .from('content_items')
+          .insert({
+            title: formData.title,
+            type: formData.type,
+            status: formData.status,
+            script: formData.script || null,
+            hook: formData.hook || null,
+            source: formData.source || null,
+            actor_prompt: formData.actor_prompt || null,
+            voice: formData.voice || null,
+            business_id: businessId,
+            created_by: user.id,
+          })
+        
+        if (error) {
+          throw error
+        }
+        
+        showSuccessToast('Content created successfully')
         loadData()
         handleClose()
-      } else {
-        toast.error('Failed to create content')
       }
+    } catch (error) {
+      console.error('Submit content error:', error)
+      showErrorToast(error, editingItem ? 'Failed to update content' : 'Failed to create content')
+    } finally {
+      setSubmitting(false)
     }
   }
 
   async function handleStatusChange(itemId: string, newStatus: string) {
-    const { error } = await supabase
-      .from('content_items')
-      .update({ status: newStatus })
-      .eq('id', itemId)
-    
-    if (!error) {
+    try {
+      const { error } = await supabase
+        .from('content_items')
+        .update({ status: newStatus })
+        .eq('id', itemId)
+      
+      if (error) {
+        throw error
+      }
+      
       const stage = pipelineStages.find(s => s.key === newStatus)
-      toast.success(`Moved to ${stage?.label || newStatus}`)
+      showSuccessToast(`Moved to ${stage?.label || newStatus}`)
       loadData()
+    } catch (error) {
+      console.error('Status change error:', error)
+      showErrorToast(error, 'Failed to update status')
     }
   }
 
   async function handleDelete(itemId: string) {
-    const { error } = await supabase
-      .from('content_items')
-      .delete()
-      .eq('id', itemId)
-    
-    if (!error) {
-      toast.success('Content deleted')
+    try {
+      const { error } = await supabase
+        .from('content_items')
+        .delete()
+        .eq('id', itemId)
+      
+      if (error) {
+        throw error
+      }
+      
+      showSuccessToast('Content deleted')
       loadData()
-    } else {
-      toast.error('Failed to delete content')
+    } catch (error) {
+      console.error('Delete content error:', error)
+      showErrorToast(error, 'Failed to delete content')
     }
   }
 
@@ -254,15 +325,6 @@ export default function ContentPage() {
   }
 
   const getItemsByStatus = (status: string) => content.filter(c => c.status === status)
-  
-  // Analytics calculations
-  const stageCounts = pipelineStages.map(stage => ({
-    ...stage,
-    count: getItemsByStatus(stage.key).length
-  }))
-  
-  const totalItems = content.length
-  const maxCount = Math.max(...stageCounts.map(s => s.count), 1)
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-purple-50/30">
@@ -288,91 +350,17 @@ export default function ContentPage() {
       </header>
 
       <main className="p-4 sm:p-6">
+        {/* Error State */}
+        {loadError && !loading && (
+          <div className="mb-6">
+            <ErrorFallback error={loadError} resetError={loadData} />
+          </div>
+        )}
+        
         {loading ? (
           <div className="text-center py-12 text-slate-500">Loading content pipeline...</div>
-        ) : (
-          <>
-            {/* Pipeline Analytics */}
-            <Card className="mb-6 bg-white shadow-sm border-0">
-              <CardHeader className="px-6 pt-5 pb-0">
-                <div className="flex items-center justify-between w-full">
-                  <h3 className="font-semibold text-slate-800 text-lg">Pipeline Analytics</h3>
-                  <Chip size="sm" className="bg-violet-100 text-violet-700 font-medium">
-                    {totalItems} Total Items
-                  </Chip>
-                </div>
-              </CardHeader>
-              <CardBody className="px-6 pb-6">
-                {/* Stage Count Cards */}
-                <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3 mb-6">
-                  {stageCounts.map(stage => (
-                    <div 
-                      key={stage.key} 
-                      className={`rounded-xl p-3 ${stage.color} transition-transform hover:scale-105`}
-                    >
-                      <p className={`text-2xl font-bold ${stage.textColor}`}>{stage.count}</p>
-                      <p className={`text-xs font-medium ${stage.textColor} opacity-80`}>{stage.label}</p>
-                    </div>
-                  ))}
-                </div>
-                
-                {/* Bar Chart - Pipeline Distribution */}
-                <div className="space-y-3">
-                  <p className="text-sm font-medium text-slate-600 mb-3">Pipeline Distribution</p>
-                  {stageCounts.map(stage => (
-                    <div key={stage.key} className="flex items-center gap-3">
-                      <span className={`text-xs font-medium w-20 ${stage.textColor}`}>{stage.label}</span>
-                      <div className="flex-1 h-6 bg-slate-100 rounded-full overflow-hidden">
-                        <div 
-                          className={`h-full ${stage.color} rounded-full transition-all duration-500 flex items-center justify-end pr-2`}
-                          style={{ width: totalItems > 0 ? `${Math.max((stage.count / maxCount) * 100, stage.count > 0 ? 10 : 0)}%` : '0%' }}
-                        >
-                          {stage.count > 0 && (
-                            <span className={`text-xs font-bold ${stage.textColor}`}>{stage.count}</span>
-                          )}
-                        </div>
-                      </div>
-                      <span className="text-xs text-slate-400 w-12 text-right">
-                        {totalItems > 0 ? Math.round((stage.count / totalItems) * 100) : 0}%
-                      </span>
-                    </div>
-                  ))}
-                </div>
-                
-                {/* Quick Stats */}
-                {totalItems > 0 && (
-                  <div className="mt-6 pt-4 border-t border-slate-100 flex flex-wrap gap-4">
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full bg-emerald-400"></div>
-                      <span className="text-sm text-slate-600">
-                        <span className="font-semibold">{stageCounts.find(s => s.key === 'posted')?.count || 0}</span> Published
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full bg-cyan-400"></div>
-                      <span className="text-sm text-slate-600">
-                        <span className="font-semibold">{stageCounts.find(s => s.key === 'scheduled')?.count || 0}</span> Scheduled
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full bg-amber-400"></div>
-                      <span className="text-sm text-slate-600">
-                        <span className="font-semibold">{stageCounts.find(s => s.key === 'review')?.count || 0}</span> In Review
-                      </span>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <div className="w-3 h-3 rounded-full bg-slate-300"></div>
-                      <span className="text-sm text-slate-600">
-                        <span className="font-semibold">{stageCounts.find(s => s.key === 'idea')?.count || 0}</span> Ideas Backlog
-                      </span>
-                    </div>
-                  </div>
-                )}
-              </CardBody>
-            </Card>
-            
-            {/* Pipeline Kanban Board */}
-            <div className="flex gap-4 overflow-x-auto pb-4">
+        ) : !loadError && (
+          <div className="flex gap-4 overflow-x-auto pb-4">
             {pipelineStages.map(stage => (
               <div key={stage.key} className="flex-shrink-0 w-72">
                 <div className={`rounded-t-xl px-4 py-2 ${stage.color}`}>
@@ -450,7 +438,6 @@ export default function ContentPage() {
               </div>
             ))}
           </div>
-          </>
         )}
       </main>
 
@@ -541,6 +528,7 @@ export default function ContentPage() {
               color="primary" 
               onPress={handleSubmit}
               isDisabled={!formData.title.trim()}
+              isLoading={submitting}
             >
               {editingItem ? 'Save Changes' : 'Create'}
             </Button>

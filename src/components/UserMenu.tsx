@@ -11,6 +11,7 @@ import {
   User
 } from "@heroui/react"
 import { createClient } from '@/lib/supabase/client'
+import { showErrorToast, showSuccessToast } from '@/lib/errors'
 
 interface UserMenuProps {
   user: {
@@ -26,10 +27,24 @@ export default function UserMenu({ user }: UserMenuProps) {
   const supabase = createClient()
 
   const handleLogout = async () => {
+    if (loading) return // Prevent double clicks
+    
     setLoading(true)
-    await supabase.auth.signOut()
-    router.push('/login')
-    router.refresh()
+    
+    try {
+      const { error } = await supabase.auth.signOut()
+      
+      if (error) {
+        throw error
+      }
+      
+      router.push('/login')
+      router.refresh()
+    } catch (error) {
+      console.error('Logout error:', error)
+      showErrorToast(error, 'Failed to sign out. Please try again.')
+      setLoading(false)
+    }
   }
 
   return (
@@ -57,6 +72,7 @@ export default function UserMenu({ user }: UserMenuProps) {
           color="danger" 
           onPress={handleLogout}
           textValue="logout"
+          isDisabled={loading}
         >
           {loading ? 'Signing out...' : 'Sign Out'}
         </DropdownItem>

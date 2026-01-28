@@ -4,6 +4,7 @@ import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { Card, CardBody, CardHeader, Input, Button, Link, Divider } from '@heroui/react'
 import { createClient } from '@/lib/supabase/client'
+import { showErrorToast, getErrorMessage } from '@/lib/errors'
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -18,17 +19,50 @@ export default function LoginPage() {
     setLoading(true)
     setError('')
 
-    const { error } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
-
-    if (error) {
-      setError(error.message)
+    // Validation
+    if (!email.trim()) {
+      setError('Please enter your email address')
       setLoading(false)
-    } else {
+      return
+    }
+
+    if (!password) {
+      setError('Please enter your password')
+      setLoading(false)
+      return
+    }
+
+    try {
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: email.trim(),
+        password,
+      })
+
+      if (signInError) {
+        // Provide user-friendly error messages
+        let friendlyMessage = getErrorMessage(signInError)
+        
+        if (signInError.message.includes('Invalid login credentials')) {
+          friendlyMessage = 'Invalid email or password. Please try again.'
+        } else if (signInError.message.includes('Email not confirmed')) {
+          friendlyMessage = 'Please verify your email address before signing in.'
+        } else if (signInError.message.includes('Too many requests')) {
+          friendlyMessage = 'Too many login attempts. Please wait a moment and try again.'
+        }
+        
+        setError(friendlyMessage)
+        setLoading(false)
+        return
+      }
+
       router.push('/')
       router.refresh()
+    } catch (err) {
+      console.error('Login error:', err)
+      const errorMessage = getErrorMessage(err)
+      setError(errorMessage)
+      showErrorToast(err, 'Login failed')
+      setLoading(false)
     }
   }
 
@@ -58,6 +92,7 @@ export default function LoginPage() {
               onChange={(e) => setEmail(e.target.value)}
               variant="bordered"
               isRequired
+              isDisabled={loading}
             />
             
             <Input
@@ -68,6 +103,7 @@ export default function LoginPage() {
               onChange={(e) => setPassword(e.target.value)}
               variant="bordered"
               isRequired
+              isDisabled={loading}
             />
             
             <Button

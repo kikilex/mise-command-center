@@ -9,16 +9,12 @@ import {
   Chip,
   Avatar,
   Progress,
-  Divider,
-  Switch,
-  Input,
-  Select,
-  SelectItem,
-  Checkbox,
-  CheckboxGroup
+  Divider
 } from "@heroui/react"
 import { createClient } from '@/lib/supabase/client'
 import UserMenu from '@/components/UserMenu'
+import { showErrorToast, getErrorMessage } from '@/lib/errors'
+import { ErrorFallback } from '@/components/ErrorBoundary'
 
 interface AIAgent {
   id: string
@@ -45,40 +41,12 @@ interface WorkLog {
   created_at: string
 }
 
-interface AutonomousSettings {
-  enabled: boolean
-  maxActionsPerSession: number
-  requireApprovalForExternal: boolean
-  notifications: {
-    onTaskComplete: boolean
-    onError: boolean
-    onApprovalNeeded: boolean
-    deliveryMethod: 'email' | 'push' | 'both' | 'none'
-  }
-}
-
 interface UserData {
   id: string
   email: string
   name?: string
   avatar_url?: string
   role?: string
-  settings?: {
-    autonomous?: AutonomousSettings
-    [key: string]: unknown
-  }
-}
-
-const defaultAutonomousSettings: AutonomousSettings = {
-  enabled: false,
-  maxActionsPerSession: 10,
-  requireApprovalForExternal: true,
-  notifications: {
-    onTaskComplete: true,
-    onError: true,
-    onApprovalNeeded: true,
-    deliveryMethod: 'push'
-  }
 }
 
 export default function AIWorkspacePage() {
@@ -87,8 +55,7 @@ export default function AIWorkspacePage() {
   const [aiTasks, setAiTasks] = useState<any[]>([])
   const [user, setUser] = useState<UserData | null>(null)
   const [loading, setLoading] = useState(true)
-  const [autonomousSettings, setAutonomousSettings] = useState<AutonomousSettings>(defaultAutonomousSettings)
-  const [savingSettings, setSavingSettings] = useState(false)
+  const [loadError, setLoadError] = useState<string | null>(null)
   
   const supabase = createClient()
 
@@ -98,121 +65,111 @@ export default function AIWorkspacePage() {
 
   async function loadData() {
     setLoading(true)
+    setLoadError(null)
     
-    // Get user
-    const { data: { user: authUser } } = await supabase.auth.getUser()
-    if (authUser) {
-      const { data: profile } = await supabase
-        .from('users')
-        .select('*')
-        .eq('id', authUser.id)
-        .single()
+    try {
+      // Get user
+      const { data: { user: authUser }, error: authError } = await supabase.auth.getUser()
       
-      setUser({
-        id: authUser.id,
-        email: authUser.email || '',
-        name: profile?.name || authUser.email?.split('@')[0],
-        avatar_url: profile?.avatar_url,
-        role: profile?.role,
-        settings: profile?.settings
-      })
-
-      // Load autonomous settings from user profile
-      if (profile?.settings?.autonomous) {
-        setAutonomousSettings({
-          ...defaultAutonomousSettings,
-          ...profile.settings.autonomous
-        })
+      if (authError) {
+        console.error('Auth error:', authError)
       }
+      
+      if (authUser) {
+        try {
+          const { data: profile, error: profileError } = await supabase
+            .from('users')
+            .select('*')
+            .eq('id', authUser.id)
+            .single()
+          
+          if (profileError) {
+            console.error('Profile fetch error:', profileError)
+          }
+          
+          setUser({
+            id: authUser.id,
+            email: authUser.email || '',
+            name: profile?.name || authUser.email?.split('@')[0],
+            avatar_url: profile?.avatar_url,
+            role: profile?.role
+          })
+        } catch (err) {
+          console.error('Failed to fetch profile:', err)
+          setUser({
+            id: authUser.id,
+            email: authUser.email || '',
+            name: authUser.email?.split('@')[0],
+          })
+        }
+      }
+
+      // Get AI agents
+      const { data: agentsData, error: agentsError } = await supabase
+        .from('ai_agents')
+        .select('*')
+        .order('created_at', { ascending: true })
+      
+      if (agentsError) {
+        console.error('Agents fetch error:', agentsError)
+        throw agentsError
+      }
+      
+      setAgents(agentsData || [])
+
+      // Get work logs
+      const { data: logsData, error: logsError } = await supabase
+        .from('ai_work_log')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(50)
+      
+      if (logsError) {
+        console.error('Work logs fetch error:', logsError)
+        // Non-fatal - we can still show agents
+      }
+      
+      setWorkLogs(logsData || [])
+
+      // Get AI-flagged tasks
+      const { data: tasksData, error: tasksError } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('ai_flag', true)
+        .neq('status', 'done')
+        .order('priority', { ascending: true })
+      
+      if (tasksError) {
+        console.error('AI tasks fetch error:', tasksError)
+        // Non-fatal - we can still show agents and logs
+      }
+      
+      setAiTasks(tasksData || [])
+    } catch (error) {
+      console.error('Load AI workspace error:', error)
+      setLoadError(getErrorMessage(error))
+      showErrorToast(error, 'Failed to load AI workspace')
+    } finally {
+      setLoading(false)
     }
-
-    // Get AI agents
-    const { data: agentsData } = await supabase
-      .from('ai_agents')
-      .select('*')
-      .order('created_at', { ascending: true })
-    
-    if (agentsData) setAgents(agentsData)
-
-    // Get work logs
-    const { data: logsData } = await supabase
-      .from('ai_work_log')
-      .select('*')
-      .order('created_at', { ascending: false })
-      .limit(50)
-    
-    if (logsData) setWorkLogs(logsData)
-
-    // Get AI-flagged tasks
-    const { data: tasksData } = await supabase
-      .from('tasks')
-      .select('*')
-      .eq('ai_flag', true)
-      .neq('status', 'done')
-      .order('priority', { ascending: true })
-    
-    if (tasksData) setAiTasks(tasksData)
-
-    setLoading(false)
-  }
-
-  async function saveAutonomousSettings(newSettings: AutonomousSettings) {
-    if (!user) return
-    
-    setSavingSettings(true)
-    
-    // Merge with existing user settings
-    const updatedSettings = {
-      ...(user.settings || {}),
-      autonomous: newSettings
-    }
-    
-    const { error } = await supabase
-      .from('users')
-      .update({ settings: updatedSettings })
-      .eq('id', user.id)
-    
-    if (!error) {
-      setAutonomousSettings(newSettings)
-      setUser({ ...user, settings: updatedSettings })
-    }
-    
-    setSavingSettings(false)
-  }
-
-  function updateAutonomousSetting<K extends keyof AutonomousSettings>(
-    key: K,
-    value: AutonomousSettings[K]
-  ) {
-    const newSettings = { ...autonomousSettings, [key]: value }
-    setAutonomousSettings(newSettings)
-    saveAutonomousSettings(newSettings)
-  }
-
-  function updateNotificationSetting<K extends keyof AutonomousSettings['notifications']>(
-    key: K,
-    value: AutonomousSettings['notifications'][K]
-  ) {
-    const newSettings = {
-      ...autonomousSettings,
-      notifications: { ...autonomousSettings.notifications, [key]: value }
-    }
-    setAutonomousSettings(newSettings)
-    saveAutonomousSettings(newSettings)
   }
 
   function formatTime(dateStr: string) {
-    const date = new Date(dateStr)
-    const now = new Date()
-    const diff = now.getTime() - date.getTime()
-    const minutes = Math.floor(diff / 60000)
-    const hours = Math.floor(minutes / 60)
-    const days = Math.floor(hours / 24)
+    try {
+      const date = new Date(dateStr)
+      const now = new Date()
+      const diff = now.getTime() - date.getTime()
+      const minutes = Math.floor(diff / 60000)
+      const hours = Math.floor(minutes / 60)
+      const days = Math.floor(hours / 24)
 
-    if (minutes < 1) return 'Just now'
-    if (minutes < 60) return `${minutes}m ago`
-    if (hours < 24) return `${hours}h ago`
-    return `${days}d ago`
+      if (minutes < 1) return 'Just now'
+      if (minutes < 60) return `${minutes}m ago`
+      if (hours < 24) return `${hours}h ago`
+      return `${days}d ago`
+    } catch {
+      return 'Unknown'
+    }
   }
 
   function getActionIcon(action: string) {
@@ -261,155 +218,19 @@ export default function AIWorkspacePage() {
       </header>
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+        {/* Error State */}
+        {loadError && !loading && (
+          <div className="mb-6">
+            <ErrorFallback error={loadError} resetError={loadData} />
+          </div>
+        )}
+        
         {loading ? (
           <div className="text-center py-12 text-slate-500">Loading AI workspace...</div>
-        ) : (
+        ) : !loadError && (
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Left Column - Agents & Queue */}
             <div className="lg:col-span-2 space-y-6">
-              {/* Autonomous Mode Controls */}
-              <Card className="bg-white shadow-sm border-2 border-violet-100">
-                <CardHeader className="px-6 pt-6 pb-2">
-                  <div className="flex items-center justify-between w-full">
-                    <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-400 to-orange-500 flex items-center justify-center">
-                        <span className="text-white text-xl">🤖</span>
-                      </div>
-                      <div>
-                        <h2 className="text-lg font-semibold text-slate-800">Autonomous Mode</h2>
-                        <p className="text-sm text-slate-500">Control AI autonomous operations</p>
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      {savingSettings && (
-                        <span className="text-xs text-slate-400">Saving...</span>
-                      )}
-                      <Switch
-                        isSelected={autonomousSettings.enabled}
-                        onValueChange={(value) => updateAutonomousSetting('enabled', value)}
-                        color="warning"
-                        size="lg"
-                      >
-                        <span className={autonomousSettings.enabled ? 'text-amber-600 font-medium' : 'text-slate-400'}>
-                          {autonomousSettings.enabled ? 'Active' : 'Disabled'}
-                        </span>
-                      </Switch>
-                    </div>
-                  </div>
-                </CardHeader>
-                <CardBody className="px-6 pb-6">
-                  <div className={`space-y-6 ${!autonomousSettings.enabled ? 'opacity-50 pointer-events-none' : ''}`}>
-                    {/* Session Limits */}
-                    <div className="p-4 rounded-xl bg-slate-50">
-                      <h3 className="font-medium text-slate-700 mb-3">Session Limits</h3>
-                      <div className="flex items-center gap-4">
-                        <label className="text-sm text-slate-600 whitespace-nowrap">
-                          Max actions per session:
-                        </label>
-                        <Input
-                          type="number"
-                          min={1}
-                          max={100}
-                          value={autonomousSettings.maxActionsPerSession.toString()}
-                          onChange={(e) => {
-                            const val = parseInt(e.target.value) || 10
-                            updateAutonomousSetting('maxActionsPerSession', Math.min(100, Math.max(1, val)))
-                          }}
-                          className="w-24"
-                          size="sm"
-                        />
-                        <span className="text-xs text-slate-400">
-                          (1-100 actions before requiring human check-in)
-                        </span>
-                      </div>
-                    </div>
-
-                    {/* Approval Settings */}
-                    <div className="p-4 rounded-xl bg-slate-50">
-                      <h3 className="font-medium text-slate-700 mb-3">Approval Requirements</h3>
-                      <Switch
-                        isSelected={autonomousSettings.requireApprovalForExternal}
-                        onValueChange={(value) => updateAutonomousSetting('requireApprovalForExternal', value)}
-                        size="sm"
-                      >
-                        <div>
-                          <span className="text-sm text-slate-700">Require approval for external actions</span>
-                          <p className="text-xs text-slate-400 mt-1">
-                            AI will pause and request approval before sending emails, posting content, or making API calls
-                          </p>
-                        </div>
-                      </Switch>
-                    </div>
-
-                    {/* Notification Preferences */}
-                    <div className="p-4 rounded-xl bg-slate-50">
-                      <h3 className="font-medium text-slate-700 mb-4">Notification Preferences</h3>
-                      <div className="space-y-4">
-                        <div className="flex flex-wrap gap-6">
-                          <Checkbox
-                            isSelected={autonomousSettings.notifications.onTaskComplete}
-                            onValueChange={(value) => updateNotificationSetting('onTaskComplete', value)}
-                            size="sm"
-                          >
-                            <span className="text-sm text-slate-600">Task completed</span>
-                          </Checkbox>
-                          <Checkbox
-                            isSelected={autonomousSettings.notifications.onError}
-                            onValueChange={(value) => updateNotificationSetting('onError', value)}
-                            size="sm"
-                          >
-                            <span className="text-sm text-slate-600">Errors occurred</span>
-                          </Checkbox>
-                          <Checkbox
-                            isSelected={autonomousSettings.notifications.onApprovalNeeded}
-                            onValueChange={(value) => updateNotificationSetting('onApprovalNeeded', value)}
-                            size="sm"
-                          >
-                            <span className="text-sm text-slate-600">Approval needed</span>
-                          </Checkbox>
-                        </div>
-                        
-                        <Divider className="my-3" />
-                        
-                        <div className="flex items-center gap-4">
-                          <label className="text-sm text-slate-600">Delivery method:</label>
-                          <Select
-                            selectedKeys={[autonomousSettings.notifications.deliveryMethod]}
-                            onSelectionChange={(keys) => {
-                              const value = Array.from(keys)[0] as AutonomousSettings['notifications']['deliveryMethod']
-                              if (value) updateNotificationSetting('deliveryMethod', value)
-                            }}
-                            className="w-40"
-                            size="sm"
-                          >
-                            <SelectItem key="push">Push only</SelectItem>
-                            <SelectItem key="email">Email only</SelectItem>
-                            <SelectItem key="both">Push & Email</SelectItem>
-                            <SelectItem key="none">None</SelectItem>
-                          </Select>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Status Banner */}
-                    {autonomousSettings.enabled && (
-                      <div className="p-4 rounded-xl bg-amber-50 border border-amber-200">
-                        <div className="flex items-center gap-3">
-                          <span className="text-2xl">⚡</span>
-                          <div>
-                            <p className="font-medium text-amber-800">Autonomous Mode Active</p>
-                            <p className="text-sm text-amber-600">
-                              AI can perform up to {autonomousSettings.maxActionsPerSession} actions per session
-                              {autonomousSettings.requireApprovalForExternal && ', with approval required for external actions'}
-                            </p>
-                          </div>
-                        </div>
-                      </div>
-                    )}
-                  </div>
-                </CardBody>
-              </Card>
-
               {/* AI Agents */}
               <Card className="bg-white shadow-sm">
                 <CardHeader className="px-6 pt-6 pb-2">
