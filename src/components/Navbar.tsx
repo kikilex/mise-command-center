@@ -21,9 +21,6 @@ interface NavbarProps {
   actions?: React.ReactNode
 }
 
-// Settings is always shown (not customizable)
-const settingsItem = { key: 'settings', href: '/settings', label: 'Settings', icon: '⚙️' }
-
 export default function Navbar({ user, actions }: NavbarProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const pathname = usePathname()
@@ -33,16 +30,14 @@ export default function Navbar({ user, actions }: NavbarProps) {
   // Determine if we're in business mode (a business is selected)
   const isBusinessMode = selectedBusiness !== null
 
-  // Get nav items based on current mode from user settings
+  // Get nav items based on current mode from user settings (no settings in nav)
   const navItems = useMemo(() => {
-    const dynamicItems = getActiveNavItems(isBusinessMode).map(item => ({
+    return getActiveNavItems(isBusinessMode).map(item => ({
       key: item.key,
       href: item.href,
       label: item.label,
       icon: item.icon,
     }))
-    // Always include settings at the end
-    return [...dynamicItems, settingsItem]
   }, [getActiveNavItems, isBusinessMode])
 
   const isActive = (href: string) => {

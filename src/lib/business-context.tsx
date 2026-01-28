@@ -44,17 +44,21 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
 
   // Load saved selection from localStorage after businesses are loaded
   useEffect(() => {
-    if (!initialized && businesses.length > 0) {
+    if (!initialized && !loading) {
       const saved = localStorage.getItem(STORAGE_KEY)
-      if (saved && businesses.find(b => b.id === saved)) {
+      if (saved === 'personal' || saved === null) {
+        // User explicitly chose Personal mode or no selection saved
+        setSelectedBusinessIdState(null)
+      } else if (saved && businesses.find(b => b.id === saved)) {
+        // Valid business ID saved
         setSelectedBusinessIdState(saved)
-      } else if (businesses.length > 0) {
-        // Default to first business if no valid saved selection
-        setSelectedBusinessIdState(businesses[0].id)
+      } else {
+        // No valid saved selection - default to Personal (null), not first business
+        setSelectedBusinessIdState(null)
       }
       setInitialized(true)
     }
-  }, [businesses, initialized])
+  }, [businesses, loading, initialized])
 
   async function loadBusinesses() {
     setLoading(true)
@@ -84,7 +88,8 @@ export function BusinessProvider({ children }: { children: ReactNode }) {
     if (id) {
       localStorage.setItem(STORAGE_KEY, id)
     } else {
-      localStorage.removeItem(STORAGE_KEY)
+      // Explicitly save "personal" so we know user chose Personal mode
+      localStorage.setItem(STORAGE_KEY, 'personal')
     }
   }
 
