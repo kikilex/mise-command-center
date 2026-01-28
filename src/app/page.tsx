@@ -43,45 +43,51 @@ export default function Home() {
         className="bg-white/80 backdrop-blur-sm border-b border-slate-100 sticky top-0 z-50"
         maxWidth="full"
       >
-        <NavbarContent className="basis-1/5 sm:basis-full" justify="start">
-          <NavbarBrand as="li" className="gap-3 max-w-fit">
-            <div className="flex items-center gap-4">
-              <div className="flex items-center gap-2">
-                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
-                  <span className="text-white font-bold text-lg">M</span>
-                </div>
-                <span className="font-semibold text-slate-800 text-lg">Mise</span>
+        {/* Brand - always visible */}
+        <NavbarContent justify="start">
+          <NavbarBrand className="gap-3 max-w-fit">
+            <div className="flex items-center gap-2">
+              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
+                <span className="text-white font-bold text-lg">M</span>
               </div>
-              <div className="hidden sm:flex items-center gap-1 ml-4">
-                <div className="w-8 h-8 rounded-full bg-emerald-400 flex items-center justify-center text-white text-xs font-medium">CC</div>
-                <div className="w-8 h-8 rounded-full bg-blue-400 flex items-center justify-center text-white text-xs font-medium">+</div>
-              </div>
+              <span className="font-semibold text-slate-800 text-lg">Mise</span>
+            </div>
+            <div className="hidden md:flex items-center gap-1 ml-4">
+              <div className="w-8 h-8 rounded-full bg-emerald-400 flex items-center justify-center text-white text-xs font-medium">CC</div>
+              <div className="w-8 h-8 rounded-full bg-blue-400 flex items-center justify-center text-white text-xs font-medium">+</div>
             </div>
           </NavbarBrand>
         </NavbarContent>
 
-        <NavbarContent className="hidden md:flex basis-1/5 sm:basis-full" justify="center">
-          <NavbarItem>
-            <Tabs 
-              aria-label="Navigation" 
-              variant="light" 
-              classNames={{
-                tabList: "gap-2",
-                tab: "px-4 py-2 text-sm font-medium",
-                cursor: "bg-white shadow-md",
-              }}
-              defaultSelectedKey="overview"
-            >
-              <Tab key="overview" title="Overview" />
-              <Tab key="tasks" title="Tasks" />
-              <Tab key="content" title="Content" />
-              <Tab key="businesses" title="Businesses" />
-              <Tab key="analytics" title="Analytics" />
-            </Tabs>
-          </NavbarItem>
+        {/* Desktop navigation tabs - hidden on mobile */}
+        <NavbarContent className="hidden md:flex gap-4" justify="center">
+          <Tabs 
+            aria-label="Navigation" 
+            variant="light" 
+            classNames={{
+              tabList: "gap-2",
+              tab: "px-4 py-2 text-sm font-medium",
+              cursor: "bg-white shadow-md",
+            }}
+            defaultSelectedKey="overview"
+          >
+            <Tab key="overview" title="Overview" />
+            <Tab key="tasks" title="Tasks" />
+            <Tab key="content" title="Content" />
+            <Tab key="businesses" title="Businesses" />
+            <Tab key="analytics" title="Analytics" />
+          </Tabs>
         </NavbarContent>
 
-        <NavbarContent className="basis-1 pl-4" justify="end">
+        {/* Mobile menu toggle - LEFT side on mobile */}
+        <NavbarContent className="md:hidden" justify="start">
+          <NavbarMenuToggle
+            aria-label={isMenuOpen ? "Close menu" : "Open menu"}
+          />
+        </NavbarContent>
+
+        {/* Right side - notifications and avatar */}
+        <NavbarContent justify="end">
           <NavbarItem className="hidden sm:flex">
             <Button isIconOnly variant="light" className="text-slate-500">
               <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -96,21 +102,19 @@ export default function Home() {
               className="ring-2 ring-white shadow-md"
             />
           </NavbarItem>
-          <NavbarMenuToggle
-            aria-label={isMenuOpen ? "Close menu" : "Open menu"}
-            className="md:hidden"
-          />
         </NavbarContent>
 
-        <NavbarMenu>
+        <NavbarMenu className="bg-white/95 backdrop-blur-md pt-6 gap-4">
           {menuItems.map((item, index) => (
             <NavbarMenuItem key={`${item}-${index}`}>
-              <div
-                className="w-full text-slate-800 hover:text-violet-600 cursor-pointer py-2"
-                onClick={() => setIsMenuOpen(false)}
+              <Button
+                fullWidth
+                variant="light"
+                className="justify-start text-lg font-medium text-slate-700 hover:text-violet-600 hover:bg-violet-50"
+                onPress={() => setIsMenuOpen(false)}
               >
                 {item}
-              </div>
+              </Button>
             </NavbarMenuItem>
           ))}
         </NavbarMenu>
