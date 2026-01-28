@@ -170,7 +170,7 @@ export default function Home() {
               <a href="/tasks" className="px-4 py-2 text-sm font-medium rounded-lg text-slate-600 hover:bg-white/50 transition-colors">
                 Tasks
               </a>
-              <a href="#" className="px-4 py-2 text-sm font-medium rounded-lg text-slate-600 hover:bg-white/50 transition-colors">
+              <a href="/content" className="px-4 py-2 text-sm font-medium rounded-lg text-slate-600 hover:bg-white/50 transition-colors">
                 Content
               </a>
               <a href="#" className="px-4 py-2 text-sm font-medium rounded-lg text-slate-600 hover:bg-white/50 transition-colors">
@@ -210,7 +210,7 @@ export default function Home() {
               <a href="/tasks" className="w-full text-left px-4 py-3 rounded-lg text-slate-700 hover:bg-violet-50 hover:text-violet-600 font-medium transition-colors">
                 Tasks
               </a>
-              <a href="#" className="w-full text-left px-4 py-3 rounded-lg text-slate-700 hover:bg-violet-50 hover:text-violet-600 font-medium transition-colors">
+              <a href="/content" className="w-full text-left px-4 py-3 rounded-lg text-slate-700 hover:bg-violet-50 hover:text-violet-600 font-medium transition-colors">
                 Content
               </a>
               <a href="#" className="w-full text-left px-4 py-3 rounded-lg text-slate-700 hover:bg-violet-50 hover:text-violet-600 font-medium transition-colors">
