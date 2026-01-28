@@ -9,13 +9,14 @@ export interface MenuConfig {
 }
 
 export const DEFAULT_MENU_CONFIG: MenuConfig = {
-  personal: ['dashboard', 'tasks', 'calendar', 'notes', 'family'],
-  business: ['dashboard', 'tasks', 'content', 'calendar', 'ai'],
+  personal: ['dashboard', 'tasks', 'projects', 'calendar', 'notes', 'family'],
+  business: ['dashboard', 'tasks', 'projects', 'content', 'calendar', 'ai'],
 }
 
 export const PERSONAL_MENU_OPTIONS = [
   { key: 'dashboard', label: 'Dashboard', icon: '🏠', href: '/' },
   { key: 'tasks', label: 'Tasks', icon: '✅', href: '/tasks' },
+  { key: 'projects', label: 'Projects', icon: '📁', href: '/projects' },
   { key: 'calendar', label: 'Calendar', icon: '📅', href: '/calendar' },
   { key: 'notes', label: 'Notes', icon: '📝', href: '/notes' },
   { key: 'family', label: 'Family', icon: '👨‍👩‍👧‍👦', href: '/family' },
@@ -24,6 +25,7 @@ export const PERSONAL_MENU_OPTIONS = [
 export const BUSINESS_MENU_OPTIONS = [
   { key: 'dashboard', label: 'Dashboard', icon: '🏠', href: '/' },
   { key: 'tasks', label: 'Tasks', icon: '✅', href: '/tasks' },
+  { key: 'projects', label: 'Projects', icon: '📁', href: '/projects' },
   { key: 'content', label: 'Content', icon: '🎬', href: '/content' },
   { key: 'calendar', label: 'Calendar', icon: '📅', href: '/calendar' },
   { key: 'ai', label: 'AI Workspace', icon: '🤖', href: '/ai' },
