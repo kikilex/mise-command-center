@@ -71,6 +71,7 @@ export default function TasksPage() {
     status: 'todo',
     priority: 'medium',
     ai_flag: false,
+    due_date: '',
   })
   
   const supabase = createClient()
@@ -122,6 +123,7 @@ export default function TasksPage() {
           status: formData.status,
           priority: formData.priority,
           ai_flag: formData.ai_flag,
+          due_date: formData.due_date || null,
         })
         .eq('id', editingTask.id)
       
@@ -143,6 +145,7 @@ export default function TasksPage() {
           priority: formData.priority,
           ai_flag: formData.ai_flag,
           created_by: user.id,
+          due_date: formData.due_date || null,
         })
       
       if (!error) {
@@ -189,6 +192,7 @@ export default function TasksPage() {
       status: task.status,
       priority: task.priority,
       ai_flag: task.ai_flag,
+      due_date: task.due_date || '',
     })
     onOpen()
   }
@@ -201,6 +205,7 @@ export default function TasksPage() {
       status: 'todo',
       priority: 'medium',
       ai_flag: false,
+      due_date: '',
     })
     onClose()
   }
@@ -213,6 +218,7 @@ export default function TasksPage() {
       status: 'todo',
       priority: 'medium',
       ai_flag: false,
+      due_date: '',
     })
     onOpen()
   }
@@ -327,6 +333,11 @@ export default function TasksPage() {
                         <Chip size="sm" variant="flat" className="capitalize">
                           {task.priority}
                         </Chip>
+                        {task.due_date && (
+                          <Chip size="sm" variant="flat" className="bg-blue-100 text-blue-700">
+                            Due: {new Date(task.due_date).toLocaleDateString()}
+                          </Chip>
+                        )}
                       </div>
                     </div>
 
@@ -376,6 +387,13 @@ export default function TasksPage() {
                 placeholder="Add details..."
                 value={formData.description}
                 onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+              />
+              <Input
+                label="Due Date"
+                type="date"
+                placeholder="Set a due date"
+                value={formData.due_date}
+                onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
               />
               <div className="grid grid-cols-2 gap-4">
                 <Select
