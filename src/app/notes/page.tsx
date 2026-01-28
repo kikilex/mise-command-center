@@ -373,6 +373,24 @@ export default function NotesPage() {
     ]
   }, [usedFolders])
 
+  // Folder filter options (includes "all")
+  const folderFilterOptions = useMemo(() => [
+    { key: 'all', label: 'All Folders' },
+    ...allFolders
+  ], [allFolders])
+
+  // Tag filter options (includes "all")
+  const tagFilterOptions = useMemo(() => [
+    { key: 'all', label: 'All Tags' },
+    ...allTags.map(t => ({ key: t, label: `#${t}` }))
+  ], [allTags])
+
+  // Project options (includes "none")
+  const projectOptions = useMemo(() => [
+    { key: '', label: 'None' },
+    ...projects.map(p => ({ key: p.id, label: p.name }))
+  ], [projects])
+
   // Filter notes
   const filteredNotes = useMemo(() => {
     return notes.filter(note => {
@@ -462,12 +480,9 @@ export default function NotesPage() {
               className="w-40"
               size="sm"
             >
-              {[
-                <SelectItem key="all">All Folders</SelectItem>,
-                ...allFolders.map(f => (
-                  <SelectItem key={f.key}>{f.label}</SelectItem>
-                ))
-              ]}
+              {folderFilterOptions.map(f => (
+                <SelectItem key={f.key}>{f.label}</SelectItem>
+              ))}
             </Select>
             
             {allTags.length > 0 && (
@@ -478,12 +493,9 @@ export default function NotesPage() {
                 className="w-40"
                 size="sm"
               >
-                {[
-                  <SelectItem key="all">All Tags</SelectItem>,
-                  ...allTags.map(tag => (
-                    <SelectItem key={tag}>#{tag}</SelectItem>
-                  ))
-                ]}
+                {tagFilterOptions.map(t => (
+                  <SelectItem key={t.key}>{t.label}</SelectItem>
+                ))}
               </Select>
             )}
           </div>
@@ -675,9 +687,10 @@ export default function NotesPage() {
                   label="Link to Project (optional)"
                   selectedKeys={formData.project_id ? [formData.project_id] : []}
                   onChange={(e) => setFormData({ ...formData, project_id: e.target.value })}
-                  items={[{ id: '', name: 'None' }, ...projects]}
                 >
-                  {(item) => <SelectItem key={item.id}>{item.name}</SelectItem>}
+                  {projectOptions.map(p => (
+                    <SelectItem key={p.key}>{p.label}</SelectItem>
+                  ))}
                 </Select>
               </div>
               
