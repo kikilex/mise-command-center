@@ -11,16 +11,40 @@ import {
   Progress,
   Input,
   Tabs,
-  Tab
+  Tab,
+  Navbar,
+  NavbarBrand,
+  NavbarContent,
+  NavbarItem,
+  NavbarMenuToggle,
+  NavbarMenu,
+  NavbarMenuItem
 } from "@heroui/react";
+import { useState } from "react";
 
 export default function Home() {
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+
+  const menuItems = [
+    "Overview",
+    "Tasks",
+    "Content",
+    "Businesses",
+    "Analytics",
+  ];
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-purple-50/30">
       {/* Header */}
-      <header className="bg-white/80 backdrop-blur-sm border-b border-slate-100 sticky top-0 z-50">
-        <div className="max-w-7xl mx-auto px-6 py-4">
-          <div className="flex items-center justify-between">
+      <Navbar 
+        isBordered 
+        isMenuOpen={isMenuOpen}
+        onMenuOpenChange={setIsMenuOpen}
+        className="bg-white/80 backdrop-blur-sm border-b border-slate-100 sticky top-0 z-50"
+        maxWidth="full"
+      >
+        <NavbarContent className="basis-1/5 sm:basis-full" justify="start">
+          <NavbarBrand as="li" className="gap-3 max-w-fit">
             <div className="flex items-center gap-4">
               <div className="flex items-center gap-2">
                 <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
@@ -28,12 +52,16 @@ export default function Home() {
                 </div>
                 <span className="font-semibold text-slate-800 text-lg">Mise</span>
               </div>
-              <div className="flex items-center gap-1 ml-4">
+              <div className="hidden sm:flex items-center gap-1 ml-4">
                 <div className="w-8 h-8 rounded-full bg-emerald-400 flex items-center justify-center text-white text-xs font-medium">CC</div>
                 <div className="w-8 h-8 rounded-full bg-blue-400 flex items-center justify-center text-white text-xs font-medium">+</div>
               </div>
             </div>
-            
+          </NavbarBrand>
+        </NavbarContent>
+
+        <NavbarContent className="hidden md:flex basis-1/5 sm:basis-full" justify="center">
+          <NavbarItem>
             <Tabs 
               aria-label="Navigation" 
               variant="light" 
@@ -50,22 +78,43 @@ export default function Home() {
               <Tab key="businesses" title="Businesses" />
               <Tab key="analytics" title="Analytics" />
             </Tabs>
+          </NavbarItem>
+        </NavbarContent>
 
-            <div className="flex items-center gap-3">
-              <Button isIconOnly variant="light" className="text-slate-500">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-                </svg>
-              </Button>
-              <Avatar 
-                src="https://i.pravatar.cc/150?u=alex" 
-                size="sm"
-                className="ring-2 ring-white shadow-md"
-              />
-            </div>
-          </div>
-        </div>
-      </header>
+        <NavbarContent className="basis-1 pl-4" justify="end">
+          <NavbarItem className="hidden sm:flex">
+            <Button isIconOnly variant="light" className="text-slate-500">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+              </svg>
+            </Button>
+          </NavbarItem>
+          <NavbarItem>
+            <Avatar 
+              src="https://i.pravatar.cc/150?u=alex" 
+              size="sm"
+              className="ring-2 ring-white shadow-md"
+            />
+          </NavbarItem>
+          <NavbarMenuToggle
+            aria-label={isMenuOpen ? "Close menu" : "Open menu"}
+            className="md:hidden"
+          />
+        </NavbarContent>
+
+        <NavbarMenu>
+          {menuItems.map((item, index) => (
+            <NavbarMenuItem key={`${item}-${index}`}>
+              <div
+                className="w-full text-slate-800 hover:text-violet-600 cursor-pointer py-2"
+                onClick={() => setIsMenuOpen(false)}
+              >
+                {item}
+              </div>
+            </NavbarMenuItem>
+          ))}
+        </NavbarMenu>
+      </Navbar>
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-6 py-8">
