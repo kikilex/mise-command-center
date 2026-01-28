@@ -94,8 +94,15 @@ export default function Home() {
           </NavbarBrand>
         </NavbarContent>
 
+        {/* Mobile menu toggle */}
+        <NavbarContent className="flex md:!hidden" justify="start">
+          <NavbarMenuToggle
+            aria-label={isMenuOpen ? "Close menu" : "Open menu"}
+          />
+        </NavbarContent>
+
         {/* Desktop navigation tabs - hidden on mobile */}
-        <NavbarContent className="hidden md:flex gap-4" justify="center">
+        <NavbarContent className="!hidden md:!flex gap-4" justify="center">
           <Tabs 
             aria-label="Navigation" 
             variant="light" 
@@ -112,13 +119,6 @@ export default function Home() {
             <Tab key="businesses" title="Businesses" />
             <Tab key="analytics" title="Analytics" />
           </Tabs>
-        </NavbarContent>
-
-        {/* Mobile menu toggle - LEFT side on mobile */}
-        <NavbarContent className="md:hidden" justify="start">
-          <NavbarMenuToggle
-            aria-label={isMenuOpen ? "Close menu" : "Open menu"}
-          />
         </NavbarContent>
 
         {/* Right side - notifications and avatar */}
