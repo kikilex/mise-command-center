@@ -4,6 +4,7 @@ import { HeroUIProvider } from '@heroui/react'
 import { ThemeProvider as NextThemesProvider } from 'next-themes'
 import { useRouter } from 'next/navigation'
 import { BusinessProvider } from '@/lib/business-context'
+import { MenuSettingsProvider } from '@/lib/menu-settings'
 
 export function Providers({ children }: { children: React.ReactNode }) {
   const router = useRouter()
@@ -17,7 +18,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
     >
       <HeroUIProvider navigate={router.push}>
         <BusinessProvider>
-          {children}
+          <MenuSettingsProvider>
+            {children}
+          </MenuSettingsProvider>
         </BusinessProvider>
       </HeroUIProvider>
     </NextThemesProvider>

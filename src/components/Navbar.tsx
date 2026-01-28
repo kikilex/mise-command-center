@@ -5,6 +5,7 @@ import { Button, Avatar } from "@heroui/react"
 import { usePathname } from 'next/navigation'
 import UserMenu from './UserMenu'
 import BusinessSelector from './BusinessSelector'
+import { useBusiness } from '@/lib/business-context'
 
 interface UserData {
   id?: string
@@ -19,18 +20,31 @@ interface NavbarProps {
   actions?: React.ReactNode
 }
 
-const navItems = [
+// Personal context nav items (no business selected)
+const personalNavItems = [
+  { href: '/', label: 'Dashboard', icon: '🏠' },
+  { href: '/tasks', label: 'Tasks', icon: '✅' },
+  { href: '/calendar', label: 'Calendar', icon: '📅' },
+  { href: '/notes', label: 'Notes', icon: '📝' },
+  { href: '/family', label: 'Family', icon: '🛒' },
+]
+
+// Business context nav items (business selected)
+const businessNavItems = [
   { href: '/', label: 'Dashboard', icon: '🏠' },
   { href: '/tasks', label: 'Tasks', icon: '✅' },
   { href: '/content', label: 'Content', icon: '🎬' },
   { href: '/calendar', label: 'Calendar', icon: '📅' },
-  { href: '/notes', label: 'Notes', icon: '📝' },
-  { href: '/settings', label: 'Settings', icon: '⚙️' },
+  { href: '/ai-workspace', label: 'AI Workspace', icon: '🤖' },
 ]
 
 export default function Navbar({ user, actions }: NavbarProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const pathname = usePathname()
+  const { selectedBusiness } = useBusiness()
+
+  // Choose nav items based on context
+  const navItems = selectedBusiness ? businessNavItems : personalNavItems
 
   const isActive = (href: string) => {
     if (href === '/') {
