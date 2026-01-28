@@ -24,17 +24,40 @@ interface UserData {
   role?: string
 }
 
+interface DashboardStats {
+  totalTasks: number
+  completedTasks: number
+  contentPipeline: number
+  readyToPost: number
+  aiAgents: number
+  recentTasks: Array<{
+    id: string
+    title: string
+    assignee: string
+    status: string
+    priority: string
+  }>
+}
+
 export default function Home() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [user, setUser] = useState<UserData | null>(null);
+  const [stats, setStats] = useState<DashboardStats>({
+    totalTasks: 0,
+    completedTasks: 0,
+    contentPipeline: 0,
+    readyToPost: 0,
+    aiAgents: 1,
+    recentTasks: []
+  });
   const [loading, setLoading] = useState(true);
   const supabase = createClient();
 
   useEffect(() => {
-    async function getUser() {
+    async function loadData() {
+      // Get user
       const { data: { user: authUser } } = await supabase.auth.getUser();
       if (authUser) {
-        // Try to get user profile from our users table
         const { data: profile } = await supabase
           .from('users')
           .select('*')
@@ -48,9 +71,57 @@ export default function Home() {
           role: profile?.role || 'member'
         });
       }
+
+      // Get task stats
+      const { data: tasks } = await supabase.from('tasks').select('*');
+      const { data: content } = await supabase.from('content_items').select('*');
+      const { data: agents } = await supabase.from('ai_agents').select('*').eq('is_active', true);
+      const { data: users } = await supabase.from('users').select('id, name, email');
+
+      const userMap = new Map(users?.map(u => [u.id, u.name || u.email?.split('@')[0]]) || []);
+
+      if (tasks) {
+        const completedCount = tasks.filter(t => t.status === 'done').length;
+        const recentTasks = tasks.slice(0, 4).map(t => ({
+          id: t.id,
+          title: t.title,
+          assignee: userMap.get(t.assignee_id) || userMap.get(t.created_by) || 'Unassigned',
+          status: t.status === 'in_progress' ? 'In Progress' : 
+                  t.status === 'todo' ? 'Todo' : 
+                  t.status === 'done' ? 'Done' :
+                  t.status === 'review' ? 'Review' : t.status,
+          priority: t.priority
+        }));
+
+        setStats(prev => ({
+          ...prev,
+          totalTasks: tasks.length,
+          completedTasks: completedCount,
+          recentTasks
+        }));
+      }
+
+      if (content) {
+        const readyCount = content.filter(c => 
+          c.status === 'approved' || c.status === 'scheduled'
+        ).length;
+        setStats(prev => ({
+          ...prev,
+          contentPipeline: content.length,
+          readyToPost: readyCount
+        }));
+      }
+
+      if (agents) {
+        setStats(prev => ({
+          ...prev,
+          aiAgents: agents.length || 1
+        }));
+      }
+
       setLoading(false);
     }
-    getUser();
+    loadData();
   }, [supabase]);
 
   return (
@@ -162,10 +233,16 @@ export default function Home() {
             <CardBody className="p-5">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-slate-500 text-sm font-medium">Tasks</span>
-                <Chip size="sm" className="bg-emerald-100 text-emerald-700 font-medium">+12</Chip>
+                {stats.totalTasks > 0 && (
+                  <Chip size="sm" className="bg-emerald-100 text-emerald-700 font-medium">
+                    {stats.completedTasks} done
+                  </Chip>
+                )}
               </div>
-              <p className="text-3xl font-bold text-slate-800">24</p>
-              <p className="text-slate-400 text-sm mt-1">8 completed this week</p>
+              <p className="text-3xl font-bold text-slate-800">{stats.totalTasks}</p>
+              <p className="text-slate-400 text-sm mt-1">
+                {stats.totalTasks === 0 ? 'No tasks yet' : `${stats.completedTasks} completed`}
+              </p>
             </CardBody>
           </Card>
 
@@ -173,10 +250,16 @@ export default function Home() {
             <CardBody className="p-5">
               <div className="flex items-center justify-between mb-2">
                 <span className="text-slate-500 text-sm font-medium">Content Pipeline</span>
-                <Chip size="sm" className="bg-blue-100 text-blue-700 font-medium">+3</Chip>
+                {stats.readyToPost > 0 && (
+                  <Chip size="sm" className="bg-blue-100 text-blue-700 font-medium">
+                    {stats.readyToPost} ready
+                  </Chip>
+                )}
               </div>
-              <p className="text-3xl font-bold text-slate-800">15</p>
-              <p className="text-slate-400 text-sm mt-1">4 ready to post</p>
+              <p className="text-3xl font-bold text-slate-800">{stats.contentPipeline}</p>
+              <p className="text-slate-400 text-sm mt-1">
+                {stats.contentPipeline === 0 ? 'No content yet' : `${stats.readyToPost} ready to post`}
+              </p>
             </CardBody>
           </Card>
 
@@ -197,7 +280,7 @@ export default function Home() {
                 <span className="text-slate-500 text-sm font-medium">AI Agents</span>
                 <Chip size="sm" className="bg-emerald-100 text-emerald-700 font-medium">Online</Chip>
               </div>
-              <p className="text-3xl font-bold text-slate-800">1</p>
+              <p className="text-3xl font-bold text-slate-800">{stats.aiAgents}</p>
               <p className="text-slate-400 text-sm mt-1">Ax (Umbrella CEO)</p>
             </CardBody>
           </Card>
@@ -213,74 +296,78 @@ export default function Home() {
               <CardBody className="p-6">
                 <div className="flex items-center justify-between mb-4">
                   <h3 className="font-semibold text-slate-800">Task Completion Rate</h3>
-                  <span className="text-slate-400">→</span>
+                  <a href="/tasks" className="text-slate-400 hover:text-violet-600">→</a>
                 </div>
                 <div className="flex items-center gap-4 mb-3">
-                  <span className="text-4xl font-bold text-slate-800">87%</span>
+                  <span className="text-4xl font-bold text-slate-800">
+                    {stats.totalTasks > 0 ? Math.round((stats.completedTasks / stats.totalTasks) * 100) : 0}%
+                  </span>
                   <div className="flex -space-x-2">
-                    <Avatar src="https://i.pravatar.cc/150?u=alex" size="sm" className="ring-2 ring-white" />
-                    <Avatar src="https://i.pravatar.cc/150?u=mom" size="sm" className="ring-2 ring-white" />
-                    <div className="w-8 h-8 rounded-full bg-slate-200 ring-2 ring-white flex items-center justify-center text-xs text-slate-600 font-medium">+2</div>
+                    {user && <Avatar name={user.name} size="sm" className="ring-2 ring-white" />}
                   </div>
                 </div>
                 <div className="flex gap-1 mb-2">
-                  {[...Array(20)].map((_, i) => (
+                  {[...Array(Math.min(20, Math.max(stats.totalTasks, 1)))].map((_, i) => (
                     <div 
                       key={i} 
-                      className={`w-3 h-3 rounded-full ${i < 17 ? 'bg-emerald-400' : 'bg-slate-200'}`}
+                      className={`w-3 h-3 rounded-full ${
+                        stats.totalTasks > 0 && i < Math.round((stats.completedTasks / stats.totalTasks) * Math.min(20, stats.totalTasks))
+                          ? 'bg-emerald-400' 
+                          : 'bg-slate-200'
+                      }`}
                     />
                   ))}
                 </div>
-                <p className="text-slate-400 text-sm">Most tasks completed within deadlines</p>
+                <p className="text-slate-400 text-sm">
+                  {stats.totalTasks === 0 
+                    ? 'Create your first task to get started' 
+                    : `${stats.completedTasks} of ${stats.totalTasks} tasks completed`}
+                </p>
               </CardBody>
             </Card>
 
-            {/* Today's Tasks */}
+            {/* Recent Tasks */}
             <Card className="bg-white shadow-sm border-0">
               <CardHeader className="px-6 pt-6 pb-0">
                 <div className="flex items-center justify-between w-full">
-                  <h3 className="font-semibold text-slate-800">Today&apos;s Tasks</h3>
-                  <div className="flex items-center gap-2">
-                    <Tabs size="sm" variant="light" defaultSelectedKey="priority">
-                      <Tab key="priority" title={<span className="flex items-center gap-1">Priority <Chip size="sm" className="bg-rose-100 text-rose-600 min-w-5 h-5">3</Chip></span>} />
-                      <Tab key="active" title={<span className="flex items-center gap-1">Active <Chip size="sm" className="bg-slate-100 text-slate-600 min-w-5 h-5">5</Chip></span>} />
-                      <Tab key="completed" title="Completed" />
-                    </Tabs>
-                  </div>
+                  <h3 className="font-semibold text-slate-800">Recent Tasks</h3>
+                  <a href="/tasks" className="text-sm text-violet-600 hover:text-violet-700 font-medium">
+                    View all →
+                  </a>
                 </div>
               </CardHeader>
               <CardBody className="px-6 pb-6">
                 <div className="space-y-3 mt-4">
-                  {[
-                    { title: "Set up Command Center database", assignee: "Ax", status: "In Progress", priority: "high" },
-                    { title: "Review testimony scripts", assignee: "Mom", status: "Todo", priority: "medium" },
-                    { title: "Deploy to production", assignee: "Ax", status: "Todo", priority: "high" },
-                    { title: "Create content calendar", assignee: "Alex", status: "Draft", priority: "low" },
-                  ].map((task, i) => (
-                    <div key={i} className="flex items-center justify-between p-4 rounded-xl bg-slate-50/50 hover:bg-slate-100/50 transition-colors">
-                      <div className="flex items-center gap-4">
-                        <div className={`w-2 h-2 rounded-full ${
-                          task.priority === 'high' ? 'bg-rose-400' : 
-                          task.priority === 'medium' ? 'bg-amber-400' : 'bg-slate-300'
-                        }`} />
-                        <div>
-                          <p className="font-medium text-slate-700">{task.title}</p>
-                          <p className="text-sm text-slate-400">Assigned to {task.assignee}</p>
+                  {stats.recentTasks.length === 0 ? (
+                    <p className="text-slate-400 text-center py-4">No tasks yet. Create your first task!</p>
+                  ) : (
+                    stats.recentTasks.map((task) => (
+                      <div key={task.id} className="flex items-center justify-between p-4 rounded-xl bg-slate-50/50 hover:bg-slate-100/50 transition-colors">
+                        <div className="flex items-center gap-4">
+                          <div className={`w-2 h-2 rounded-full ${
+                            task.priority === 'high' || task.priority === 'critical' ? 'bg-rose-400' : 
+                            task.priority === 'medium' ? 'bg-amber-400' : 'bg-slate-300'
+                          }`} />
+                          <div>
+                            <p className="font-medium text-slate-700">{task.title}</p>
+                            <p className="text-sm text-slate-400">Assigned to {task.assignee}</p>
+                          </div>
                         </div>
+                        <Chip 
+                          size="sm" 
+                          variant="flat"
+                          className={
+                            task.status === 'In Progress' ? 'bg-blue-100 text-blue-700' :
+                            task.status === 'Done' ? 'bg-emerald-100 text-emerald-700' :
+                            task.status === 'Review' ? 'bg-purple-100 text-purple-700' :
+                            'bg-slate-100 text-slate-600'
+                          }
+                        >
+                          {task.status}
+                        </Chip>
                       </div>
-                      <Chip 
-                        size="sm" 
-                        variant="flat"
-                        className={
-                          task.status === 'In Progress' ? 'bg-blue-100 text-blue-700' :
-                          task.status === 'Todo' ? 'bg-slate-100 text-slate-600' :
-                          'bg-slate-100 text-slate-500'
-                        }
-                      >
-                        {task.status}
-                      </Chip>
-                    </div>
-                  ))}
+                    ))
+                  )}
                 </div>
                 <Button 
                   as="a"
