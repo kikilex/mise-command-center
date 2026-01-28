@@ -11,7 +11,8 @@ import {
   Progress,
   Input,
   Tabs,
-  Tab
+  Tab,
+  Skeleton
 } from "@heroui/react";
 import { useState, useEffect } from "react";
 import { createClient } from '@/lib/supabase/client'
@@ -228,6 +229,19 @@ export default function Home() {
       <main className="max-w-7xl mx-auto px-6 py-8">
         
         {/* Stats Row */}
+        {loading ? (
+          <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
+            {[1, 2, 3, 4].map((i) => (
+              <Card key={i} className="bg-white shadow-sm border-0">
+                <CardBody className="p-5">
+                  <Skeleton className="w-20 h-4 rounded mb-2" />
+                  <Skeleton className="w-16 h-8 rounded mb-2" />
+                  <Skeleton className="w-32 h-3 rounded" />
+                </CardBody>
+              </Card>
+            ))}
+          </div>
+        ) : (
         <div className="grid grid-cols-1 md:grid-cols-4 gap-6 mb-8">
           <Card className="bg-white shadow-sm border-0 hover:shadow-md transition-shadow">
             <CardBody className="p-5">
@@ -285,6 +299,7 @@ export default function Home() {
             </CardBody>
           </Card>
         </div>
+        )}
 
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           
