@@ -1,11 +1,12 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { Button, Avatar } from "@heroui/react"
 import { usePathname } from 'next/navigation'
 import UserMenu from './UserMenu'
 import BusinessSelector from './BusinessSelector'
 import { useBusiness } from '@/lib/business-context'
+import { useMenuSettings } from '@/lib/menu-settings'
 
 interface UserData {
   id?: string
@@ -20,31 +21,29 @@ interface NavbarProps {
   actions?: React.ReactNode
 }
 
-// Personal context nav items (no business selected)
-const personalNavItems = [
-  { href: '/', label: 'Dashboard', icon: '🏠' },
-  { href: '/tasks', label: 'Tasks', icon: '✅' },
-  { href: '/calendar', label: 'Calendar', icon: '📅' },
-  { href: '/notes', label: 'Notes', icon: '📝' },
-  { href: '/family', label: 'Family', icon: '🛒' },
-]
-
-// Business context nav items (business selected)
-const businessNavItems = [
-  { href: '/', label: 'Dashboard', icon: '🏠' },
-  { href: '/tasks', label: 'Tasks', icon: '✅' },
-  { href: '/content', label: 'Content', icon: '🎬' },
-  { href: '/calendar', label: 'Calendar', icon: '📅' },
-  { href: '/ai-workspace', label: 'AI Workspace', icon: '🤖' },
-]
+// Settings is always shown (not customizable)
+const settingsItem = { key: 'settings', href: '/settings', label: 'Settings', icon: '⚙️' }
 
 export default function Navbar({ user, actions }: NavbarProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const pathname = usePathname()
   const { selectedBusiness } = useBusiness()
+  const { getActiveNavItems, loading: menuLoading } = useMenuSettings()
 
-  // Choose nav items based on context
-  const navItems = selectedBusiness ? businessNavItems : personalNavItems
+  // Determine if we're in business mode (a business is selected)
+  const isBusinessMode = selectedBusiness !== null
+
+  // Get nav items based on current mode from user settings
+  const navItems = useMemo(() => {
+    const dynamicItems = getActiveNavItems(isBusinessMode).map(item => ({
+      key: item.key,
+      href: item.href,
+      label: item.label,
+      icon: item.icon,
+    }))
+    // Always include settings at the end
+    return [...dynamicItems, settingsItem]
+  }, [getActiveNavItems, isBusinessMode])
 
   const isActive = (href: string) => {
     if (href === '/') {
@@ -92,7 +91,7 @@ export default function Navbar({ user, actions }: NavbarProps) {
           <nav className="hidden lg:flex items-center gap-1 bg-default-100 rounded-xl p-1">
             {navItems.map((item) => (
               <a 
-                key={item.href}
+                key={item.key}
                 href={item.href} 
                 className={`px-3 py-2 text-sm font-medium rounded-lg transition-colors whitespace-nowrap min-h-[36px] flex items-center gap-1.5 ${
                   isActive(item.href)
@@ -142,7 +141,7 @@ export default function Navbar({ user, actions }: NavbarProps) {
           <div className="flex flex-col gap-1">
             {navItems.map((item) => (
               <a 
-                key={item.href}
+                key={item.key}
                 href={item.href} 
                 className={`w-full text-left px-4 py-3 rounded-lg font-medium transition-colors min-h-[44px] flex items-center gap-3 ${
                   isActive(item.href)

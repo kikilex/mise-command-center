@@ -19,6 +19,7 @@ import { createClient } from '@/lib/supabase/client'
 import Navbar from '@/components/Navbar'
 import { showErrorToast, showSuccessToast } from '@/lib/errors'
 import { useBusiness, Business } from '@/lib/business-context'
+import { useMenuSettings, PERSONAL_MENU_OPTIONS, BUSINESS_MENU_OPTIONS, DEFAULT_MENU_CONFIG, MenuConfig } from '@/lib/menu-settings'
 import AddBusinessModal from '@/components/AddBusinessModal'
 import EditBusinessModal from '@/components/EditBusinessModal'
 import DeleteBusinessModal from '@/components/DeleteBusinessModal'
@@ -65,14 +66,17 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [savingTheme, setSavingTheme] = useState(false)
+  const [savingMenus, setSavingMenus] = useState(false)
   const [reminderSettings, setReminderSettings] = useState<ReminderSettings>(DEFAULT_REMINDER_SETTINGS)
   const [mounted, setMounted] = useState(false)
   const [editingBusiness, setEditingBusiness] = useState<Business | null>(null)
   const [deletingBusiness, setDeletingBusiness] = useState<Business | null>(null)
+  const [localMenuConfig, setLocalMenuConfig] = useState<MenuConfig>(DEFAULT_MENU_CONFIG)
   
   const { theme, setTheme } = useTheme()
   const supabase = createClient()
   const { businesses, refreshBusinesses } = useBusiness()
+  const { menuConfig, updateMenuConfig, refreshMenuSettings } = useMenuSettings()
   
   const { 
     isOpen: isAddOpen, 
@@ -99,6 +103,11 @@ export default function SettingsPage() {
   useEffect(() => {
     loadUserAndSettings()
   }, [])
+
+  // Sync local menu config with context
+  useEffect(() => {
+    setLocalMenuConfig(menuConfig)
+  }, [menuConfig])
 
   async function loadUserAndSettings() {
     setLoading(true)
@@ -208,6 +217,41 @@ export default function SettingsPage() {
 
   function resetToDefaults() {
     setReminderSettings(DEFAULT_REMINDER_SETTINGS)
+  }
+
+  function togglePersonalMenu(key: string) {
+    setLocalMenuConfig(prev => ({
+      ...prev,
+      personal: prev.personal.includes(key)
+        ? prev.personal.filter(k => k !== key)
+        : [...prev.personal, key],
+    }))
+  }
+
+  function toggleBusinessMenu(key: string) {
+    setLocalMenuConfig(prev => ({
+      ...prev,
+      business: prev.business.includes(key)
+        ? prev.business.filter(k => k !== key)
+        : [...prev.business, key],
+    }))
+  }
+
+  async function saveMenuSettings() {
+    setSavingMenus(true)
+    try {
+      await updateMenuConfig(localMenuConfig)
+      showSuccessToast('Menu settings saved')
+    } catch (error) {
+      console.error('Save menu settings error:', error)
+      showErrorToast(error, 'Failed to save menu settings')
+    } finally {
+      setSavingMenus(false)
+    }
+  }
+
+  function resetMenusToDefaults() {
+    setLocalMenuConfig(DEFAULT_MENU_CONFIG)
   }
 
   async function handleThemeChange(newTheme: ThemeValue) {
@@ -337,6 +381,88 @@ export default function SettingsPage() {
             {savingTheme && (
               <p className="text-sm text-default-500 mt-4">Saving...</p>
             )}
+          </CardBody>
+        </Card>
+
+        {/* Menu Customization Card */}
+        <Card className="mb-6">
+          <CardHeader className="flex flex-col items-start px-6 pt-6">
+            <h2 className="text-lg font-semibold">Menu Customization</h2>
+            <p className="text-sm text-default-500 mt-1">
+              Choose which modules appear in your navigation menu for each context
+            </p>
+          </CardHeader>
+          <Divider />
+          <CardBody className="px-6 py-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Personal Menu */}
+              <div className="p-4 rounded-lg border border-default-200">
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="text-lg">👤</span>
+                  <h3 className="font-semibold">Personal Menu</h3>
+                </div>
+                <p className="text-sm text-default-500 mb-4">
+                  Shown when no business is selected
+                </p>
+                <div className="space-y-3">
+                  {PERSONAL_MENU_OPTIONS.map((option) => (
+                    <Checkbox
+                      key={option.key}
+                      isSelected={localMenuConfig.personal.includes(option.key)}
+                      onValueChange={() => togglePersonalMenu(option.key)}
+                    >
+                      <span className="flex items-center gap-2">
+                        <span>{option.icon}</span>
+                        <span className="text-default-600">{option.label}</span>
+                      </span>
+                    </Checkbox>
+                  ))}
+                </div>
+              </div>
+
+              {/* Business Menu */}
+              <div className="p-4 rounded-lg border border-default-200">
+                <div className="flex items-center gap-2 mb-4">
+                  <span className="text-lg">💼</span>
+                  <h3 className="font-semibold">Business Menu</h3>
+                </div>
+                <p className="text-sm text-default-500 mb-4">
+                  Shown when a business is selected
+                </p>
+                <div className="space-y-3">
+                  {BUSINESS_MENU_OPTIONS.map((option) => (
+                    <Checkbox
+                      key={option.key}
+                      isSelected={localMenuConfig.business.includes(option.key)}
+                      onValueChange={() => toggleBusinessMenu(option.key)}
+                    >
+                      <span className="flex items-center gap-2">
+                        <span>{option.icon}</span>
+                        <span className="text-default-600">{option.label}</span>
+                      </span>
+                    </Checkbox>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <Divider className="my-6" />
+
+            <div className="flex justify-between">
+              <Button
+                variant="flat"
+                onPress={resetMenusToDefaults}
+              >
+                Reset to Defaults
+              </Button>
+              <Button
+                color="primary"
+                onPress={saveMenuSettings}
+                isLoading={savingMenus}
+              >
+                Save Menu Settings
+              </Button>
+            </div>
           </CardBody>
         </Card>
 
