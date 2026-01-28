@@ -32,8 +32,6 @@ import {
   FileVideo,
   BookOpen,
   ShoppingBag,
-  PrayingHands,
-  Cross,
   Heart,
   Sparkles,
   TrendingUp,
@@ -81,8 +79,8 @@ export const templateIcons: Record<string, LucideIcon> = {
   campaign: Megaphone,
   simple: Folder,
   // Content templates
-  prayer: Heart, // Using Heart since PrayingHands doesn't exist
-  testimony: Cross,
+  prayer: Heart,
+  testimony: BookOpen,
   educational: BookOpen,
   promotional: ShoppingBag,
   'short form': Zap,
@@ -130,7 +128,6 @@ export {
   BookOpen,
   ShoppingBag,
   Heart,
-  Cross,
   Sparkles,
   TrendingUp,
   DollarSign,

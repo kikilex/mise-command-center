@@ -26,7 +26,7 @@ import { useBusiness } from '@/lib/business-context'
 import { showErrorToast, showSuccessToast, getErrorMessage } from '@/lib/errors'
 import { ErrorFallback } from '@/components/ErrorBoundary'
 import { 
-  Heart, Cross, BookOpen, ShoppingBag, Zap, FileText, 
+  Heart, BookOpen, ShoppingBag, Zap, FileText, 
   Plus, ChevronRight, Edit, Video
 } from '@/lib/icons'
 
@@ -91,7 +91,7 @@ const pipelineStages = [
 // Map template names to Lucide icons
 const contentIconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   'prayer': Heart,
-  'testimony': Cross,
+  'testimony': BookOpen,
   'educational': BookOpen,
   'promotional': ShoppingBag,
   'short form': Zap,
