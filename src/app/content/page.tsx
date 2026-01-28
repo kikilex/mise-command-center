@@ -312,16 +312,42 @@ export default function ContentPage() {
                         {item.hook && (
                           <p className="text-xs text-slate-500 line-clamp-2 mb-2">"{item.hook}"</p>
                         )}
-                        <Select
-                          size="sm"
-                          selectedKeys={[item.status]}
-                          className="w-full"
-                          onChange={(e) => handleStatusChange(item.id, e.target.value)}
-                        >
-                          {pipelineStages.map(s => (
-                            <SelectItem key={s.key}>{s.label}</SelectItem>
-                          ))}
-                        </Select>
+                        <div className="flex gap-1 mt-2">
+                          {item.status === 'script' && (
+                            <Button 
+                              size="sm" 
+                              color="warning" 
+                              variant="flat"
+                              className="flex-1 text-xs"
+                              onPress={() => handleStatusChange(item.id, 'review')}
+                            >
+                              Send for Review
+                            </Button>
+                          )}
+                          {item.status === 'review' && (
+                            <Button 
+                              size="sm" 
+                              color="success" 
+                              variant="flat"
+                              className="flex-1 text-xs"
+                              onPress={() => handleStatusChange(item.id, 'approved')}
+                            >
+                              ✓ Approve
+                            </Button>
+                          )}
+                          {item.status !== 'script' && item.status !== 'review' && (
+                            <Select
+                              size="sm"
+                              selectedKeys={[item.status]}
+                              className="w-full"
+                              onChange={(e) => handleStatusChange(item.id, e.target.value)}
+                            >
+                              {pipelineStages.map(s => (
+                                <SelectItem key={s.key}>{s.label}</SelectItem>
+                              ))}
+                            </Select>
+                          )}
+                        </div>
                       </CardBody>
                     </Card>
                   ))}
