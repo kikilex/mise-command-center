@@ -67,9 +67,30 @@ export default function SettingsPage() {
   const [savingTheme, setSavingTheme] = useState(false)
   const [reminderSettings, setReminderSettings] = useState<ReminderSettings>(DEFAULT_REMINDER_SETTINGS)
   const [mounted, setMounted] = useState(false)
+  const [editingBusiness, setEditingBusiness] = useState<Business | null>(null)
+  const [deletingBusiness, setDeletingBusiness] = useState<Business | null>(null)
   
   const { theme, setTheme } = useTheme()
   const supabase = createClient()
+  const { businesses, refreshBusinesses } = useBusiness()
+  
+  const { 
+    isOpen: isAddOpen, 
+    onOpen: onAddOpen, 
+    onClose: onAddClose 
+  } = useDisclosure()
+  
+  const { 
+    isOpen: isEditOpen, 
+    onOpen: onEditOpen, 
+    onClose: onEditClose 
+  } = useDisclosure()
+  
+  const { 
+    isOpen: isDeleteOpen, 
+    onOpen: onDeleteOpen, 
+    onClose: onDeleteClose 
+  } = useDisclosure()
 
   useEffect(() => {
     setMounted(true)
@@ -411,6 +432,91 @@ export default function SettingsPage() {
           </CardBody>
         </Card>
 
+        {/* Business Management Card */}
+        <Card className="mb-6">
+          <CardHeader className="flex flex-row items-center justify-between px-6 pt-6">
+            <div>
+              <h2 className="text-lg font-semibold">Business Management</h2>
+              <p className="text-sm text-default-500 mt-1">
+                Manage your businesses and organizations
+              </p>
+            </div>
+            <Button
+              color="primary"
+              size="sm"
+              startContent={<PlusIcon className="w-4 h-4" />}
+              onPress={onAddOpen}
+            >
+              Add Business
+            </Button>
+          </CardHeader>
+          <Divider />
+          <CardBody className="px-6 py-6">
+            {businesses.length === 0 ? (
+              <div className="text-center py-8 text-default-500">
+                <p className="mb-4">You don&apos;t have any businesses yet.</p>
+                <Button
+                  color="primary"
+                  variant="flat"
+                  startContent={<PlusIcon className="w-4 h-4" />}
+                  onPress={onAddOpen}
+                >
+                  Create Your First Business
+                </Button>
+              </div>
+            ) : (
+              <div className="space-y-3">
+                {businesses.map((business) => (
+                  <div
+                    key={business.id}
+                    className="flex items-center justify-between p-4 rounded-lg border border-default-200 hover:border-default-300 transition-colors"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div
+                        className="w-4 h-4 rounded-full flex-shrink-0"
+                        style={{ backgroundColor: business.color || '#3b82f6' }}
+                      />
+                      <div>
+                        <p className="font-medium">{business.name}</p>
+                        {business.description && (
+                          <p className="text-sm text-default-500 line-clamp-1">
+                            {business.description}
+                          </p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <Button
+                        isIconOnly
+                        size="sm"
+                        variant="light"
+                        onPress={() => {
+                          setEditingBusiness(business)
+                          onEditOpen()
+                        }}
+                      >
+                        <PencilIcon className="w-4 h-4" />
+                      </Button>
+                      <Button
+                        isIconOnly
+                        size="sm"
+                        variant="light"
+                        color="danger"
+                        onPress={() => {
+                          setDeletingBusiness(business)
+                          onDeleteOpen()
+                        }}
+                      >
+                        <TrashIcon className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardBody>
+        </Card>
+
         {/* Info Card */}
         <Card className="bg-secondary/10 border border-secondary/20">
           <CardBody className="px-6 py-4">
@@ -429,6 +535,33 @@ export default function SettingsPage() {
           </CardBody>
         </Card>
       </main>
+
+      {/* Business Modals */}
+      <AddBusinessModal
+        isOpen={isAddOpen}
+        onClose={onAddClose}
+        onSuccess={refreshBusinesses}
+      />
+
+      <EditBusinessModal
+        isOpen={isEditOpen}
+        onClose={() => {
+          onEditClose()
+          setEditingBusiness(null)
+        }}
+        onSuccess={refreshBusinesses}
+        business={editingBusiness}
+      />
+
+      <DeleteBusinessModal
+        isOpen={isDeleteOpen}
+        onClose={() => {
+          onDeleteClose()
+          setDeletingBusiness(null)
+        }}
+        onSuccess={refreshBusinesses}
+        business={deletingBusiness}
+      />
     </div>
   )
 }
