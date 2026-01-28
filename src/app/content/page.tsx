@@ -17,13 +17,16 @@ import {
   SelectItem,
   Textarea,
   useDisclosure,
-  Avatar
+  Avatar,
+  ButtonGroup
 } from "@heroui/react"
 import { createClient } from '@/lib/supabase/client'
 import Navbar from '@/components/Navbar'
 import { useBusiness } from '@/lib/business-context'
 import { showErrorToast, showSuccessToast, getErrorMessage } from '@/lib/errors'
 import { ErrorFallback } from '@/components/ErrorBoundary'
+
+type ViewMode = 'board' | 'list'
 
 interface ContentItem {
   id: string
@@ -75,6 +78,8 @@ export default function ContentPage() {
   const [submitting, setSubmitting] = useState(false)
   const { isOpen, onOpen, onClose } = useDisclosure()
   const [editingItem, setEditingItem] = useState<ContentItem | null>(null)
+  const [viewMode, setViewMode] = useState<ViewMode>('list') // Default to list for mobile-first
+  const [collapsedStages, setCollapsedStages] = useState<Set<string>>(new Set())
   const [formData, setFormData] = useState({
     title: '',
     type: 'testimony',
@@ -338,6 +343,93 @@ export default function ContentPage() {
   // Calculate total content count
   const totalContent = content.length
 
+  const toggleStageCollapse = (stageKey: string) => {
+    setCollapsedStages(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(stageKey)) {
+        newSet.delete(stageKey)
+      } else {
+        newSet.add(stageKey)
+      }
+      return newSet
+    })
+  }
+
+  // Content card component - reused in both views
+  const ContentCard = ({ item, compact = false }: { item: ContentItem; compact?: boolean }) => (
+    <Card className="bg-white shadow-sm cursor-pointer hover:shadow-md transition-shadow">
+      <CardBody className={compact ? "p-3" : "p-4"}>
+        <div className="flex items-start justify-between mb-2">
+          <div className="flex items-center gap-2">
+            <Chip size="sm" variant="flat" className="text-xs capitalize">
+              {item.type}
+            </Chip>
+            {compact && (
+              <Chip 
+                size="sm" 
+                variant="flat" 
+                className={`text-xs ${pipelineStages.find(s => s.key === item.status)?.textColor}`}
+                style={{ 
+                  backgroundColor: pipelineStages.find(s => s.key === item.status)?.color.replace('bg-', '').includes('slate') 
+                    ? '#e2e8f0' 
+                    : undefined 
+                }}
+              >
+                {pipelineStages.find(s => s.key === item.status)?.label}
+              </Chip>
+            )}
+          </div>
+          <button 
+            onClick={() => handleEdit(item)}
+            className="text-slate-400 hover:text-slate-600"
+          >
+            ✏️
+          </button>
+        </div>
+        <h4 className="font-medium text-slate-800 text-sm mb-2">{item.title}</h4>
+        {item.hook && (
+          <p className="text-xs text-slate-500 line-clamp-2 mb-2">"{item.hook}"</p>
+        )}
+        <div className="flex gap-1 mt-2">
+          {item.status === 'script' && (
+            <Button 
+              size="sm" 
+              color="warning" 
+              variant="flat"
+              className="flex-1 text-xs"
+              onPress={() => handleStatusChange(item.id, 'review')}
+            >
+              Send for Review
+            </Button>
+          )}
+          {item.status === 'review' && (
+            <Button 
+              size="sm" 
+              color="success" 
+              variant="flat"
+              className="flex-1 text-xs"
+              onPress={() => handleStatusChange(item.id, 'approved')}
+            >
+              ✓ Approve
+            </Button>
+          )}
+          {item.status !== 'script' && item.status !== 'review' && (
+            <Select
+              size="sm"
+              selectedKeys={[item.status]}
+              className="w-full"
+              onChange={(e) => handleStatusChange(item.id, e.target.value)}
+            >
+              {pipelineStages.map(s => (
+                <SelectItem key={s.key}>{s.label}</SelectItem>
+              ))}
+            </Select>
+          )}
+        </div>
+      </CardBody>
+    </Card>
+  )
+
   return (
     <div className="min-h-screen bg-background">
       <Navbar 
@@ -357,21 +449,43 @@ export default function ContentPage() {
       <main className="p-4 sm:p-6">
         {/* Header with business context */}
         <div className="mb-6">
-          <div className="flex items-center gap-3 mb-2">
-            <h1 className="text-2xl font-bold text-slate-800">Content Pipeline</h1>
-            {selectedBusiness && (
-              <Chip 
-                size="sm" 
-                variant="flat"
-                style={{ backgroundColor: `${selectedBusiness.color}20`, color: selectedBusiness.color }}
-              >
-                {selectedBusiness.name}
-              </Chip>
+          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+            <div>
+              <div className="flex items-center gap-3 mb-2">
+                <h1 className="text-2xl font-bold text-slate-800">Content Pipeline</h1>
+                {selectedBusiness && (
+                  <Chip 
+                    size="sm" 
+                    variant="flat"
+                    style={{ backgroundColor: `${selectedBusiness.color}20`, color: selectedBusiness.color }}
+                  >
+                    {selectedBusiness.name}
+                  </Chip>
+                )}
+              </div>
+              {selectedBusinessId && (
+                <p className="text-slate-500 text-sm">{totalContent} items in pipeline</p>
+              )}
+            </div>
+            
+            {/* View Toggle */}
+            {selectedBusinessId && (
+              <ButtonGroup size="sm" variant="flat">
+                <Button
+                  className={viewMode === 'list' ? 'bg-primary-100 text-primary-700' : ''}
+                  onPress={() => setViewMode('list')}
+                >
+                  <span className="mr-1">☰</span> List
+                </Button>
+                <Button
+                  className={viewMode === 'board' ? 'bg-primary-100 text-primary-700' : ''}
+                  onPress={() => setViewMode('board')}
+                >
+                  <span className="mr-1">▦</span> Board
+                </Button>
+              </ButtonGroup>
             )}
           </div>
-          {selectedBusinessId && (
-            <p className="text-slate-500 text-sm">{totalContent} items in pipeline</p>
-          )}
         </div>
 
         {/* No business selected state */}
@@ -404,83 +518,79 @@ export default function ContentPage() {
           loading ? (
             <div className="text-center py-12 text-slate-500">Loading content pipeline...</div>
           ) : (
-            <div className="flex gap-4 overflow-x-auto pb-4">
-              {pipelineStages.map(stage => (
-                <div key={stage.key} className="flex-shrink-0 w-72">
-                  <div className={`rounded-t-xl px-4 py-2 ${stage.color}`}>
-                    <div className="flex items-center justify-between">
-                      <h3 className={`font-semibold ${stage.textColor}`}>{stage.label}</h3>
-                      <Chip size="sm" variant="flat" className={stage.textColor}>
-                        {getItemsByStatus(stage.key).length}
-                      </Chip>
-                    </div>
-                  </div>
-                  <div className="bg-slate-100/50 rounded-b-xl p-2 min-h-[400px] space-y-2">
-                    {getItemsByStatus(stage.key).map(item => (
-                      <Card key={item.id} className="bg-white shadow-sm cursor-pointer hover:shadow-md transition-shadow">
-                        <CardBody className="p-3">
-                          <div className="flex items-start justify-between mb-2">
-                            <Chip size="sm" variant="flat" className="text-xs capitalize">
-                              {item.type}
-                            </Chip>
-                            <button 
-                              onClick={() => handleEdit(item)}
-                              className="text-slate-400 hover:text-slate-600"
-                            >
-                              ✏️
-                            </button>
+            <div className="max-w-7xl mx-auto">
+              {/* List View - Mobile Friendly */}
+              {viewMode === 'list' && (
+                <div className="space-y-4">
+                  {pipelineStages.map(stage => {
+                    const stageItems = getItemsByStatus(stage.key)
+                    const isCollapsed = collapsedStages.has(stage.key)
+                    
+                    return (
+                      <div key={stage.key} className="rounded-xl overflow-hidden border border-slate-200">
+                        {/* Stage Header - Clickable to collapse */}
+                        <button
+                          onClick={() => toggleStageCollapse(stage.key)}
+                          className={`w-full px-4 py-3 ${stage.color} flex items-center justify-between`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <span className={`text-lg transition-transform ${isCollapsed ? '' : 'rotate-90'}`}>
+                              ▶
+                            </span>
+                            <h3 className={`font-semibold ${stage.textColor}`}>{stage.label}</h3>
                           </div>
-                          <h4 className="font-medium text-slate-800 text-sm mb-2">{item.title}</h4>
-                          {item.hook && (
-                            <p className="text-xs text-slate-500 line-clamp-2 mb-2">"{item.hook}"</p>
-                          )}
-                          <div className="flex gap-1 mt-2">
-                            {item.status === 'script' && (
-                              <Button 
-                                size="sm" 
-                                color="warning" 
-                                variant="flat"
-                                className="flex-1 text-xs"
-                                onPress={() => handleStatusChange(item.id, 'review')}
-                              >
-                                Send for Review
-                              </Button>
-                            )}
-                            {item.status === 'review' && (
-                              <Button 
-                                size="sm" 
-                                color="success" 
-                                variant="flat"
-                                className="flex-1 text-xs"
-                                onPress={() => handleStatusChange(item.id, 'approved')}
-                              >
-                                ✓ Approve
-                              </Button>
-                            )}
-                            {item.status !== 'script' && item.status !== 'review' && (
-                              <Select
-                                size="sm"
-                                selectedKeys={[item.status]}
-                                className="w-full"
-                                onChange={(e) => handleStatusChange(item.id, e.target.value)}
-                              >
-                                {pipelineStages.map(s => (
-                                  <SelectItem key={s.key}>{s.label}</SelectItem>
-                                ))}
-                              </Select>
+                          <Chip size="sm" variant="flat" className={stage.textColor}>
+                            {stageItems.length}
+                          </Chip>
+                        </button>
+                        
+                        {/* Stage Content - Collapsible */}
+                        {!isCollapsed && (
+                          <div className="bg-slate-50 p-3 space-y-3">
+                            {stageItems.length > 0 ? (
+                              stageItems.map(item => (
+                                <ContentCard key={item.id} item={item} compact={false} />
+                              ))
+                            ) : (
+                              <div className="text-center py-6 text-slate-400 text-sm">
+                                No items in this stage
+                              </div>
                             )}
                           </div>
-                        </CardBody>
-                      </Card>
-                    ))}
-                    {getItemsByStatus(stage.key).length === 0 && (
-                      <div className="text-center py-8 text-slate-400 text-sm">
-                        No items
+                        )}
                       </div>
-                    )}
-                  </div>
+                    )
+                  })}
                 </div>
-              ))}
+              )}
+
+              {/* Board View - Kanban Style */}
+              {viewMode === 'board' && (
+                <div className="flex gap-4 overflow-x-auto pb-4">
+                  {pipelineStages.map(stage => (
+                    <div key={stage.key} className="flex-shrink-0 w-72">
+                      <div className={`rounded-t-xl px-4 py-2 ${stage.color}`}>
+                        <div className="flex items-center justify-between">
+                          <h3 className={`font-semibold ${stage.textColor}`}>{stage.label}</h3>
+                          <Chip size="sm" variant="flat" className={stage.textColor}>
+                            {getItemsByStatus(stage.key).length}
+                          </Chip>
+                        </div>
+                      </div>
+                      <div className="bg-slate-100/50 rounded-b-xl p-2 min-h-[400px] space-y-2">
+                        {getItemsByStatus(stage.key).map(item => (
+                          <ContentCard key={item.id} item={item} compact={true} />
+                        ))}
+                        {getItemsByStatus(stage.key).length === 0 && (
+                          <div className="text-center py-8 text-slate-400 text-sm">
+                            No items
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )
         )}
