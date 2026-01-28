@@ -11,14 +11,7 @@ import {
   Progress,
   Input,
   Tabs,
-  Tab,
-  Navbar,
-  NavbarBrand,
-  NavbarContent,
-  NavbarItem,
-  NavbarMenuToggle,
-  NavbarMenu,
-  NavbarMenuItem
+  Tab
 } from "@heroui/react";
 import { useState, useEffect } from "react";
 import { createClient } from '@/lib/supabase/client'
@@ -70,93 +63,98 @@ export default function Home() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-purple-50/30">
-      {/* Header */}
-      <Navbar 
-        isBordered 
-        isMenuOpen={isMenuOpen}
-        onMenuOpenChange={setIsMenuOpen}
-        className="bg-white/80 backdrop-blur-sm border-b border-slate-100 sticky top-0 z-50"
-        maxWidth="full"
-      >
-        {/* Brand - always visible */}
-        <NavbarContent justify="start">
-          <NavbarBrand className="gap-3 max-w-fit">
-            <div className="flex items-center gap-2">
-              <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
-                <span className="text-white font-bold text-lg">M</span>
-              </div>
-              <span className="font-semibold text-slate-800 text-lg">Mise</span>
-            </div>
-            <div className="hidden md:flex items-center gap-1 ml-4">
-              <div className="w-8 h-8 rounded-full bg-emerald-400 flex items-center justify-center text-white text-xs font-medium">CC</div>
-              <div className="w-8 h-8 rounded-full bg-blue-400 flex items-center justify-center text-white text-xs font-medium">+</div>
-            </div>
-          </NavbarBrand>
-        </NavbarContent>
-
-        {/* Mobile menu toggle */}
-        <NavbarContent className="flex md:!hidden" justify="start">
-          <NavbarMenuToggle
-            aria-label={isMenuOpen ? "Close menu" : "Open menu"}
-          />
-        </NavbarContent>
-
-        {/* Desktop navigation tabs - hidden on mobile */}
-        <NavbarContent className="!hidden md:!flex gap-4" justify="center">
-          <Tabs 
-            aria-label="Navigation" 
-            variant="light" 
-            classNames={{
-              tabList: "gap-2",
-              tab: "px-4 py-2 text-sm font-medium",
-              cursor: "bg-white shadow-md",
-            }}
-            defaultSelectedKey="overview"
-          >
-            <Tab key="overview" title="Overview" />
-            <Tab key="tasks" title="Tasks" />
-            <Tab key="content" title="Content" />
-            <Tab key="businesses" title="Businesses" />
-            <Tab key="analytics" title="Analytics" />
-          </Tabs>
-        </NavbarContent>
-
-        {/* Right side - notifications and avatar */}
-        <NavbarContent justify="end">
-          <NavbarItem className="hidden sm:flex">
-            <Button isIconOnly variant="light" className="text-slate-500">
-              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
-              </svg>
-            </Button>
-          </NavbarItem>
-          <NavbarItem>
-            {user ? (
-              <UserMenu user={user} />
-            ) : (
-              <Avatar 
-                size="sm"
-                className="ring-2 ring-white shadow-md"
-              />
-            )}
-          </NavbarItem>
-        </NavbarContent>
-
-        <NavbarMenu className="bg-white/95 backdrop-blur-md pt-6 gap-4">
-          {menuItems.map((item, index) => (
-            <NavbarMenuItem key={`${item}-${index}`}>
-              <Button
-                fullWidth
-                variant="light"
-                className="justify-start text-lg font-medium text-slate-700 hover:text-violet-600 hover:bg-violet-50"
-                onPress={() => setIsMenuOpen(false)}
+      {/* Header - Custom responsive navbar */}
+      <header className="bg-white/80 backdrop-blur-sm border-b border-slate-100 sticky top-0 z-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6">
+          <div className="flex items-center justify-between h-16">
+            {/* Left: Hamburger (mobile) + Brand */}
+            <div className="flex items-center gap-3">
+              {/* Mobile hamburger */}
+              <button 
+                className="md:hidden p-2 rounded-lg hover:bg-slate-100"
+                onClick={() => setIsMenuOpen(!isMenuOpen)}
+                aria-label="Toggle menu"
               >
-                {item}
+                <svg className="w-6 h-6 text-slate-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  {isMenuOpen ? (
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                  ) : (
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                  )}
+                </svg>
+              </button>
+              
+              {/* Brand */}
+              <div className="flex items-center gap-2">
+                <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
+                  <span className="text-white font-bold text-lg">M</span>
+                </div>
+                <span className="font-semibold text-slate-800 text-lg">Mise</span>
+              </div>
+              
+              {/* Business avatars - desktop only */}
+              <div className="hidden md:flex items-center gap-1 ml-4">
+                <div className="w-8 h-8 rounded-full bg-emerald-400 flex items-center justify-center text-white text-xs font-medium">CC</div>
+                <div className="w-8 h-8 rounded-full bg-blue-400 flex items-center justify-center text-white text-xs font-medium">+</div>
+              </div>
+            </div>
+
+            {/* Center: Desktop navigation tabs */}
+            <div className="hidden md:flex">
+              <Tabs 
+                aria-label="Navigation" 
+                variant="light" 
+                classNames={{
+                  tabList: "gap-2",
+                  tab: "px-4 py-2 text-sm font-medium",
+                  cursor: "bg-white shadow-md",
+                }}
+                defaultSelectedKey="overview"
+              >
+                <Tab key="overview" title="Overview" />
+                <Tab key="tasks" title="Tasks" />
+                <Tab key="content" title="Content" />
+                <Tab key="businesses" title="Businesses" />
+                <Tab key="analytics" title="Analytics" />
+              </Tabs>
+            </div>
+
+            {/* Right: Notifications + Avatar */}
+            <div className="flex items-center gap-2">
+              <Button isIconOnly variant="light" className="hidden sm:flex text-slate-500">
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
+                </svg>
               </Button>
-            </NavbarMenuItem>
-          ))}
-        </NavbarMenu>
-      </Navbar>
+              {user ? (
+                <UserMenu user={user} />
+              ) : (
+                <Avatar 
+                  size="sm"
+                  className="ring-2 ring-white shadow-md"
+                />
+              )}
+            </div>
+          </div>
+        </div>
+
+        {/* Mobile menu dropdown */}
+        {isMenuOpen && (
+          <div className="md:hidden bg-white border-t border-slate-100 py-4 px-4 shadow-lg">
+            <div className="flex flex-col gap-2">
+              {menuItems.map((item) => (
+                <button
+                  key={item}
+                  className="w-full text-left px-4 py-3 rounded-lg text-slate-700 hover:bg-violet-50 hover:text-violet-600 font-medium transition-colors"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  {item}
+                </button>
+              ))}
+            </div>
+          </div>
+        )}
+      </header>
 
       {/* Main Content */}
       <main className="max-w-7xl mx-auto px-6 py-8">
