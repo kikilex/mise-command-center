@@ -21,6 +21,7 @@ import {
 } from "@heroui/react"
 import { createClient } from '@/lib/supabase/client'
 import UserMenu from '@/components/UserMenu'
+import toast from 'react-hot-toast'
 
 interface ContentItem {
   id: string
@@ -148,8 +149,11 @@ export default function ContentPage() {
         .eq('id', editingItem.id)
       
       if (!error) {
+        toast.success('Content updated')
         loadData()
         handleClose()
+      } else {
+        toast.error('Failed to update content')
       }
     } else {
       const { error } = await supabase
@@ -168,8 +172,11 @@ export default function ContentPage() {
         })
       
       if (!error) {
+        toast.success('Content created')
         loadData()
         handleClose()
+      } else {
+        toast.error('Failed to create content')
       }
     }
   }
@@ -180,7 +187,11 @@ export default function ContentPage() {
       .update({ status: newStatus })
       .eq('id', itemId)
     
-    if (!error) loadData()
+    if (!error) {
+      const stage = pipelineStages.find(s => s.key === newStatus)
+      toast.success(`Moved to ${stage?.label || newStatus}`)
+      loadData()
+    }
   }
 
   async function handleDelete(itemId: string) {
@@ -189,7 +200,12 @@ export default function ContentPage() {
       .delete()
       .eq('id', itemId)
     
-    if (!error) loadData()
+    if (!error) {
+      toast.success('Content deleted')
+      loadData()
+    } else {
+      toast.error('Failed to delete content')
+    }
   }
 
   function handleEdit(item: ContentItem) {

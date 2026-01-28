@@ -20,6 +20,7 @@ import {
 } from "@heroui/react"
 import { createClient } from '@/lib/supabase/client'
 import UserMenu from '@/components/UserMenu'
+import toast from 'react-hot-toast'
 
 interface Task {
   id: string
@@ -125,8 +126,11 @@ export default function TasksPage() {
         .eq('id', editingTask.id)
       
       if (!error) {
+        toast.success('Task updated')
         loadTasks()
         handleClose()
+      } else {
+        toast.error('Failed to update task')
       }
     } else {
       // Create new task
@@ -142,8 +146,11 @@ export default function TasksPage() {
         })
       
       if (!error) {
+        toast.success('Task created')
         loadTasks()
         handleClose()
+      } else {
+        toast.error('Failed to create task')
       }
     }
   }
@@ -154,7 +161,12 @@ export default function TasksPage() {
       .delete()
       .eq('id', taskId)
     
-    if (!error) loadTasks()
+    if (!error) {
+      toast.success('Task deleted')
+      loadTasks()
+    } else {
+      toast.error('Failed to delete task')
+    }
   }
 
   async function handleStatusChange(taskId: string, newStatus: string) {
@@ -163,7 +175,10 @@ export default function TasksPage() {
       .update({ status: newStatus })
       .eq('id', taskId)
     
-    if (!error) loadTasks()
+    if (!error) {
+      toast.success('Status updated')
+      loadTasks()
+    }
   }
 
   function handleEdit(task: Task) {
