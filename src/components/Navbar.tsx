@@ -22,6 +22,7 @@ interface NavbarProps {
 const navItems = [
   { href: '/', label: 'Dashboard' },
   { href: '/tasks', label: 'Tasks' },
+  { href: '/notes', label: 'Notes' },
   { href: '/content', label: 'Content' },
   { href: '/calendar', label: 'Calendar' },
   { href: '/business', label: 'Business' },

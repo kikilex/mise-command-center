@@ -184,9 +184,45 @@ export default function SettingsPage() {
     setReminderSettings(DEFAULT_REMINDER_SETTINGS)
   }
 
+  async function handleThemeChange(newTheme: ThemeValue) {
+    setTheme(newTheme)
+    
+    if (!user) return
+
+    setSavingTheme(true)
+    try {
+      const { data: profile, error: fetchError } = await supabase
+        .from('users')
+        .select('settings')
+        .eq('id', user.id)
+        .single()
+
+      if (fetchError) throw fetchError
+
+      const updatedSettings = {
+        ...(profile?.settings || {}),
+        theme: newTheme,
+      }
+
+      const { error } = await supabase
+        .from('users')
+        .update({ settings: updatedSettings })
+        .eq('id', user.id)
+
+      if (error) throw error
+
+      showSuccessToast('Theme preference saved')
+    } catch (error) {
+      console.error('Save theme error:', error)
+      showErrorToast(error, 'Failed to save theme preference')
+    } finally {
+      setSavingTheme(false)
+    }
+  }
+
   if (loading) {
     return (
-      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-purple-50/30">
+      <div className="min-h-screen bg-background">
         <Navbar user={null} />
         <main className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
           <div className="flex justify-center py-12">
@@ -198,17 +234,91 @@ export default function SettingsPage() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-purple-50/30">
+    <div className="min-h-screen bg-background">
       <Navbar user={user} />
 
       <main className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
-        <h1 className="text-2xl font-bold text-slate-800 mb-6">Settings</h1>
+        <h1 className="text-2xl font-bold text-foreground mb-6">Settings</h1>
+
+        {/* Theme Settings Card */}
+        <Card className="mb-6">
+          <CardHeader className="flex flex-col items-start px-6 pt-6">
+            <h2 className="text-lg font-semibold">Appearance</h2>
+            <p className="text-sm text-default-500 mt-1">
+              Customize how the app looks on your device
+            </p>
+          </CardHeader>
+          <Divider />
+          <CardBody className="px-6 py-6">
+            {mounted ? (
+              <RadioGroup
+                label="Theme"
+                value={theme}
+                onValueChange={(value) => handleThemeChange(value as ThemeValue)}
+                orientation="horizontal"
+                classNames={{
+                  wrapper: "gap-4",
+                }}
+              >
+                <Radio
+                  value="light"
+                  description="Always use light mode"
+                  classNames={{
+                    base: "inline-flex m-0 items-center justify-between flex-row-reverse max-w-[300px] cursor-pointer rounded-lg gap-4 p-4 border-2 border-default-200 data-[selected=true]:border-primary",
+                    wrapper: "hidden",
+                    labelWrapper: "ml-0",
+                  }}
+                >
+                  <div className="flex items-center gap-2">
+                    <SunIcon className="w-5 h-5" />
+                    <span>Light</span>
+                  </div>
+                </Radio>
+                <Radio
+                  value="dark"
+                  description="Always use dark mode"
+                  classNames={{
+                    base: "inline-flex m-0 items-center justify-between flex-row-reverse max-w-[300px] cursor-pointer rounded-lg gap-4 p-4 border-2 border-default-200 data-[selected=true]:border-primary",
+                    wrapper: "hidden",
+                    labelWrapper: "ml-0",
+                  }}
+                >
+                  <div className="flex items-center gap-2">
+                    <MoonIcon className="w-5 h-5" />
+                    <span>Dark</span>
+                  </div>
+                </Radio>
+                <Radio
+                  value="system"
+                  description="Follow system settings"
+                  classNames={{
+                    base: "inline-flex m-0 items-center justify-between flex-row-reverse max-w-[300px] cursor-pointer rounded-lg gap-4 p-4 border-2 border-default-200 data-[selected=true]:border-primary",
+                    wrapper: "hidden",
+                    labelWrapper: "ml-0",
+                  }}
+                >
+                  <div className="flex items-center gap-2">
+                    <ComputerDesktopIcon className="w-5 h-5" />
+                    <span>System</span>
+                  </div>
+                </Radio>
+              </RadioGroup>
+            ) : (
+              <div className="flex justify-center py-4">
+                <Spinner size="sm" />
+              </div>
+            )}
+            {savingTheme && (
+              <p className="text-sm text-default-500 mt-4">Saving...</p>
+            )}
+          </CardBody>
+        </Card>
 
         {/* Reminder Settings Card */}
-        <Card className="bg-white mb-6">
+        <Card className="bg-content1 mb-6">
           <CardHeader className="flex flex-col items-start px-6 pt-6">
-            <h2 className="text-lg font-semibold text-slate-800">Task Reminder Settings</h2>
-            <p className="text-sm text-slate-500 mt-1">
+            <h2 className="text-lg font-semibold">Task Reminder Settings</h2>
+            <p className="text-sm text-default-500 mt-1">
               Configure when you want to receive reminders based on task priority
             </p>
           </CardHeader>
@@ -218,27 +328,27 @@ export default function SettingsPage() {
               {/* High Priority */}
               <div>
                 <div className="flex items-center gap-2 mb-4">
-                  <div className="w-3 h-3 rounded-full bg-red-500" />
-                  <h3 className="font-semibold text-slate-700">High Priority / Critical Tasks</h3>
+                  <div className="w-3 h-3 rounded-full bg-danger" />
+                  <h3 className="font-semibold">High Priority / Critical Tasks</h3>
                 </div>
                 <div className="ml-5 space-y-3">
                   <Checkbox
                     isSelected={reminderSettings.high['24h']}
                     onValueChange={(v) => updateHighPriority('24h', v)}
                   >
-                    <span className="text-slate-600">24 hours before due</span>
+                    <span className="text-default-600">24 hours before due</span>
                   </Checkbox>
                   <Checkbox
                     isSelected={reminderSettings.high['6h']}
                     onValueChange={(v) => updateHighPriority('6h', v)}
                   >
-                    <span className="text-slate-600">6 hours before due</span>
+                    <span className="text-default-600">6 hours before due</span>
                   </Checkbox>
                   <Checkbox
                     isSelected={reminderSettings.high['1h']}
                     onValueChange={(v) => updateHighPriority('1h', v)}
                   >
-                    <span className="text-slate-600">1 hour before due</span>
+                    <span className="text-default-600">1 hour before due</span>
                   </Checkbox>
                 </div>
               </div>
@@ -246,15 +356,15 @@ export default function SettingsPage() {
               {/* Medium Priority */}
               <div>
                 <div className="flex items-center gap-2 mb-4">
-                  <div className="w-3 h-3 rounded-full bg-yellow-500" />
-                  <h3 className="font-semibold text-slate-700">Medium Priority Tasks</h3>
+                  <div className="w-3 h-3 rounded-full bg-warning" />
+                  <h3 className="font-semibold">Medium Priority Tasks</h3>
                 </div>
                 <div className="ml-5 space-y-3">
                   <Checkbox
                     isSelected={reminderSettings.medium['24h']}
                     onValueChange={(v) => updateMediumPriority('24h', v)}
                   >
-                    <span className="text-slate-600">24 hours before due</span>
+                    <span className="text-default-600">24 hours before due</span>
                   </Checkbox>
                 </div>
               </div>
@@ -262,15 +372,15 @@ export default function SettingsPage() {
               {/* Low Priority */}
               <div>
                 <div className="flex items-center gap-2 mb-4">
-                  <div className="w-3 h-3 rounded-full bg-slate-400" />
-                  <h3 className="font-semibold text-slate-700">Low Priority Tasks</h3>
+                  <div className="w-3 h-3 rounded-full bg-default-400" />
+                  <h3 className="font-semibold">Low Priority Tasks</h3>
                 </div>
                 <div className="ml-5 space-y-3">
                   <Checkbox
                     isSelected={reminderSettings.low['day_of']}
                     onValueChange={(v) => updateLowPriority('day_of', v)}
                   >
-                    <span className="text-slate-600">Morning of due date (9:00 AM)</span>
+                    <span className="text-default-600">Morning of due date (9:00 AM)</span>
                   </Checkbox>
                 </div>
               </div>
@@ -297,13 +407,13 @@ export default function SettingsPage() {
         </Card>
 
         {/* Info Card */}
-        <Card className="bg-violet-50 border border-violet-200">
+        <Card className="bg-secondary/10 border border-secondary/20">
           <CardBody className="px-6 py-4">
             <div className="flex gap-3">
               <span className="text-xl">💡</span>
-              <div className="text-sm text-violet-700">
+              <div className="text-sm">
                 <p className="font-medium mb-1">How reminders work:</p>
-                <ul className="list-disc list-inside space-y-1 text-violet-600">
+                <ul className="list-disc list-inside space-y-1 text-default-600">
                   <li>Reminders are checked periodically by the system</li>
                   <li>Each reminder window is tracked separately so you only get notified once per window</li>
                   <li>Tasks marked as Done will not trigger reminders</li>

@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { 
   Button, 
   Card, 
@@ -16,7 +16,15 @@ import {
   SelectItem,
   Textarea,
   useDisclosure,
-  Avatar
+  Tabs,
+  Tab,
+  Table,
+  TableHeader,
+  TableColumn,
+  TableBody,
+  TableRow,
+  TableCell,
+  SortDescriptor,
 } from "@heroui/react"
 import { createClient } from '@/lib/supabase/client'
 import Navbar from '@/components/Navbar'
@@ -43,6 +51,10 @@ interface UserData {
   avatar_url?: string
 }
 
+type ViewType = 'kanban' | 'list' | 'calendar' | 'my-tasks' | 'ai-queue'
+
+const VIEW_STORAGE_KEY = 'mise-tasks-view'
+
 const statusOptions = [
   { key: 'backlog', label: 'Backlog', color: 'default' },
   { key: 'todo', label: 'To Do', color: 'primary' },
@@ -59,6 +71,22 @@ const priorityOptions = [
   { key: 'low', label: 'Low', color: 'bg-slate-400' },
 ]
 
+const priorityOrder: Record<string, number> = {
+  'critical': 1,
+  'high': 2,
+  'medium': 3,
+  'low': 4,
+}
+
+const statusOrder: Record<string, number> = {
+  'blocked': 1,
+  'in_progress': 2,
+  'review': 3,
+  'todo': 4,
+  'backlog': 5,
+  'done': 6,
+}
+
 // Default reminder windows by priority
 const reminderWindowsByPriority: Record<string, string[]> = {
   critical: ['24h before', '6h before', '1h before'],
@@ -73,7 +101,13 @@ export default function TasksPage() {
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
+  const [currentView, setCurrentView] = useState<ViewType>('kanban')
   const [filter, setFilter] = useState<string>('all')
+  const [sortDescriptor, setSortDescriptor] = useState<SortDescriptor>({
+    column: 'created_at',
+    direction: 'descending',
+  })
+  const [currentDate, setCurrentDate] = useState(new Date())
   const { isOpen, onOpen, onClose } = useDisclosure()
   const [editingTask, setEditingTask] = useState<Task | null>(null)
   const [formData, setFormData] = useState({
@@ -86,6 +120,20 @@ export default function TasksPage() {
   })
   
   const supabase = createClient()
+
+  // Load saved view from localStorage
+  useEffect(() => {
+    const savedView = localStorage.getItem(VIEW_STORAGE_KEY) as ViewType | null
+    if (savedView && ['kanban', 'list', 'calendar', 'my-tasks', 'ai-queue'].includes(savedView)) {
+      setCurrentView(savedView)
+    }
+  }, [])
+
+  // Save view to localStorage when changed
+  const handleViewChange = (view: ViewType) => {
+    setCurrentView(view)
+    localStorage.setItem(VIEW_STORAGE_KEY, view)
+  }
 
   useEffect(() => {
     loadUser()
@@ -300,9 +348,70 @@ export default function TasksPage() {
     onOpen()
   }
 
-  const filteredTasks = filter === 'all' 
-    ? tasks 
-    : tasks.filter(t => t.status === filter)
+  // Filter logic based on view
+  const getViewFilteredTasks = () => {
+    let filtered = tasks
+
+    // Apply view-specific filters
+    switch (currentView) {
+      case 'my-tasks':
+        filtered = tasks.filter(t => t.assignee_id === user?.id)
+        break
+      case 'ai-queue':
+        filtered = tasks.filter(t => t.ai_flag === true)
+        break
+      default:
+        break
+    }
+
+    // Apply status filter (for list view and kanban when not "all")
+    if (filter !== 'all' && currentView !== 'kanban') {
+      filtered = filtered.filter(t => t.status === filter)
+    }
+
+    return filtered
+  }
+
+  const filteredTasks = getViewFilteredTasks()
+
+  // Sorted tasks for list view
+  const sortedTasks = useMemo(() => {
+    const sorted = [...filteredTasks]
+    
+    if (sortDescriptor.column) {
+      sorted.sort((a, b) => {
+        let aValue: any = a[sortDescriptor.column as keyof Task]
+        let bValue: any = b[sortDescriptor.column as keyof Task]
+        
+        // Handle special sorting for priority and status
+        if (sortDescriptor.column === 'priority') {
+          aValue = priorityOrder[a.priority] || 99
+          bValue = priorityOrder[b.priority] || 99
+        } else if (sortDescriptor.column === 'status') {
+          aValue = statusOrder[a.status] || 99
+          bValue = statusOrder[b.status] || 99
+        } else if (sortDescriptor.column === 'due_date') {
+          aValue = a.due_date ? new Date(a.due_date).getTime() : Infinity
+          bValue = b.due_date ? new Date(b.due_date).getTime() : Infinity
+        }
+        
+        // Handle null/undefined values
+        if (aValue == null) aValue = ''
+        if (bValue == null) bValue = ''
+        
+        let cmp = 0
+        if (typeof aValue === 'string' && typeof bValue === 'string') {
+          cmp = aValue.localeCompare(bValue)
+        } else {
+          cmp = aValue < bValue ? -1 : aValue > bValue ? 1 : 0
+        }
+        
+        return sortDescriptor.direction === 'descending' ? -cmp : cmp
+      })
+    }
+    
+    return sorted
+  }, [filteredTasks, sortDescriptor])
 
   const getStatusColor = (status: string) => {
     return statusOptions.find(s => s.key === status)?.color || 'default'
@@ -312,14 +421,484 @@ export default function TasksPage() {
     return priorityOptions.find(p => p.key === priority)?.color || 'bg-slate-400'
   }
 
+  // Calendar helpers
+  const getDaysInMonth = (date: Date) => {
+    const year = date.getFullYear()
+    const month = date.getMonth()
+    const firstDay = new Date(year, month, 1)
+    const lastDay = new Date(year, month + 1, 0)
+    const daysInMonth = lastDay.getDate()
+    const startingDay = firstDay.getDay()
+    
+    return { daysInMonth, startingDay }
+  }
+
+  const { daysInMonth, startingDay } = getDaysInMonth(currentDate)
+
+  const getTasksForDay = (day: number) => {
+    const year = currentDate.getFullYear()
+    const month = currentDate.getMonth()
+    const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`
+    
+    return filteredTasks.filter(t => t.due_date?.startsWith(dateStr))
+  }
+
+  const isToday = (day: number) => {
+    const today = new Date()
+    return (
+      day === today.getDate() &&
+      currentDate.getMonth() === today.getMonth() &&
+      currentDate.getFullYear() === today.getFullYear()
+    )
+  }
+
+  const prevMonth = () => {
+    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() - 1, 1))
+  }
+
+  const nextMonth = () => {
+    setCurrentDate(new Date(currentDate.getFullYear(), currentDate.getMonth() + 1, 1))
+  }
+
+  const monthNames = ['January', 'February', 'March', 'April', 'May', 'June',
+    'July', 'August', 'September', 'October', 'November', 'December']
+
+  const dayNames = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat']
+
+  // Group tasks by status for Kanban view
+  const tasksByStatus = useMemo(() => {
+    const grouped: Record<string, Task[]> = {}
+    statusOptions.forEach(s => {
+      grouped[s.key] = filteredTasks.filter(t => t.status === s.key)
+    })
+    return grouped
+  }, [filteredTasks])
+
+  // Render task card (shared between views)
+  const renderTaskCard = (task: Task, compact = false) => (
+    <Card key={task.id} className="bg-white hover:shadow-md transition-shadow">
+      <CardBody className={compact ? "p-3" : "p-4"}>
+        <div className="flex items-start gap-3">
+          {/* Priority indicator */}
+          <div className={`w-2 h-2 rounded-full mt-2 flex-shrink-0 ${getPriorityColor(task.priority)}`} />
+          
+          {/* Task content */}
+          <div className="flex-1 min-w-0">
+            <div className="flex items-center gap-2 mb-1 flex-wrap">
+              <h3 className={`font-medium text-slate-800 ${compact ? 'text-sm' : ''} truncate`}>{task.title}</h3>
+              {task.ai_flag && (
+                <Chip size="sm" className="bg-violet-100 text-violet-700">🤖 AI</Chip>
+              )}
+            </div>
+            {!compact && task.description && (
+              <p className="text-sm text-slate-500 line-clamp-2">{task.description}</p>
+            )}
+            <div className="flex items-center gap-2 mt-2 flex-wrap">
+              {!compact && (
+                <Select
+                  size="sm"
+                  selectedKeys={[task.status]}
+                  className="w-32"
+                  onChange={(e) => handleStatusChange(task.id, e.target.value)}
+                >
+                  {statusOptions.map(s => (
+                    <SelectItem key={s.key}>{s.label}</SelectItem>
+                  ))}
+                </Select>
+              )}
+              <Chip size="sm" variant="flat" className="capitalize">
+                {task.priority}
+              </Chip>
+              {task.due_date && (
+                <Chip size="sm" variant="flat" className="bg-blue-100 text-blue-700">
+                  Due: {new Date(task.due_date).toLocaleDateString()}
+                </Chip>
+              )}
+            </div>
+          </div>
+
+          {/* Actions */}
+          {!compact && (
+            <div className="flex gap-2 flex-shrink-0">
+              <Button 
+                size="sm" 
+                variant="flat" 
+                onPress={() => handleEdit(task)}
+              >
+                Edit
+              </Button>
+              <Button 
+                size="sm" 
+                variant="flat" 
+                color="danger"
+                onPress={() => handleDelete(task.id)}
+              >
+                Delete
+              </Button>
+            </div>
+          )}
+        </div>
+      </CardBody>
+    </Card>
+  )
+
+  // Render Kanban View
+  const renderKanbanView = () => (
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 overflow-x-auto">
+      {statusOptions.map(status => (
+        <div key={status.key} className="min-w-[280px]">
+          <div className="flex items-center justify-between mb-3 px-1">
+            <div className="flex items-center gap-2">
+              <Chip 
+                size="sm" 
+                color={status.color as any}
+                variant="flat"
+              >
+                {status.label}
+              </Chip>
+              <span className="text-sm text-slate-500">
+                ({tasksByStatus[status.key]?.length || 0})
+              </span>
+            </div>
+          </div>
+          <div className="space-y-2 min-h-[200px] bg-slate-50/50 rounded-lg p-2">
+            {tasksByStatus[status.key]?.map(task => renderTaskCard(task, true))}
+            {tasksByStatus[status.key]?.length === 0 && (
+              <div className="text-center text-slate-400 text-sm py-8">
+                No tasks
+              </div>
+            )}
+          </div>
+        </div>
+      ))}
+    </div>
+  )
+
+  // Render List View
+  const renderListView = () => (
+    <Card className="bg-white">
+      <CardBody className="p-0">
+        <Table
+          aria-label="Tasks table"
+          sortDescriptor={sortDescriptor}
+          onSortChange={setSortDescriptor}
+          classNames={{
+            wrapper: "min-h-[400px]",
+          }}
+        >
+          <TableHeader>
+            <TableColumn key="title" allowsSorting>Title</TableColumn>
+            <TableColumn key="status" allowsSorting width={140}>Status</TableColumn>
+            <TableColumn key="priority" allowsSorting width={100}>Priority</TableColumn>
+            <TableColumn key="assignee_id" width={120}>Assignee</TableColumn>
+            <TableColumn key="due_date" allowsSorting width={120}>Due Date</TableColumn>
+            <TableColumn key="actions" width={150}>Actions</TableColumn>
+          </TableHeader>
+          <TableBody items={sortedTasks} emptyContent="No tasks to display">
+            {(task) => (
+              <TableRow key={task.id}>
+                <TableCell>
+                  <div className="flex items-center gap-2">
+                    <div className={`w-2 h-2 rounded-full flex-shrink-0 ${getPriorityColor(task.priority)}`} />
+                    <span className="font-medium truncate max-w-[300px]">{task.title}</span>
+                    {task.ai_flag && (
+                      <Chip size="sm" className="bg-violet-100 text-violet-700 flex-shrink-0">🤖</Chip>
+                    )}
+                  </div>
+                </TableCell>
+                <TableCell>
+                  <Select
+                    size="sm"
+                    selectedKeys={[task.status]}
+                    className="w-full"
+                    onChange={(e) => handleStatusChange(task.id, e.target.value)}
+                  >
+                    {statusOptions.map(s => (
+                      <SelectItem key={s.key}>{s.label}</SelectItem>
+                    ))}
+                  </Select>
+                </TableCell>
+                <TableCell>
+                  <Chip size="sm" variant="flat" className="capitalize">
+                    {task.priority}
+                  </Chip>
+                </TableCell>
+                <TableCell>
+                  <span className="text-slate-500 text-sm">
+                    {task.assignee_id ? 'Assigned' : '—'}
+                  </span>
+                </TableCell>
+                <TableCell>
+                  {task.due_date ? (
+                    <span className="text-sm">
+                      {new Date(task.due_date).toLocaleDateString()}
+                    </span>
+                  ) : (
+                    <span className="text-slate-400">—</span>
+                  )}
+                </TableCell>
+                <TableCell>
+                  <div className="flex gap-2">
+                    <Button 
+                      size="sm" 
+                      variant="flat" 
+                      onPress={() => handleEdit(task)}
+                    >
+                      Edit
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant="flat" 
+                      color="danger"
+                      onPress={() => handleDelete(task.id)}
+                    >
+                      Delete
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </CardBody>
+    </Card>
+  )
+
+  // Render Calendar View
+  const renderCalendarView = () => (
+    <Card className="bg-white shadow-sm">
+      <CardBody className="p-6">
+        {/* Calendar Header */}
+        <div className="flex items-center justify-between mb-6">
+          <Button variant="flat" onPress={prevMonth}>←</Button>
+          <h2 className="text-xl font-semibold text-slate-800">
+            {monthNames[currentDate.getMonth()]} {currentDate.getFullYear()}
+          </h2>
+          <Button variant="flat" onPress={nextMonth}>→</Button>
+        </div>
+
+        {/* Day Headers */}
+        <div className="grid grid-cols-7 gap-1 mb-2">
+          {dayNames.map(day => (
+            <div key={day} className="text-center text-sm font-medium text-slate-500 py-2">
+              {day}
+            </div>
+          ))}
+        </div>
+
+        {/* Calendar Grid */}
+        <div className="grid grid-cols-7 gap-1">
+          {/* Empty cells for days before the 1st */}
+          {Array.from({ length: startingDay }).map((_, i) => (
+            <div key={`empty-${i}`} className="min-h-[100px] bg-slate-50/50 rounded-lg" />
+          ))}
+          
+          {/* Days of the month */}
+          {Array.from({ length: daysInMonth }).map((_, i) => {
+            const day = i + 1
+            const dayTasks = getTasksForDay(day)
+            const hasItems = dayTasks.length > 0
+            
+            return (
+              <div
+                key={day}
+                className={`min-h-[100px] p-2 rounded-lg border transition-colors ${
+                  isToday(day) 
+                    ? 'bg-violet-50 border-violet-200' 
+                    : hasItems 
+                      ? 'bg-white border-slate-200 hover:border-violet-200' 
+                      : 'bg-slate-50/50 border-transparent'
+                }`}
+              >
+                <div className={`text-sm font-medium mb-1 ${
+                  isToday(day) ? 'text-violet-600' : 'text-slate-700'
+                }`}>
+                  {day}
+                </div>
+                <div className="space-y-1">
+                  {dayTasks.slice(0, 3).map(task => (
+                    <div 
+                      key={task.id}
+                      className={`text-xs p-1 rounded truncate cursor-pointer hover:opacity-80 ${
+                        task.ai_flag 
+                          ? 'bg-violet-100 text-violet-700' 
+                          : 'bg-blue-100 text-blue-700'
+                      }`}
+                      title={task.title}
+                      onClick={() => handleEdit(task)}
+                    >
+                      {task.ai_flag ? '🤖 ' : '📋 '}{task.title}
+                    </div>
+                  ))}
+                  
+                  {/* Show more indicator */}
+                  {dayTasks.length > 3 && (
+                    <div className="text-xs text-slate-400">
+                      +{dayTasks.length - 3} more
+                    </div>
+                  )}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+
+        {/* Legend */}
+        <div className="flex flex-wrap gap-4 mt-6 pt-4 border-t border-slate-100">
+          <div className="text-sm font-medium text-slate-600 mr-2">Legend:</div>
+          <div className="flex items-center gap-2 text-sm text-slate-600">
+            <div className="w-3 h-3 rounded bg-blue-100 border border-blue-200" />
+            <span>Regular Tasks</span>
+          </div>
+          <div className="flex items-center gap-2 text-sm text-slate-600">
+            <div className="w-3 h-3 rounded bg-violet-100 border border-violet-200" />
+            <span>AI Tasks</span>
+          </div>
+        </div>
+      </CardBody>
+    </Card>
+  )
+
+  // Render My Tasks View (uses list format with filter)
+  const renderMyTasksView = () => {
+    if (!user) {
+      return (
+        <Card className="bg-white">
+          <CardBody className="text-center py-12">
+            <p className="text-slate-500 mb-4">Please sign in to view your tasks</p>
+          </CardBody>
+        </Card>
+      )
+    }
+
+    return (
+      <div className="space-y-3">
+        {filteredTasks.length === 0 ? (
+          <Card className="bg-white">
+            <CardBody className="text-center py-12">
+              <p className="text-slate-500 mb-4">No tasks assigned to you</p>
+              <Button color="primary" onPress={handleNew}>Create a task</Button>
+            </CardBody>
+          </Card>
+        ) : (
+          filteredTasks.map(task => renderTaskCard(task))
+        )}
+      </div>
+    )
+  }
+
+  // Render AI Queue View
+  const renderAIQueueView = () => (
+    <div className="space-y-3">
+      {filteredTasks.length === 0 ? (
+        <Card className="bg-white">
+          <CardBody className="text-center py-12">
+            <div className="text-4xl mb-4">🤖</div>
+            <p className="text-slate-500 mb-4">No tasks in the AI queue</p>
+            <p className="text-sm text-slate-400 mb-4">
+              Tasks with the AI flag enabled will appear here
+            </p>
+            <Button color="primary" onPress={handleNew}>Create an AI task</Button>
+          </CardBody>
+        </Card>
+      ) : (
+        <>
+          <div className="flex items-center gap-2 mb-4 px-1">
+            <span className="text-lg">🤖</span>
+            <span className="text-slate-600 font-medium">
+              {filteredTasks.length} task{filteredTasks.length !== 1 ? 's' : ''} ready for AI
+            </span>
+          </div>
+          {filteredTasks.map(task => renderTaskCard(task))}
+        </>
+      )}
+    </div>
+  )
+
+  // Render current view
+  const renderCurrentView = () => {
+    switch (currentView) {
+      case 'kanban':
+        return renderKanbanView()
+      case 'list':
+        return renderListView()
+      case 'calendar':
+        return renderCalendarView()
+      case 'my-tasks':
+        return renderMyTasksView()
+      case 'ai-queue':
+        return renderAIQueueView()
+      default:
+        return renderKanbanView()
+    }
+  }
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-purple-50/30">
       <Navbar user={user} />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
-        {/* Toolbar */}
-        <div className="flex flex-col sm:flex-row gap-4 justify-between mb-6">
-          <div className="flex gap-2 flex-wrap">
+        {/* View Tabs */}
+        <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center mb-6">
+          <Tabs 
+            selectedKey={currentView} 
+            onSelectionChange={(key) => handleViewChange(key as ViewType)}
+            color="primary"
+            variant="solid"
+            size="md"
+          >
+            <Tab key="kanban" title={
+              <div className="flex items-center gap-2">
+                <span>📊</span>
+                <span>Kanban</span>
+              </div>
+            } />
+            <Tab key="list" title={
+              <div className="flex items-center gap-2">
+                <span>📋</span>
+                <span>List</span>
+              </div>
+            } />
+            <Tab key="calendar" title={
+              <div className="flex items-center gap-2">
+                <span>📅</span>
+                <span>Calendar</span>
+              </div>
+            } />
+            <Tab key="my-tasks" title={
+              <div className="flex items-center gap-2">
+                <span>👤</span>
+                <span>My Tasks</span>
+                {user && (
+                  <Chip size="sm" variant="flat">
+                    {tasks.filter(t => t.assignee_id === user.id).length}
+                  </Chip>
+                )}
+              </div>
+            } />
+            <Tab key="ai-queue" title={
+              <div className="flex items-center gap-2">
+                <span>🤖</span>
+                <span>AI Queue</span>
+                <Chip size="sm" variant="flat" className="bg-violet-100 text-violet-700">
+                  {tasks.filter(t => t.ai_flag).length}
+                </Chip>
+              </div>
+            } />
+          </Tabs>
+          
+          <Button 
+            color="primary" 
+            onPress={handleNew}
+            className="font-semibold"
+          >
+            + New Task
+          </Button>
+        </div>
+
+        {/* Status filter (for list view only) */}
+        {currentView === 'list' && (
+          <div className="flex gap-2 flex-wrap mb-6">
             <Button 
               size="sm" 
               variant={filter === 'all' ? 'solid' : 'flat'}
@@ -339,14 +918,7 @@ export default function TasksPage() {
               </Button>
             ))}
           </div>
-          <Button 
-            color="primary" 
-            onPress={handleNew}
-            className="font-semibold"
-          >
-            + New Task
-          </Button>
-        </div>
+        )}
 
         {/* Error State */}
         {loadError && !loading && (
@@ -355,81 +927,11 @@ export default function TasksPage() {
           </div>
         )}
 
-        {/* Task List */}
+        {/* Main Content */}
         {loading ? (
           <div className="text-center py-12 text-slate-500">Loading tasks...</div>
-        ) : !loadError && filteredTasks.length === 0 ? (
-          <Card className="bg-white">
-            <CardBody className="text-center py-12">
-              <p className="text-slate-500 mb-4">No tasks yet</p>
-              <Button color="primary" onPress={handleNew}>Create your first task</Button>
-            </CardBody>
-          </Card>
         ) : !loadError && (
-          <div className="space-y-3">
-            {filteredTasks.map(task => (
-              <Card key={task.id} className="bg-white hover:shadow-md transition-shadow">
-                <CardBody className="p-4">
-                  <div className="flex items-start gap-4">
-                    {/* Priority indicator */}
-                    <div className={`w-2 h-2 rounded-full mt-2 ${getPriorityColor(task.priority)}`} />
-                    
-                    {/* Task content */}
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center gap-2 mb-1">
-                        <h3 className="font-medium text-slate-800 truncate">{task.title}</h3>
-                        {task.ai_flag && (
-                          <Chip size="sm" className="bg-violet-100 text-violet-700">🤖 AI</Chip>
-                        )}
-                      </div>
-                      {task.description && (
-                        <p className="text-sm text-slate-500 line-clamp-2">{task.description}</p>
-                      )}
-                      <div className="flex items-center gap-2 mt-2">
-                        <Select
-                          size="sm"
-                          selectedKeys={[task.status]}
-                          className="w-32"
-                          onChange={(e) => handleStatusChange(task.id, e.target.value)}
-                        >
-                          {statusOptions.map(s => (
-                            <SelectItem key={s.key}>{s.label}</SelectItem>
-                          ))}
-                        </Select>
-                        <Chip size="sm" variant="flat" className="capitalize">
-                          {task.priority}
-                        </Chip>
-                        {task.due_date && (
-                          <Chip size="sm" variant="flat" className="bg-blue-100 text-blue-700">
-                            Due: {new Date(task.due_date).toLocaleDateString()}
-                          </Chip>
-                        )}
-                      </div>
-                    </div>
-
-                    {/* Actions */}
-                    <div className="flex gap-2">
-                      <Button 
-                        size="sm" 
-                        variant="flat" 
-                        onPress={() => handleEdit(task)}
-                      >
-                        Edit
-                      </Button>
-                      <Button 
-                        size="sm" 
-                        variant="flat" 
-                        color="danger"
-                        onPress={() => handleDelete(task.id)}
-                      >
-                        Delete
-                      </Button>
-                    </div>
-                  </div>
-                </CardBody>
-              </Card>
-            ))}
-          </div>
+          renderCurrentView()
         )}
       </main>
 
