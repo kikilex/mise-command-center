@@ -20,10 +20,45 @@ import {
   NavbarMenu,
   NavbarMenuItem
 } from "@heroui/react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
+import { createClient } from '@/lib/supabase/client'
+import UserMenu from '@/components/UserMenu'
+
+interface UserData {
+  email: string
+  name?: string
+  avatar_url?: string
+  role?: string
+}
 
 export default function Home() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const [user, setUser] = useState<UserData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const supabase = createClient();
+
+  useEffect(() => {
+    async function getUser() {
+      const { data: { user: authUser } } = await supabase.auth.getUser();
+      if (authUser) {
+        // Try to get user profile from our users table
+        const { data: profile } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', authUser.id)
+          .single();
+        
+        setUser({
+          email: authUser.email || '',
+          name: profile?.name || authUser.user_metadata?.name || authUser.email?.split('@')[0],
+          avatar_url: profile?.avatar_url,
+          role: profile?.role || 'member'
+        });
+      }
+      setLoading(false);
+    }
+    getUser();
+  }, [supabase]);
 
   const menuItems = [
     "Overview",
@@ -96,11 +131,14 @@ export default function Home() {
             </Button>
           </NavbarItem>
           <NavbarItem>
-            <Avatar 
-              src="https://i.pravatar.cc/150?u=alex" 
-              size="sm"
-              className="ring-2 ring-white shadow-md"
-            />
+            {user ? (
+              <UserMenu user={user} />
+            ) : (
+              <Avatar 
+                size="sm"
+                className="ring-2 ring-white shadow-md"
+              />
+            )}
           </NavbarItem>
         </NavbarContent>
 
