@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
-import { Bot } from 'lucide-react'
+import { useState, useEffect, useMemo } from 'react'
+import { useRouter } from 'next/navigation'
+import { Bot, LayoutDashboard, Activity, ListTodo, BookOpen, Zap } from 'lucide-react'
 import { 
   Button, 
   Card, 
@@ -10,12 +11,14 @@ import {
   Chip,
   Tabs,
   Tab,
+  Spinner,
 } from "@heroui/react"
 import { createClient } from '@/lib/supabase/client'
 import Navbar from '@/components/Navbar'
 import WorkLogPanel from '@/components/WorkLogPanel'
 import { showErrorToast, getErrorMessage } from '@/lib/errors'
 import { ErrorFallback } from '@/components/ErrorBoundary'
+import JournalView from '@/components/JournalView'
 
 interface AIAgent {
   id: string
@@ -50,7 +53,7 @@ interface UserData {
   role?: string
 }
 
-type ViewType = 'overview' | 'work-log' | 'agents' | 'queue'
+type ViewType = 'overview' | 'work-log' | 'agents' | 'queue' | 'journal'
 
 export default function AIWorkspacePage() {
   const [agents, setAgents] = useState<AIAgent[]>([])
@@ -63,6 +66,7 @@ export default function AIWorkspacePage() {
   const [currentView, setCurrentView] = useState<ViewType>('overview')
   
   const supabase = createClient()
+  const router = useRouter()
 
   useEffect(() => {
     loadData()
@@ -243,7 +247,7 @@ export default function AIWorkspacePage() {
                 {agents.slice(0, 4).map(agent => (
                   <div key={agent.id} className="flex items-center gap-3 p-3 rounded-xl bg-slate-50 dark:bg-slate-700/50">
                     <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center flex-shrink-0">
-                      <span className="text-white text-lg">⚡</span>
+                      <Zap className="w-5 h-5 text-white" />
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex items-center gap-2">
@@ -348,7 +352,7 @@ export default function AIWorkspacePage() {
             {agents.map(agent => (
               <div key={agent.id} className="flex items-center gap-4 p-4 rounded-xl bg-slate-50 dark:bg-slate-700/50 border border-slate-200 dark:border-slate-600">
                 <div className="w-14 h-14 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center flex-shrink-0">
-                  <span className="text-white text-2xl">⚡</span>
+                  <Zap className="w-7 h-7 text-white" />
                 </div>
                 <div className="flex-1">
                   <div className="flex items-center gap-2 mb-1">
@@ -441,6 +445,8 @@ export default function AIWorkspacePage() {
         return renderAgentsTab()
       case 'queue':
         return renderQueueTab()
+      case 'journal':
+        return <JournalView />
       default:
         return renderOverview()
     }
@@ -467,13 +473,13 @@ export default function AIWorkspacePage() {
             >
               <Tab key="overview" title={
                 <div className="flex items-center gap-2">
-                  <span>📊</span>
+                  <LayoutDashboard className="w-4 h-4" />
                   <span>Overview</span>
                 </div>
               } />
               <Tab key="work-log" title={
                 <div className="flex items-center gap-2">
-                  <span>📋</span>
+                  <Activity className="w-4 h-4" />
                   <span>Work Log</span>
                   <Chip size="sm" variant="flat">
                     {workLogs.length}
@@ -491,11 +497,17 @@ export default function AIWorkspacePage() {
               } />
               <Tab key="queue" title={
                 <div className="flex items-center gap-2">
-                  <span>📥</span>
+                  <ListTodo className="w-4 h-4" />
                   <span>Queue</span>
                   <Chip size="sm" variant="flat" className="bg-violet-100 dark:bg-violet-900/50 text-violet-700 dark:text-violet-300">
                     {aiTasks.length}
                   </Chip>
+                </div>
+              } />
+              <Tab key="journal" title={
+                <div className="flex items-center gap-2">
+                  <BookOpen className="w-4 h-4" />
+                  <span>Journal</span>
                 </div>
               } />
             </Tabs>
