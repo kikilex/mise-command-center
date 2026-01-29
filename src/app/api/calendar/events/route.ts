@@ -1,120 +1,219 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@supabase/supabase-js'
 import { exec } from 'child_process'
 import { promisify } from 'util'
 
 const execAsync = promisify(exec)
 
-interface CalendarEvent {
+// Create admin client for bypassing RLS
+const supabaseAdmin = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY!
+)
+
+export interface CalendarEvent {
   id: string
   title: string
-  date: string
-  time: string | null
-  calendar: string
-  isAllDay: boolean
+  description: string | null
+  start_time: string
+  end_time: string
+  all_day: boolean
+  location: string | null
+  calendar_name: string
+  apple_event_id: string | null
+  business_id: string | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
+  last_synced_at: string | null
+  sync_status: string
 }
 
-// Parse icalBuddy output grouped by calendar
-function parseIcalBuddyOutput(output: string): CalendarEvent[] {
-  const events: CalendarEvent[] = []
-  const lines = output.trim().split('\n')
-  
-  let currentCalendar = 'Unknown'
-  
-  for (const line of lines) {
-    // Calendar header line (e.g., "US Holidays:")
-    if (line.endsWith(':') && !line.includes(' | ')) {
-      currentCalendar = line.slice(0, -1).trim()
-      continue
-    }
-    
-    // Separator line
-    if (line.startsWith('---')) {
-      continue
-    }
-    
-    // Event line (e.g., "Valentine's Day | 2026-02-14" or "Meeting | 2026-02-14 at 09:00 - 10:00")
-    if (line.includes(' | ')) {
-      const parts = line.split(' | ')
-      if (parts.length >= 2) {
-        const title = parts[0].trim()
-        const datetime = parts[1].trim()
-        
-        // Parse date and time
-        // All-day: "2026-02-14"
-        // Timed: "2026-02-14 at 09:00 - 10:00" or "2026-02-14 at 09:00"
-        let date = ''
-        let time: string | null = null
-        let isAllDay = true
-        
-        const atIndex = datetime.indexOf(' at ')
-        if (atIndex !== -1) {
-          date = datetime.slice(0, atIndex).trim()
-          const timeStr = datetime.slice(atIndex + 4).trim()
-          // Extract start time (before any " - ")
-          time = timeStr.split(' - ')[0].trim()
-          isAllDay = false
-        } else {
-          // All-day event - just the date
-          date = datetime.split(' ')[0] // Handle any trailing notes
-        }
-        
-        // Generate a unique ID
-        const id = `${currentCalendar}-${title}-${date}`.replace(/\s+/g, '-').toLowerCase()
-        
-        events.push({
-          id,
-          title,
-          date,
-          time,
-          calendar: currentCalendar,
-          isAllDay,
-        })
-      }
-    }
-  }
-  
-  return events
-}
-
+// GET - List events from Supabase
 export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url)
-    const start = searchParams.get('start') || 'today'
-    const end = searchParams.get('end') || 'today+30'
-    const calendars = searchParams.get('calendars') || 'Home,Work,US Holidays,Birthdays'
+    const start = searchParams.get('start')
+    const end = searchParams.get('end')
+    const calendars = searchParams.get('calendars')?.split(',')
     
-    // Build icalBuddy command
-    // -nc: no calendar names in output (we use -sc instead)
-    // -nrd: no relative dates
-    // -sc: separate by calendar (gives us calendar headers)
-    // -b "": no bullet prefix
-    // -ps "/ | /": property separator
-    // -iep: include only these properties
-    // -po: property order
-    // -df: date format
-    // -tf: time format
-    // -ic: include calendars
-    const cmd = `icalBuddy -nc -nrd -sc -b "" -ps "/ | /" -iep "title,datetime" -po "title,datetime" -df "%Y-%m-%d" -tf "%H:%M" -ic "${calendars}" eventsFrom:${start} to:${end}`
+    let query = supabaseAdmin
+      .from('calendar_events')
+      .select('*')
+      .order('start_time', { ascending: true })
     
-    const { stdout, stderr } = await execAsync(cmd, {
-      timeout: 10000,
-      env: { ...process.env, PATH: '/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin' }
-    })
-    
-    if (stderr && !stdout) {
-      console.error('icalBuddy stderr:', stderr)
-      return NextResponse.json({ events: [], error: stderr }, { status: 500 })
+    if (start) {
+      query = query.gte('start_time', `${start}T00:00:00`)
+    }
+    if (end) {
+      query = query.lte('start_time', `${end}T23:59:59`)
+    }
+    if (calendars && calendars.length > 0) {
+      query = query.in('calendar_name', calendars)
     }
     
-    const events = parseIcalBuddyOutput(stdout)
+    const { data: events, error } = await query
+    
+    if (error) {
+      console.error('Failed to fetch events:', error)
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+    
+    // Transform to the format expected by the frontend
+    const transformedEvents = (events || []).map(e => ({
+      id: e.id,
+      title: e.title,
+      date: e.start_time.split('T')[0],
+      time: e.all_day ? null : e.start_time.split('T')[1]?.substring(0, 5),
+      calendar: e.calendar_name,
+      isAllDay: e.all_day,
+      // Include full data for detail views
+      description: e.description,
+      start_time: e.start_time,
+      end_time: e.end_time,
+      location: e.location,
+      apple_event_id: e.apple_event_id,
+      sync_status: e.sync_status,
+    }))
     
     return NextResponse.json({ 
-      events,
-      calendars: calendars.split(',').map(c => c.trim()),
+      events: transformedEvents,
+      calendars: ['Family', 'Work', 'Personal'],
     })
   } catch (error) {
-    console.error('Calendar API error:', error)
+    console.error('Calendar events API error:', error)
     const message = error instanceof Error ? error.message : 'Unknown error'
-    return NextResponse.json({ events: [], error: message }, { status: 500 })
+    return NextResponse.json({ error: message }, { status: 500 })
+  }
+}
+
+// POST - Create new event (also push to Apple Calendar)
+export async function POST(request: NextRequest) {
+  try {
+    const body = await request.json()
+    const { 
+      title, 
+      description, 
+      start_time, 
+      end_time, 
+      all_day = false, 
+      location, 
+      calendar_name = 'Personal',
+      business_id 
+    } = body
+    
+    if (!title || !start_time || !end_time) {
+      return NextResponse.json({ error: 'Missing required fields' }, { status: 400 })
+    }
+    
+    // First, create in Apple Calendar
+    let apple_event_id: string | null = null
+    try {
+      apple_event_id = await createAppleCalendarEvent({
+        title,
+        description,
+        start_time,
+        end_time,
+        all_day,
+        location,
+        calendar_name,
+      })
+    } catch (err) {
+      console.error('Failed to create Apple Calendar event:', err)
+      // Continue without Apple Calendar ID - will try again on sync
+    }
+    
+    // Then insert into Supabase
+    const { data: event, error } = await supabaseAdmin
+      .from('calendar_events')
+      .insert({
+        title,
+        description,
+        start_time,
+        end_time,
+        all_day,
+        location,
+        calendar_name,
+        apple_event_id,
+        business_id,
+        sync_status: apple_event_id ? 'synced' : 'pending_push',
+        last_synced_at: apple_event_id ? new Date().toISOString() : null,
+      })
+      .select()
+      .single()
+    
+    if (error) {
+      console.error('Failed to create event:', error)
+      return NextResponse.json({ error: error.message }, { status: 500 })
+    }
+    
+    return NextResponse.json({ event })
+  } catch (error) {
+    console.error('Create event error:', error)
+    const message = error instanceof Error ? error.message : 'Unknown error'
+    return NextResponse.json({ error: message }, { status: 500 })
+  }
+}
+
+// Helper: Create event in Apple Calendar using AppleScript
+async function createAppleCalendarEvent(event: {
+  title: string
+  description?: string | null
+  start_time: string
+  end_time: string
+  all_day: boolean
+  location?: string | null
+  calendar_name: string
+}): Promise<string | null> {
+  const startDate = new Date(event.start_time)
+  const endDate = new Date(event.end_time)
+  
+  // Format dates for AppleScript
+  const formatAppleDate = (d: Date) => {
+    return `date "${d.toLocaleDateString('en-US', { 
+      weekday: 'long', 
+      year: 'numeric', 
+      month: 'long', 
+      day: 'numeric' 
+    })} at ${d.toLocaleTimeString('en-US', { 
+      hour: 'numeric', 
+      minute: '2-digit',
+      hour12: true 
+    })}"`
+  }
+  
+  // Escape for AppleScript
+  const escapeForAppleScript = (s: string) => s.replace(/"/g, '\\"').replace(/\\/g, '\\\\')
+  
+  const titleEscaped = escapeForAppleScript(event.title)
+  const descEscaped = event.description ? escapeForAppleScript(event.description) : ''
+  const locationEscaped = event.location ? escapeForAppleScript(event.location) : ''
+  
+  // Map calendar names
+  const calendarMap: Record<string, string> = {
+    'Family': 'Home',
+    'Work': 'Work',
+    'Personal': 'Home',
+  }
+  const calendarName = calendarMap[event.calendar_name] || 'Home'
+  
+  const script = `
+tell application "Calendar"
+  tell calendar "${calendarName}"
+    set newEvent to make new event with properties {summary:"${titleEscaped}", start date:${formatAppleDate(startDate)}, end date:${formatAppleDate(endDate)}${event.all_day ? ', allday event:true' : ''}${descEscaped ? `, description:"${descEscaped}"` : ''}${locationEscaped ? `, location:"${locationEscaped}"` : ''}}
+    return uid of newEvent
+  end tell
+end tell
+`
+  
+  try {
+    const { stdout } = await execAsync(`osascript -e '${script.replace(/'/g, "'\"'\"'")}'`, {
+      timeout: 15000,
+      env: { ...process.env, PATH: '/usr/local/bin:/opt/homebrew/bin:/usr/bin:/bin' }
+    })
+    return stdout.trim() || null
+  } catch (error) {
+    console.error('AppleScript error:', error)
+    throw error
   }
 }

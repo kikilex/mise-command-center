@@ -7,11 +7,23 @@ import {
   CardBody,
   Checkbox,
   CheckboxGroup,
+  Chip,
+  Modal,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+  Input,
+  Textarea,
+  Select,
+  SelectItem,
 } from "@heroui/react"
+import { RefreshCw, Plus, Calendar, MapPin, Clock, AlertCircle } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import Navbar from '@/components/Navbar'
 import { showErrorToast, getErrorMessage } from '@/lib/errors'
 import { ErrorFallback } from '@/components/ErrorBoundary'
+import toast from 'react-hot-toast'
 
 interface Task {
   id: string
@@ -35,6 +47,12 @@ interface CalendarEvent {
   time: string | null
   calendar: string
   isAllDay: boolean
+  description?: string | null
+  start_time?: string
+  end_time?: string
+  location?: string | null
+  apple_event_id?: string | null
+  sync_status?: string
 }
 
 interface UserData {
@@ -43,16 +61,18 @@ interface UserData {
   name?: string
 }
 
-// Calendar colors for Apple Calendar events
-const calendarColors: Record<string, { bg: string; text: string; border: string }> = {
-  'Home': { bg: 'bg-green-100', text: 'text-green-700', border: 'border-green-200' },
-  'Work': { bg: 'bg-orange-100', text: 'text-orange-700', border: 'border-orange-200' },
-  'US Holidays': { bg: 'bg-red-100', text: 'text-red-700', border: 'border-red-200' },
-  'Birthdays': { bg: 'bg-pink-100', text: 'text-pink-700', border: 'border-pink-200' },
-  'Reminders': { bg: 'bg-yellow-100', text: 'text-yellow-700', border: 'border-yellow-200' },
+// Calendar colors
+const calendarColors: Record<string, { bg: string; text: string; border: string; darkBg: string; darkText: string }> = {
+  'Family': { bg: 'bg-green-100', text: 'text-green-700', border: 'border-green-200', darkBg: 'dark:bg-green-900/30', darkText: 'dark:text-green-300' },
+  'Work': { bg: 'bg-orange-100', text: 'text-orange-700', border: 'border-orange-200', darkBg: 'dark:bg-orange-900/30', darkText: 'dark:text-orange-300' },
+  'Personal': { bg: 'bg-blue-100', text: 'text-blue-700', border: 'border-blue-200', darkBg: 'dark:bg-blue-900/30', darkText: 'dark:text-blue-300' },
+  'US Holidays': { bg: 'bg-red-100', text: 'text-red-700', border: 'border-red-200', darkBg: 'dark:bg-red-900/30', darkText: 'dark:text-red-300' },
+  'Birthdays': { bg: 'bg-pink-100', text: 'text-pink-700', border: 'border-pink-200', darkBg: 'dark:bg-pink-900/30', darkText: 'dark:text-pink-300' },
 }
 
-const defaultCalendarColor = { bg: 'bg-slate-100', text: 'text-slate-700', border: 'border-slate-200' }
+const defaultCalendarColor = { bg: 'bg-slate-100', text: 'text-slate-700', border: 'border-slate-200', darkBg: 'dark:bg-slate-800', darkText: 'dark:text-slate-300' }
+
+const CALENDARS = ['Family', 'Work', 'Personal']
 
 export default function CalendarPage() {
   const [tasks, setTasks] = useState<Task[]>([])
@@ -61,21 +81,37 @@ export default function CalendarPage() {
   const [user, setUser] = useState<UserData | null>(null)
   const [currentDate, setCurrentDate] = useState(new Date())
   const [loading, setLoading] = useState(true)
+  const [syncing, setSyncing] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
   
   // Filter state
   const [enabledSources, setEnabledSources] = useState<string[]>(['tasks', 'content', 'calendar'])
-  const [enabledCalendars, setEnabledCalendars] = useState<string[]>(['Home', 'Work', 'US Holidays', 'Birthdays', 'Reminders'])
+  const [enabledCalendars, setEnabledCalendars] = useState<string[]>(CALENDARS)
+  
+  // Event modal state
+  const [isEventModalOpen, setIsEventModalOpen] = useState(false)
+  const [selectedEvent, setSelectedEvent] = useState<CalendarEvent | null>(null)
+  const [eventForm, setEventForm] = useState({
+    title: '',
+    description: '',
+    start_date: '',
+    start_time: '',
+    end_date: '',
+    end_time: '',
+    all_day: false,
+    location: '',
+    calendar_name: 'Personal',
+  })
+  const [saving, setSaving] = useState(false)
   
   const supabase = createClient()
 
-  // Fetch Apple Calendar events
+  // Fetch calendar events from Supabase
   const fetchCalendarEvents = useCallback(async (date: Date) => {
     try {
       const year = date.getFullYear()
       const month = date.getMonth()
       
-      // Get first and last day of month
       const firstDay = new Date(year, month, 1)
       const lastDay = new Date(year, month + 1, 0)
       
@@ -92,7 +128,6 @@ export default function CalendarPage() {
       setCalendarEvents(data.events || [])
     } catch (error) {
       console.error('Failed to fetch calendar events:', error)
-      // Non-fatal - don't show error, just continue without calendar events
     }
   }, [])
 
@@ -109,7 +144,6 @@ export default function CalendarPage() {
     setLoadError(null)
     
     try {
-      // Get user
       const { data: { user: authUser }, error: authError } = await supabase.auth.getUser()
       
       if (authError) {
@@ -124,7 +158,6 @@ export default function CalendarPage() {
         })
       }
 
-      // Get tasks with due dates
       const { data: tasksData, error: tasksError } = await supabase
         .from('tasks')
         .select('id, title, status, priority, due_date')
@@ -137,7 +170,6 @@ export default function CalendarPage() {
       
       setTasks(tasksData || [])
 
-      // Get content with scheduled dates
       const { data: contentData, error: contentError } = await supabase
         .from('content_items')
         .select('id, title, status, scheduled_date')
@@ -145,12 +177,9 @@ export default function CalendarPage() {
       
       if (contentError) {
         console.error('Content fetch error:', contentError)
-        // Non-fatal - calendar can still show tasks
       }
       
       setContent(contentData || [])
-      
-      // Fetch calendar events for current month
       await fetchCalendarEvents(new Date())
     } catch (error) {
       console.error('Load calendar data error:', error)
@@ -159,6 +188,171 @@ export default function CalendarPage() {
     } finally {
       setLoading(false)
     }
+  }
+
+  // Sync with Apple Calendar
+  async function handleSync() {
+    setSyncing(true)
+    try {
+      const response = await fetch('/api/calendar/sync', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ calendars: ['Home', 'Work'] }),
+      })
+      
+      const data = await response.json()
+      
+      if (data.error) {
+        throw new Error(data.error)
+      }
+      
+      const { results } = data
+      toast.success(`Synced! ${results.pulled} pulled, ${results.pushed} pushed, ${results.updated} updated`)
+      
+      // Refresh events
+      await fetchCalendarEvents(currentDate)
+    } catch (error) {
+      console.error('Sync failed:', error)
+      showErrorToast(error, 'Sync failed')
+    } finally {
+      setSyncing(false)
+    }
+  }
+
+  // Create/Update event
+  async function handleSaveEvent() {
+    if (!eventForm.title || !eventForm.start_date || !eventForm.end_date) {
+      toast.error('Please fill in required fields')
+      return
+    }
+    
+    setSaving(true)
+    try {
+      const startTime = eventForm.all_day 
+        ? `${eventForm.start_date}T00:00:00Z`
+        : `${eventForm.start_date}T${eventForm.start_time || '00:00'}:00Z`
+      
+      const endTime = eventForm.all_day
+        ? `${eventForm.end_date}T23:59:59Z`
+        : `${eventForm.end_date}T${eventForm.end_time || '23:59'}:00Z`
+      
+      const payload = {
+        title: eventForm.title,
+        description: eventForm.description || null,
+        start_time: startTime,
+        end_time: endTime,
+        all_day: eventForm.all_day,
+        location: eventForm.location || null,
+        calendar_name: eventForm.calendar_name,
+      }
+      
+      let response
+      if (selectedEvent) {
+        response = await fetch(`/api/calendar/events/${selectedEvent.id}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        })
+      } else {
+        response = await fetch('/api/calendar/events', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(payload),
+        })
+      }
+      
+      const data = await response.json()
+      
+      if (data.error) {
+        throw new Error(data.error)
+      }
+      
+      toast.success(selectedEvent ? 'Event updated!' : 'Event created!')
+      setIsEventModalOpen(false)
+      resetEventForm()
+      await fetchCalendarEvents(currentDate)
+    } catch (error) {
+      console.error('Save event error:', error)
+      showErrorToast(error, 'Failed to save event')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  // Delete event
+  async function handleDeleteEvent() {
+    if (!selectedEvent) return
+    
+    if (!confirm('Delete this event?')) return
+    
+    setSaving(true)
+    try {
+      const response = await fetch(`/api/calendar/events/${selectedEvent.id}`, {
+        method: 'DELETE',
+      })
+      
+      const data = await response.json()
+      
+      if (data.error) {
+        throw new Error(data.error)
+      }
+      
+      toast.success('Event deleted!')
+      setIsEventModalOpen(false)
+      resetEventForm()
+      await fetchCalendarEvents(currentDate)
+    } catch (error) {
+      console.error('Delete event error:', error)
+      showErrorToast(error, 'Failed to delete event')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  function resetEventForm() {
+    setSelectedEvent(null)
+    setEventForm({
+      title: '',
+      description: '',
+      start_date: '',
+      start_time: '',
+      end_date: '',
+      end_time: '',
+      all_day: false,
+      location: '',
+      calendar_name: 'Personal',
+    })
+  }
+
+  function openNewEventModal(date?: Date) {
+    resetEventForm()
+    if (date) {
+      const dateStr = `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`
+      setEventForm(prev => ({ ...prev, start_date: dateStr, end_date: dateStr }))
+    }
+    setIsEventModalOpen(true)
+  }
+
+  function openEventDetailModal(event: CalendarEvent) {
+    setSelectedEvent(event)
+    
+    const startDate = event.start_time ? event.start_time.split('T')[0] : event.date
+    const endDate = event.end_time ? event.end_time.split('T')[0] : event.date
+    const startTime = event.start_time && !event.isAllDay ? event.start_time.split('T')[1]?.substring(0, 5) : ''
+    const endTime = event.end_time && !event.isAllDay ? event.end_time.split('T')[1]?.substring(0, 5) : ''
+    
+    setEventForm({
+      title: event.title,
+      description: event.description || '',
+      start_date: startDate,
+      start_time: startTime,
+      end_date: endDate,
+      end_time: endTime,
+      all_day: event.isAllDay,
+      location: event.location || '',
+      calendar_name: event.calendar,
+    })
+    setIsEventModalOpen(true)
   }
 
   const getDaysInMonth = (date: Date) => {
@@ -218,15 +412,33 @@ export default function CalendarPage() {
     return calendarColors[calendarName] || defaultCalendarColor
   }
 
+  const getSyncStatusChip = (status?: string) => {
+    if (!status || status === 'synced') return null
+    
+    const statusConfig: Record<string, { color: 'warning' | 'danger' | 'primary'; label: string }> = {
+      pending_push: { color: 'warning', label: 'Pending sync' },
+      pending_pull: { color: 'primary', label: 'Update available' },
+      conflict: { color: 'danger', label: 'Conflict' },
+    }
+    
+    const config = statusConfig[status]
+    if (!config) return null
+    
+    return (
+      <Chip size="sm" color={config.color} variant="flat" className="text-xs">
+        {config.label}
+      </Chip>
+    )
+  }
+
   // Get unique calendars from events
-  const availableCalendars = [...new Set(calendarEvents.map(e => e.calendar))]
+  const availableCalendars = [...new Set([...CALENDARS, ...calendarEvents.map(e => e.calendar)])]
 
   return (
     <div className="min-h-screen bg-background">
       <Navbar user={user} />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
-        {/* Error State */}
         {loadError && !loading && (
           <div className="mb-6">
             <ErrorFallback error={loadError} resetError={loadData} />
@@ -234,16 +446,40 @@ export default function CalendarPage() {
         )}
         
         {loading ? (
-          <div className="text-center py-12 text-slate-500">Loading calendar...</div>
+          <div className="text-center py-12 text-default-500">Loading calendar...</div>
         ) : !loadError && (
           <div className="space-y-4">
+            {/* Header with actions */}
+            <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+              <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
+                <Calendar className="w-6 h-6" />
+                Calendar
+              </h1>
+              <div className="flex gap-2">
+                <Button
+                  variant="flat"
+                  startContent={<RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />}
+                  onPress={handleSync}
+                  isLoading={syncing}
+                >
+                  Sync Now
+                </Button>
+                <Button
+                  color="primary"
+                  startContent={<Plus className="w-4 h-4" />}
+                  onPress={() => openNewEventModal()}
+                >
+                  New Event
+                </Button>
+              </div>
+            </div>
+
             {/* Filters */}
-            <Card className="bg-white shadow-sm">
+            <Card className="bg-content1 shadow-sm">
               <CardBody className="p-4">
                 <div className="flex flex-wrap gap-6">
-                  {/* Source Filter */}
                   <div>
-                    <h3 className="text-sm font-medium text-slate-700 mb-2">Show</h3>
+                    <h3 className="text-sm font-medium text-default-700 mb-2">Show</h3>
                     <CheckboxGroup
                       orientation="horizontal"
                       value={enabledSources}
@@ -265,13 +501,12 @@ export default function CalendarPage() {
                       <Checkbox value="calendar">
                         <span className="flex items-center gap-1">
                           <span className="w-2 h-2 rounded bg-green-400" />
-                          Apple Calendar
+                          Calendar Events
                         </span>
                       </Checkbox>
                     </CheckboxGroup>
                   </div>
                   
-                  {/* Calendar Filter (only show when calendar is enabled) */}
                   {enabledSources.includes('calendar') && availableCalendars.length > 0 && (
                     <div className="overflow-x-auto">
                       <h3 className="text-sm font-medium text-default-700 mb-2">Calendars</h3>
@@ -303,7 +538,7 @@ export default function CalendarPage() {
             </Card>
 
             {/* Calendar */}
-            <Card className="bg-white shadow-sm">
+            <Card className="bg-content1 shadow-sm">
               <CardBody className="p-6">
                 {/* Calendar Header */}
                 <div className="flex items-center justify-between mb-6">
@@ -317,7 +552,7 @@ export default function CalendarPage() {
                 {/* Day Headers */}
                 <div className="grid grid-cols-7 gap-1 mb-2">
                   {dayNames.map(day => (
-                    <div key={day} className="text-center text-sm font-medium text-slate-500 py-2">
+                    <div key={day} className="text-center text-sm font-medium text-default-500 py-2">
                       {day}
                     </div>
                   ))}
@@ -325,74 +560,79 @@ export default function CalendarPage() {
 
                 {/* Calendar Grid */}
                 <div className="grid grid-cols-7 gap-1">
-                  {/* Empty cells for days before the 1st */}
                   {Array.from({ length: startingDay }).map((_, i) => (
-                    <div key={`empty-${i}`} className="min-h-[100px] bg-slate-50/50 rounded-lg" />
+                    <div key={`empty-${i}`} className="min-h-[100px] bg-default-50 rounded-lg" />
                   ))}
                   
-                  {/* Days of the month */}
                   {Array.from({ length: daysInMonth }).map((_, i) => {
                     const day = i + 1
                     const { tasks: dayTasks, content: dayContent, events: dayEvents } = getItemsForDay(day)
                     const hasItems = dayTasks.length > 0 || dayContent.length > 0 || dayEvents.length > 0
                     const totalItems = dayTasks.length + dayContent.length + dayEvents.length
+                    const dateForDay = new Date(currentDate.getFullYear(), currentDate.getMonth(), day)
                     
                     return (
                       <div
                         key={day}
-                        className={`min-h-[100px] p-2 rounded-lg border transition-colors ${
+                        onClick={() => openNewEventModal(dateForDay)}
+                        className={`min-h-[100px] p-2 rounded-lg border transition-colors cursor-pointer ${
                           isToday(day) 
-                            ? 'bg-violet-50 border-violet-200' 
+                            ? 'bg-violet-50 dark:bg-violet-900/20 border-violet-200 dark:border-violet-700' 
                             : hasItems 
-                              ? 'bg-white border-slate-200 hover:border-violet-200' 
-                              : 'bg-slate-50/50 border-transparent'
+                              ? 'bg-content1 border-default-200 hover:border-violet-200 dark:hover:border-violet-700' 
+                              : 'bg-default-50 border-transparent hover:bg-default-100'
                         }`}
                       >
                         <div className={`text-sm font-medium mb-1 ${
-                          isToday(day) ? 'text-violet-600' : 'text-slate-700'
+                          isToday(day) ? 'text-violet-600 dark:text-violet-400' : 'text-foreground'
                         }`}>
                           {day}
                         </div>
                         <div className="space-y-1">
-                          {/* Tasks */}
                           {dayTasks.slice(0, 1).map(task => (
                             <div 
                               key={task.id}
-                              className="text-xs p-1 rounded bg-blue-100 text-blue-700 truncate"
+                              className="text-xs p-1 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 truncate"
                               title={task.title}
+                              onClick={(e) => e.stopPropagation()}
                             >
                               📋 {task.title}
                             </div>
                           ))}
                           
-                          {/* Content */}
                           {dayContent.slice(0, 1).map(item => (
                             <div 
                               key={item.id}
-                              className="text-xs p-1 rounded bg-purple-100 text-purple-700 truncate"
+                              className="text-xs p-1 rounded bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 truncate"
                               title={item.title}
+                              onClick={(e) => e.stopPropagation()}
                             >
                               🎬 {item.title}
                             </div>
                           ))}
                           
-                          {/* Calendar Events */}
                           {dayEvents.slice(0, 2 - dayTasks.slice(0,1).length - dayContent.slice(0,1).length).map(event => {
                             const colors = getCalendarColor(event.calendar)
                             return (
                               <div 
                                 key={event.id}
-                                className={`text-xs p-1 rounded ${colors.bg} ${colors.text} truncate`}
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  openEventDetailModal(event)
+                                }}
+                                className={`text-xs p-1 rounded ${colors.bg} ${colors.darkBg} ${colors.text} ${colors.darkText} truncate cursor-pointer hover:opacity-80`}
                                 title={`${event.title} (${event.calendar})${event.time ? ` at ${event.time}` : ''}`}
                               >
                                 {event.time ? `${event.time} ` : '📅 '}{event.title}
+                                {event.sync_status && event.sync_status !== 'synced' && (
+                                  <AlertCircle className="w-3 h-3 inline ml-1 text-warning" />
+                                )}
                               </div>
                             )
                           })}
                           
-                          {/* Show more indicator */}
                           {totalItems > 2 && (
-                            <div className="text-xs text-slate-400">
+                            <div className="text-xs text-default-400">
                               +{totalItems - 2} more
                             </div>
                           )}
@@ -403,19 +643,19 @@ export default function CalendarPage() {
                 </div>
 
                 {/* Legend */}
-                <div className="flex flex-wrap gap-4 mt-6 pt-4 border-t border-slate-100">
-                  <div className="text-sm font-medium text-slate-600 mr-2">Legend:</div>
-                  <div className="flex items-center gap-2 text-sm text-slate-600">
-                    <div className="w-3 h-3 rounded bg-blue-100 border border-blue-200" />
+                <div className="flex flex-wrap gap-4 mt-6 pt-4 border-t border-default-100">
+                  <div className="text-sm font-medium text-default-600 mr-2">Legend:</div>
+                  <div className="flex items-center gap-2 text-sm text-default-600">
+                    <div className="w-3 h-3 rounded bg-blue-100 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700" />
                     <span>Tasks</span>
                   </div>
-                  <div className="flex items-center gap-2 text-sm text-slate-600">
-                    <div className="w-3 h-3 rounded bg-purple-100 border border-purple-200" />
+                  <div className="flex items-center gap-2 text-sm text-default-600">
+                    <div className="w-3 h-3 rounded bg-purple-100 dark:bg-purple-900/30 border border-purple-200 dark:border-purple-700" />
                     <span>Content</span>
                   </div>
-                  {Object.entries(calendarColors).map(([name, colors]) => (
-                    <div key={name} className="flex items-center gap-2 text-sm text-slate-600">
-                      <div className={`w-3 h-3 rounded ${colors.bg} ${colors.border} border`} />
+                  {Object.entries(calendarColors).slice(0, 3).map(([name, colors]) => (
+                    <div key={name} className="flex items-center gap-2 text-sm text-default-600">
+                      <div className={`w-3 h-3 rounded ${colors.bg} ${colors.darkBg} ${colors.border} border`} />
                       <span>{name}</span>
                     </div>
                   ))}
@@ -424,6 +664,123 @@ export default function CalendarPage() {
             </Card>
           </div>
         )}
+
+        {/* Event Modal */}
+        <Modal isOpen={isEventModalOpen} onClose={() => { setIsEventModalOpen(false); resetEventForm() }} size="lg">
+          <ModalContent>
+            <ModalHeader>
+              {selectedEvent ? 'Edit Event' : 'New Event'}
+            </ModalHeader>
+            <ModalBody>
+              <div className="space-y-4">
+                <Input
+                  label="Title"
+                  placeholder="Event title"
+                  value={eventForm.title}
+                  onChange={(e) => setEventForm(prev => ({ ...prev, title: e.target.value }))}
+                  isRequired
+                />
+                
+                <Textarea
+                  label="Description"
+                  placeholder="Event description"
+                  value={eventForm.description}
+                  onChange={(e) => setEventForm(prev => ({ ...prev, description: e.target.value }))}
+                />
+                
+                <div className="flex gap-4">
+                  <Input
+                    type="date"
+                    label="Start Date"
+                    value={eventForm.start_date}
+                    onChange={(e) => setEventForm(prev => ({ ...prev, start_date: e.target.value }))}
+                    isRequired
+                    className="flex-1"
+                  />
+                  {!eventForm.all_day && (
+                    <Input
+                      type="time"
+                      label="Start Time"
+                      value={eventForm.start_time}
+                      onChange={(e) => setEventForm(prev => ({ ...prev, start_time: e.target.value }))}
+                      className="flex-1"
+                    />
+                  )}
+                </div>
+                
+                <div className="flex gap-4">
+                  <Input
+                    type="date"
+                    label="End Date"
+                    value={eventForm.end_date}
+                    onChange={(e) => setEventForm(prev => ({ ...prev, end_date: e.target.value }))}
+                    isRequired
+                    className="flex-1"
+                  />
+                  {!eventForm.all_day && (
+                    <Input
+                      type="time"
+                      label="End Time"
+                      value={eventForm.end_time}
+                      onChange={(e) => setEventForm(prev => ({ ...prev, end_time: e.target.value }))}
+                      className="flex-1"
+                    />
+                  )}
+                </div>
+                
+                <Checkbox
+                  isSelected={eventForm.all_day}
+                  onValueChange={(checked) => setEventForm(prev => ({ ...prev, all_day: checked }))}
+                >
+                  All day event
+                </Checkbox>
+                
+                <Input
+                  label="Location"
+                  placeholder="Event location"
+                  value={eventForm.location}
+                  onChange={(e) => setEventForm(prev => ({ ...prev, location: e.target.value }))}
+                  startContent={<MapPin className="w-4 h-4 text-default-400" />}
+                />
+                
+                <Select
+                  label="Calendar"
+                  selectedKeys={[eventForm.calendar_name]}
+                  onChange={(e) => setEventForm(prev => ({ ...prev, calendar_name: e.target.value }))}
+                >
+                  {CALENDARS.map((cal) => (
+                    <SelectItem key={cal} textValue={cal}>
+                      <span className="flex items-center gap-2">
+                        <span className={`w-2 h-2 rounded ${getCalendarColor(cal).bg}`} />
+                        {cal}
+                      </span>
+                    </SelectItem>
+                  ))}
+                </Select>
+                
+                {selectedEvent && getSyncStatusChip(selectedEvent.sync_status)}
+              </div>
+            </ModalBody>
+            <ModalFooter>
+              {selectedEvent && (
+                <Button
+                  color="danger"
+                  variant="flat"
+                  onPress={handleDeleteEvent}
+                  isLoading={saving}
+                >
+                  Delete
+                </Button>
+              )}
+              <Button variant="flat" onPress={() => { setIsEventModalOpen(false); resetEventForm() }}>
+                Cancel
+              </Button>
+              <Button color="primary" onPress={handleSaveEvent} isLoading={saving}>
+                {selectedEvent ? 'Update' : 'Create'}
+              </Button>
+            </ModalFooter>
+          </ModalContent>
+        </Modal>
       </main>
     </div>
   )
