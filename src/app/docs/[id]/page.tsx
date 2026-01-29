@@ -413,33 +413,43 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
   }, [document?.content])
 
   // Group TOC items by parent headings for collapsible sections
+  // h1 = document title (displayed at top, not collapsible)
+  // h2 = main sections (collapsible parents)
+  // h3 = sub-sections (children that collapse under their parent h2)
   const groupedTOC = useMemo(() => {
-    const groups: { parent: TOCItem; children: TOCItem[] }[] = []
-    let currentParent: TOCItem | null = null
-    let currentChildren: TOCItem[] = []
+    const result: { title: TOCItem | null; sections: { parent: TOCItem; children: TOCItem[] }[] } = {
+      title: null,
+      sections: []
+    }
+    
+    let currentH2: TOCItem | null = null
+    let currentH3s: TOCItem[] = []
 
     tableOfContents.forEach((item) => {
       if (item.level === 1) {
-        // Save previous group if exists
-        if (currentParent) {
-          groups.push({ parent: currentParent, children: currentChildren })
+        // h1 is just the document title
+        result.title = item
+      } else if (item.level === 2) {
+        // Save previous h2 group if exists
+        if (currentH2) {
+          result.sections.push({ parent: currentH2, children: currentH3s })
         }
-        currentParent = item
-        currentChildren = []
-      } else if (currentParent) {
-        currentChildren.push(item)
-      } else {
-        // Orphan heading (no h1 parent) - treat as its own group
-        groups.push({ parent: item, children: [] })
+        currentH2 = item
+        currentH3s = []
+      } else if (item.level === 3) {
+        // h3 are children of the current h2
+        if (currentH2) {
+          currentH3s.push(item)
+        }
       }
     })
 
-    // Don't forget the last group
-    if (currentParent) {
-      groups.push({ parent: currentParent, children: currentChildren })
+    // Don't forget the last h2 group
+    if (currentH2) {
+      result.sections.push({ parent: currentH2, children: currentH3s })
     }
 
-    return groups
+    return result
   }, [tableOfContents])
 
   const handleShare = async () => {
@@ -659,17 +669,28 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
                   Contents
                 </h4>
                 <nav className="space-y-1">
-                  {groupedTOC.map((group) => (
-                    <div key={group.parent.id}>
-                      {/* Parent heading */}
+                  {/* Document title (h1) - not collapsible */}
+                  {groupedTOC.title && (
+                    <a
+                      href={`#${groupedTOC.title.id}`}
+                      className="block text-sm py-1 text-slate-800 dark:text-slate-100 font-semibold hover:text-violet-600 dark:hover:text-violet-400 transition-colors mb-2"
+                    >
+                      {groupedTOC.title.text}
+                    </a>
+                  )}
+                  
+                  {/* Main sections (h2) with collapsible children (h3) */}
+                  {groupedTOC.sections.map((section) => (
+                    <div key={section.parent.id}>
+                      {/* h2 heading - collapsible parent */}
                       <div className="flex items-center">
-                        {group.children.length > 0 && (
+                        {section.children.length > 0 && (
                           <button
-                            onClick={() => toggleSection(group.parent.id)}
+                            onClick={() => toggleSection(section.parent.id)}
                             className="p-0.5 -ml-1 mr-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
-                            aria-label={collapsedSections.has(group.parent.id) ? 'Expand section' : 'Collapse section'}
+                            aria-label={collapsedSections.has(section.parent.id) ? 'Expand section' : 'Collapse section'}
                           >
-                            {collapsedSections.has(group.parent.id) ? (
+                            {collapsedSections.has(section.parent.id) ? (
                               <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
                             ) : (
                               <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
@@ -677,25 +698,23 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
                           </button>
                         )}
                         <a
-                          href={`#${group.parent.id}`}
+                          href={`#${section.parent.id}`}
                           className={`flex-1 text-sm py-1 text-slate-600 dark:text-slate-300 hover:text-violet-600 dark:hover:text-violet-400 transition-colors font-medium ${
-                            group.children.length === 0 ? 'ml-4' : ''
+                            section.children.length === 0 ? 'ml-4' : ''
                           }`}
                         >
-                          {group.parent.text}
+                          {section.parent.text}
                         </a>
                       </div>
                       
-                      {/* Children (collapsible) */}
-                      {group.children.length > 0 && !collapsedSections.has(group.parent.id) && (
+                      {/* h3 children (collapsible) */}
+                      {section.children.length > 0 && !collapsedSections.has(section.parent.id) && (
                         <div className="ml-4 border-l border-slate-200 dark:border-slate-700 pl-2 mt-1 space-y-0.5">
-                          {group.children.map((child) => (
+                          {section.children.map((child) => (
                             <a
                               key={child.id}
                               href={`#${child.id}`}
-                              className={`block text-sm py-0.5 text-slate-500 dark:text-slate-400 hover:text-violet-600 dark:hover:text-violet-400 transition-colors ${
-                                child.level === 3 ? 'pl-3 text-xs' : ''
-                              }`}
+                              className="block text-xs py-0.5 text-slate-500 dark:text-slate-400 hover:text-violet-600 dark:hover:text-violet-400 transition-colors"
                             >
                               {child.text}
                             </a>
@@ -721,19 +740,31 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
                   Contents
                 </h4>
                 <nav className="space-y-2">
-                  {groupedTOC.map((group) => (
-                    <div key={group.parent.id}>
-                      {/* Parent heading */}
+                  {/* Document title (h1) - not collapsible */}
+                  {groupedTOC.title && (
+                    <a
+                      href={`#${groupedTOC.title.id}`}
+                      onClick={() => setShowTOC(false)}
+                      className="block text-sm py-1 text-slate-800 dark:text-slate-100 font-semibold hover:text-violet-600 dark:hover:text-violet-400 transition-colors mb-2"
+                    >
+                      {groupedTOC.title.text}
+                    </a>
+                  )}
+                  
+                  {/* Main sections (h2) with collapsible children (h3) */}
+                  {groupedTOC.sections.map((section) => (
+                    <div key={section.parent.id}>
+                      {/* h2 heading - collapsible parent */}
                       <div className="flex items-center">
-                        {group.children.length > 0 && (
+                        {section.children.length > 0 && (
                           <button
                             onClick={(e) => {
                               e.stopPropagation()
-                              toggleSection(group.parent.id)
+                              toggleSection(section.parent.id)
                             }}
                             className="p-0.5 -ml-1 mr-1 rounded hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
                           >
-                            {collapsedSections.has(group.parent.id) ? (
+                            {collapsedSections.has(section.parent.id) ? (
                               <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
                             ) : (
                               <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
@@ -741,27 +772,25 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
                           </button>
                         )}
                         <a
-                          href={`#${group.parent.id}`}
+                          href={`#${section.parent.id}`}
                           onClick={() => setShowTOC(false)}
                           className={`flex-1 text-sm py-1 text-slate-600 dark:text-slate-300 hover:text-violet-600 dark:hover:text-violet-400 font-medium ${
-                            group.children.length === 0 ? 'ml-4' : ''
+                            section.children.length === 0 ? 'ml-4' : ''
                           }`}
                         >
-                          {group.parent.text}
+                          {section.parent.text}
                         </a>
                       </div>
                       
-                      {/* Children (collapsible) */}
-                      {group.children.length > 0 && !collapsedSections.has(group.parent.id) && (
+                      {/* h3 children (collapsible) */}
+                      {section.children.length > 0 && !collapsedSections.has(section.parent.id) && (
                         <div className="ml-4 border-l border-slate-200 dark:border-slate-700 pl-2 mt-1 space-y-1">
-                          {group.children.map((child) => (
+                          {section.children.map((child) => (
                             <a
                               key={child.id}
                               href={`#${child.id}`}
                               onClick={() => setShowTOC(false)}
-                              className={`block text-sm py-0.5 text-slate-500 dark:text-slate-400 hover:text-violet-600 dark:hover:text-violet-400 ${
-                                child.level === 3 ? 'pl-3 text-xs' : ''
-                              }`}
+                              className="block text-xs py-0.5 text-slate-500 dark:text-slate-400 hover:text-violet-600 dark:hover:text-violet-400 transition-colors"
                             >
                               {child.text}
                             </a>
