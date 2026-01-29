@@ -2,9 +2,9 @@
 
 import { useState, useEffect, useMemo, Suspense } from 'react'
 import { useRouter } from 'next/navigation'
-import { 
-  Button, 
-  Card, 
+import {
+  Button,
+  Card,
   CardBody,
   Chip,
   Input,
@@ -27,6 +27,10 @@ import {
   TableCell,
   SortDescriptor,
   Spinner,
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+  Switch,
 } from "@heroui/react"
 import { createClient } from '@/lib/supabase/client'
 import Navbar from '@/components/Navbar'
@@ -34,18 +38,20 @@ import ContentDetailPanel from '@/components/ContentDetailPanel'
 import { useBusiness } from '@/lib/business-context'
 import { showErrorToast, showSuccessToast, getErrorMessage } from '@/lib/errors'
 import { ErrorFallback } from '@/components/ErrorBoundary'
-import { 
-  Heart, 
-  BookOpen, 
-  ShoppingBag, 
-  Zap, 
-  FileText, 
-  Plus, 
+import {
+  Heart,
+  BookOpen,
+  ShoppingBag,
+  Zap,
+  FileText,
+  Plus,
   Video,
   LayoutGrid,
   List,
   Mic,
   Search,
+  Settings,
+  Archive,
 } from 'lucide-react'
 import PromptsSection from '@/components/PromptsSection'
 
@@ -101,6 +107,7 @@ interface ContentItem {
   custom_fields: Record<string, any>
   created_at: string
   created_by: string
+  archived: boolean
   template?: ContentTemplate
 }
 
@@ -158,18 +165,21 @@ function ContentPageContent() {
     column: 'created_at',
     direction: 'descending',
   })
-  
+
   // Detail panel state
   const [selectedItem, setSelectedItem] = useState<ContentItem | null>(null)
   const [isPanelOpen, setIsPanelOpen] = useState(false)
-  
+
+  // Archive filter
+  const [showArchived, setShowArchived] = useState(false)
+
   const [formData, setFormData] = useState({
     title: '',
     status: 'idea',
     template_id: '',
     custom_fields: {} as Record<string, any>,
   })
-  
+
   const { selectedBusinessId, selectedBusiness, businesses } = useBusiness()
   const supabase = createClient()
   const router = useRouter()
@@ -199,12 +209,12 @@ function ContentPageContent() {
   async function loadUser() {
     try {
       const { data: { user: authUser }, error: authError } = await supabase.auth.getUser()
-      
+
       if (authError) {
         console.error('Auth error:', authError)
         return
       }
-      
+
       if (authUser) {
         try {
           const { data: profile, error: profileError } = await supabase
@@ -212,11 +222,11 @@ function ContentPageContent() {
             .select('*')
             .eq('id', authUser.id)
             .single()
-          
+
           if (profileError) {
             console.error('Profile fetch error:', profileError)
           }
-          
+
           setUser({
             id: authUser.id,
             email: authUser.email || '',
@@ -241,7 +251,7 @@ function ContentPageContent() {
   async function loadData() {
     setLoading(true)
     setLoadError(null)
-    
+
     try {
       if (!selectedBusinessId) {
         setContent([])
@@ -256,7 +266,7 @@ function ContentPageContent() {
         .select('*')
         .or(`business_id.is.null,business_id.eq.${selectedBusinessId}`)
         .order('name')
-      
+
       if (templatesError) {
         console.error('Templates error:', templatesError)
       } else {
@@ -269,11 +279,11 @@ function ContentPageContent() {
         .select('*, template:content_templates(*)')
         .eq('business_id', selectedBusinessId)
         .order('created_at', { ascending: false })
-      
+
       if (contentError) {
         throw contentError
       }
-      
+
       setContent(contentData || [])
     } catch (error) {
       console.error('Load data error:', error)
@@ -289,22 +299,22 @@ function ContentPageContent() {
       showErrorToast(null, 'Please sign in to manage content')
       return
     }
-    
+
     if (!selectedBusinessId) {
       showErrorToast(null, 'Please select a business first')
       return
     }
-    
+
     if (!formData.title.trim()) {
       showErrorToast(null, 'Please enter a title')
       return
     }
-    
+
     setSubmitting(true)
-    
+
     try {
       const customFields = formData.custom_fields || {}
-      
+
       if (editingItem) {
         const { error } = await supabase
           .from('content_items')
@@ -321,11 +331,11 @@ function ContentPageContent() {
             type: selectedTemplate?.name.toLowerCase() || editingItem.type,
           })
           .eq('id', editingItem.id)
-        
+
         if (error) {
           throw error
         }
-        
+
         showSuccessToast('Content updated successfully')
         loadData()
         handleClose()
@@ -346,11 +356,11 @@ function ContentPageContent() {
             voice: customFields.voice || null,
             type: selectedTemplate?.name.toLowerCase() || 'other',
           })
-        
+
         if (error) {
           throw error
         }
-        
+
         showSuccessToast('Content created successfully')
         loadData()
         handleClose()
@@ -369,11 +379,11 @@ function ContentPageContent() {
         .from('content_items')
         .update({ status: newStatus })
         .eq('id', itemId)
-      
+
       if (error) {
         throw error
       }
-      
+
       const stage = pipelineStages.find(s => s.key === newStatus)
       showSuccessToast(`Moved to ${stage?.label || newStatus}`)
       loadData()
@@ -402,11 +412,34 @@ function ContentPageContent() {
     }
   }
 
+  async function handleArchive(itemId: string, archived: boolean) {
+    try {
+      const { error } = await supabase
+        .from('content_items')
+        .update({ archived })
+        .eq('id', itemId)
+      
+      if (error) {
+        throw error
+      }
+      
+      showSuccessToast(archived ? 'Content archived' : 'Content unarchived')
+      loadData()
+      // Update selected item if panel is open
+      if (selectedItem?.id === itemId) {
+        setSelectedItem({ ...selectedItem, archived })
+      }
+    } catch (error) {
+      console.error('Archive content error:', error)
+      showErrorToast(error, 'Failed to update archive status')
+    }
+  }
+
   function handleEdit(item: ContentItem) {
     setEditingItem(item)
     const template = templates.find(t => t.id === item.template_id) || null
     setSelectedTemplate(template)
-    
+
     const customFields = {
       ...item.custom_fields,
       script: item.custom_fields?.script || item.script || '',
@@ -415,7 +448,7 @@ function ContentPageContent() {
       actor_prompt: item.custom_fields?.actor_prompt || item.actor_prompt || '',
       voice: item.custom_fields?.voice || item.voice || '',
     }
-    
+
     setFormData({
       title: item.title,
       status: item.status,
@@ -481,7 +514,7 @@ function ContentPageContent() {
 
   function renderField(field: FieldDefinition) {
     const value = formData.custom_fields[field.name] || ''
-    
+
     switch (field.type) {
       case 'text':
         return (
@@ -494,7 +527,7 @@ function ContentPageContent() {
             isRequired={field.required}
           />
         )
-      
+
       case 'textarea':
         return (
           <Textarea
@@ -507,7 +540,7 @@ function ContentPageContent() {
             minRows={3}
           />
         )
-      
+
       case 'number':
         return (
           <Input
@@ -520,7 +553,7 @@ function ContentPageContent() {
             isRequired={field.required}
           />
         )
-      
+
       case 'date':
         return (
           <Input
@@ -532,7 +565,7 @@ function ContentPageContent() {
             isRequired={field.required}
           />
         )
-      
+
       case 'select':
         return (
           <Select
@@ -547,7 +580,7 @@ function ContentPageContent() {
             ))}
           </Select>
         )
-      
+
       case 'checkbox':
         return (
           <label key={field.name} className="flex items-center gap-2 cursor-pointer">
@@ -560,7 +593,7 @@ function ContentPageContent() {
             <span className="text-sm text-slate-700 dark:text-slate-300">{field.label}</span>
           </label>
         )
-      
+
       case 'url':
         return (
           <Input
@@ -573,7 +606,7 @@ function ContentPageContent() {
             isRequired={field.required}
           />
         )
-      
+
       default:
         return null
     }
@@ -583,9 +616,14 @@ function ContentPageContent() {
   const filteredContent = useMemo(() => {
     let filtered = content
 
+    // Filter out archived unless showArchived is true
+    if (!showArchived) {
+      filtered = filtered.filter(item => !item.archived)
+    }
+
     if (searchQuery.trim()) {
       const query = searchQuery.toLowerCase()
-      filtered = filtered.filter(item => 
+      filtered = filtered.filter(item =>
         item.title.toLowerCase().includes(query) ||
         item.hook?.toLowerCase().includes(query) ||
         item.script?.toLowerCase().includes(query) ||
@@ -598,32 +636,32 @@ function ContentPageContent() {
     }
 
     return filtered
-  }, [content, searchQuery, filterStage])
+  }, [content, searchQuery, filterStage, showArchived])
 
   // Sorted content for list view
   const sortedContent = useMemo(() => {
     const sorted = [...filteredContent]
-    
+
     if (sortDescriptor.column) {
       sorted.sort((a, b) => {
         let aValue: any = a[sortDescriptor.column as keyof ContentItem]
         let bValue: any = b[sortDescriptor.column as keyof ContentItem]
-        
+
         // Handle null/undefined values
         if (aValue == null) aValue = ''
         if (bValue == null) bValue = ''
-        
+
         let cmp = 0
         if (typeof aValue === 'string' && typeof bValue === 'string') {
           cmp = aValue.localeCompare(bValue)
         } else {
           cmp = aValue < bValue ? -1 : aValue > bValue ? 1 : 0
         }
-        
+
         return sortDescriptor.direction === 'descending' ? -cmp : cmp
       })
     }
-    
+
     return sorted
   }, [filteredContent, sortDescriptor])
 
@@ -641,22 +679,28 @@ function ContentPageContent() {
   // Content card component - simplified like Tasks
   const ContentCard = ({ item }: { item: ContentItem }) => {
     const voice = item.voice || item.custom_fields?.voice
-    
+
     return (
-      <Card 
-        className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+      <Card
+        className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow cursor-pointer w-full overflow-hidden"
         isPressable
         onPress={() => handleViewDetails(item)}
       >
-        <CardBody className="p-3">
-          <div className="flex items-start gap-3">
+        <CardBody className="p-3 overflow-hidden">
+          <div className="flex items-start gap-3 min-w-0">
             {/* Content */}
             <div className="flex-1 min-w-0">
               <h3 className="font-medium text-sm text-slate-900 dark:text-slate-100 truncate mb-2">
                 {item.title}
               </h3>
-              
+
               <div className="flex items-center gap-2 flex-wrap">
+                {item.archived && (
+                  <Chip size="sm" variant="flat" className="text-xs" color="default">
+                    <Archive className="w-3 h-3 mr-1" />
+                    Archived
+                  </Chip>
+                )}
                 {item.template?.name && (
                   <Chip size="sm" variant="flat" className="text-xs capitalize">
                     {item.template.name}
@@ -680,7 +724,7 @@ function ContentPageContent() {
   const renderBoardView = () => (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
       {pipelineStages.map(stage => (
-        <div key={stage.key} className="w-full">
+        <div key={stage.key} className="w-full min-w-0">
           <div className="flex items-center justify-between mb-3 px-1">
             <div className="flex items-center gap-2">
               <span className="font-medium text-slate-700 dark:text-slate-300">
@@ -691,7 +735,7 @@ function ContentPageContent() {
               </span>
             </div>
           </div>
-          <div className="space-y-2 min-h-[150px] bg-slate-100/80 dark:bg-slate-800/50 rounded-lg p-2 border border-slate-200/50 dark:border-slate-700/50">
+          <div className="flex flex-col gap-2 min-h-[150px] bg-slate-100/80 dark:bg-slate-800/50 rounded-lg p-2 border border-slate-200/50 dark:border-slate-700/50 overflow-hidden">
             {contentByStatus[stage.key]?.map(item => (
               <ContentCard key={item.id} item={item} />
             ))}
@@ -729,8 +773,8 @@ function ContentPageContent() {
           </TableHeader>
           <TableBody items={sortedContent} emptyContent="No content to display">
             {(item) => (
-              <TableRow 
-                key={item.id} 
+              <TableRow
+                key={item.id}
                 className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/50"
                 onClick={() => handleViewDetails(item)}
               >
@@ -756,21 +800,21 @@ function ContentPageContent() {
                       {item.template.name}
                     </Chip>
                   ) : (
-                    <span className="text-slate-400">—</span>
+                    <span className="text-slate-400">-</span>
                   )}
                 </TableCell>
                 <TableCell>
                   {item.voice || item.custom_fields?.voice ? (
                     <span className="text-sm">{item.voice || item.custom_fields?.voice}</span>
                   ) : (
-                    <span className="text-slate-400">—</span>
+                    <span className="text-slate-400">-</span>
                   )}
                 </TableCell>
                 <TableCell>
                   {item.platforms?.length > 0 ? (
                     <span className="text-sm">{item.platforms.join(', ')}</span>
                   ) : (
-                    <span className="text-slate-400">—</span>
+                    <span className="text-slate-400">-</span>
                   )}
                 </TableCell>
                 <TableCell>
@@ -780,16 +824,16 @@ function ContentPageContent() {
                 </TableCell>
                 <TableCell onClick={(e) => e.stopPropagation()}>
                   <div className="flex gap-2">
-                    <Button 
-                      size="sm" 
-                      variant="flat" 
+                    <Button
+                      size="sm"
+                      variant="flat"
                       onPress={() => handleEdit(item)}
                     >
                       Edit
                     </Button>
-                    <Button 
-                      size="sm" 
-                      variant="flat" 
+                    <Button
+                      size="sm"
+                      variant="flat"
                       color="danger"
                       onPress={() => handleDelete(item.id)}
                     >
@@ -814,8 +858,8 @@ function ContentPageContent() {
         <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center mb-6">
           {/* Left side: View toggle */}
           <div className="w-full sm:w-auto overflow-x-auto pb-2 sm:pb-0 -mx-4 px-4 sm:mx-0 sm:px-0">
-            <Tabs 
-              selectedKey={viewMode} 
+            <Tabs
+              selectedKey={viewMode}
               onSelectionChange={(key) => handleViewChange(key as ViewMode)}
               color="primary"
               variant="solid"
@@ -837,22 +881,52 @@ function ContentPageContent() {
               } />
             </Tabs>
           </div>
-          
-          <Button 
-            color="success" 
-            onPress={handleNew}
-            isDisabled={!selectedBusinessId}
-            className="font-semibold flex-shrink-0"
-          >
-            + New Content
-          </Button>
+
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <Popover placement="bottom-end">
+              <PopoverTrigger>
+                <Button
+                  size="sm"
+                  variant="light"
+                  isIconOnly
+                >
+                  <Settings className="w-4 h-4" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="p-3">
+                <div className="space-y-3">
+                  <div className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                    Display Settings
+                  </div>
+                  <Switch
+                    size="sm"
+                    isSelected={showArchived}
+                    onValueChange={setShowArchived}
+                  >
+                    <span className="text-sm flex items-center gap-2">
+                      <Archive className="w-4 h-4" />
+                      Show archived content
+                    </span>
+                  </Switch>
+                </div>
+              </PopoverContent>
+            </Popover>
+            <Button
+              color="success"
+              onPress={handleNew}
+              isDisabled={!selectedBusinessId}
+              className="font-semibold !text-white"
+            >
+              + New Content
+            </Button>
+          </div>
         </div>
 
         {/* Filter chips - like Tasks page */}
         {selectedBusinessId && (
           <div className="flex gap-2 flex-wrap mb-6">
-            <Button 
-              size="sm" 
+            <Button
+              size="sm"
               variant={filterStage === 'all' ? 'solid' : 'flat'}
               color={filterStage === 'all' ? 'success' : 'default'}
               onPress={() => setFilterStage('all')}
@@ -914,7 +988,7 @@ function ContentPageContent() {
             <ErrorFallback error={loadError} resetError={loadData} />
           </div>
         )}
-        
+
         {/* Pipeline View */}
         {selectedBusinessId && !loadError && (
           loading ? (
@@ -927,8 +1001,8 @@ function ContentPageContent() {
                 <p className="text-slate-500 dark:text-slate-400">
                   No content found matching "{searchQuery}"
                 </p>
-                <Button 
-                  variant="flat" 
+                <Button
+                  variant="flat"
                   className="mt-4"
                   onPress={() => setSearchQuery('')}
                 >
@@ -966,6 +1040,7 @@ function ContentPageContent() {
         onStatusChange={handleStatusChange}
         onDelete={handleDelete}
         onEdit={handleEdit}
+        onArchive={handleArchive}
       />
 
       {/* Create/Edit Modal */}
@@ -975,8 +1050,8 @@ function ContentPageContent() {
             <div className="flex items-center gap-2">
               <span>{editingItem ? 'Edit Content' : 'New Content'}</span>
               {selectedBusiness && (
-                <Chip 
-                  size="sm" 
+                <Chip
+                  size="sm"
                   variant="flat"
                   style={{ backgroundColor: `${selectedBusiness.color}20`, color: selectedBusiness.color }}
                 >
@@ -1006,8 +1081,8 @@ function ContentPageContent() {
                           key={template.id}
                           isPressable
                           className={`cursor-pointer transition-all border ${
-                            formData.template_id === template.id 
-                              ? 'ring-2 ring-primary bg-primary-50 dark:bg-primary-900/20 border-primary' 
+                            formData.template_id === template.id
+                              ? 'ring-2 ring-primary bg-primary-50 dark:bg-primary-900/20 border-primary'
                               : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'
                           }`}
                           onPress={() => handleTemplateChange(template.id)}
@@ -1022,7 +1097,7 @@ function ContentPageContent() {
                   </div>
                 </div>
               )}
-              
+
               <Input
                 label="Title"
                 placeholder="Content title..."
@@ -1030,7 +1105,7 @@ function ContentPageContent() {
                 onChange={(e) => setFormData({ ...formData, title: e.target.value })}
                 isRequired
               />
-              
+
               <Select
                 label="Pipeline Stage"
                 selectedKeys={[formData.status]}
@@ -1040,7 +1115,7 @@ function ContentPageContent() {
                   <SelectItem key={s.key}>{s.label}</SelectItem>
                 ))}
               </Select>
-              
+
               {/* Dynamic Fields from Template */}
               {selectedTemplate && selectedTemplate.fields.length > 0 && (
                 <div className="border-t border-slate-200 dark:border-slate-700 pt-4 mt-2">
@@ -1052,7 +1127,7 @@ function ContentPageContent() {
                   </div>
                 </div>
               )}
-              
+
               {/* Fallback fields if no template selected */}
               {!selectedTemplate && (
                 <>
@@ -1071,7 +1146,7 @@ function ContentPageContent() {
                   />
                 </>
               )}
-              
+
               {/* Prompts Section - only show when editing existing content with a script */}
               {editingItem && (formData.custom_fields.script || editingItem.script) && (
                 <div className="border-t border-slate-200 dark:border-slate-700 pt-4 mt-2">
@@ -1086,9 +1161,9 @@ function ContentPageContent() {
           </ModalBody>
           <ModalFooter>
             {editingItem && (
-              <Button 
-                color="danger" 
-                variant="flat" 
+              <Button
+                color="danger"
+                variant="flat"
                 onPress={() => { handleDelete(editingItem.id); handleClose(); }}
                 className="mr-auto"
               >
@@ -1098,8 +1173,8 @@ function ContentPageContent() {
             <Button variant="flat" onPress={handleClose}>
               Cancel
             </Button>
-            <Button 
-              color="primary" 
+            <Button
+              color="primary"
               onPress={handleSubmit}
               isDisabled={!formData.title.trim()}
               isLoading={submitting}

@@ -22,6 +22,7 @@ import {
   Trash2,
   Copy,
   Check,
+  Archive,
 } from 'lucide-react'
 import {
   Button,
@@ -61,6 +62,7 @@ interface ContentItem {
   custom_fields: Record<string, any>
   created_at: string
   created_by: string
+  archived: boolean
   template?: ContentTemplate
 }
 
@@ -71,6 +73,7 @@ interface ContentDetailPanelProps {
   onStatusChange: (itemId: string, newStatus: string) => void
   onDelete: (itemId: string) => void
   onEdit: (item: ContentItem) => void
+  onArchive?: (itemId: string, archived: boolean) => void
 }
 
 const pipelineStages = [
@@ -91,6 +94,7 @@ export default function ContentDetailPanel({
   onStatusChange,
   onDelete,
   onEdit,
+  onArchive,
 }: ContentDetailPanelProps) {
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set(['script']))
   const [copied, setCopied] = useState(false)
@@ -168,6 +172,16 @@ export default function ContentDetailPanel({
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-2 flex-wrap">
+                {item.archived && (
+                  <Chip
+                    size="sm"
+                    color="default"
+                    variant="flat"
+                    startContent={<Archive className="w-3 h-3" />}
+                  >
+                    Archived
+                  </Chip>
+                )}
                 <Chip
                   size="sm"
                   color={currentStage?.color as any || 'default'}
@@ -412,8 +426,21 @@ export default function ContentDetailPanel({
             </div>
           </div>
 
-          {/* Delete Button */}
-          <div className="mt-8 pt-4 border-t border-slate-200 dark:border-slate-700">
+          {/* Archive & Delete Buttons */}
+          <div className="mt-8 pt-4 border-t border-slate-200 dark:border-slate-700 space-y-2">
+            {onArchive && (
+              <Button
+                color={item.archived ? "success" : "default"}
+                variant="flat"
+                startContent={<Archive className="w-4 h-4" />}
+                onPress={() => {
+                  onArchive(item.id, !item.archived)
+                }}
+                className="w-full"
+              >
+                {item.archived ? 'Unarchive Content' : 'Archive Content'}
+              </Button>
+            )}
             <Button
               color="danger"
               variant="flat"
