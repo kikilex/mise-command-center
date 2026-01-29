@@ -233,7 +233,7 @@ export default function NotificationBell({ userId, onNotificationClick }: Notifi
               Notifications
               {unreadCount > 0 && (
                 <span className="text-xs bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-400 px-2 py-0.5 rounded-full">
-                  {unreadCount} new
+                  {unreadCount}
                 </span>
               )}
             </h3>
