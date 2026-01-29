@@ -31,6 +31,7 @@ import { useBusiness } from '@/lib/business-context'
 import Navbar from '@/components/Navbar'
 import { showErrorToast, showSuccessToast, getErrorMessage } from '@/lib/errors'
 import { ErrorFallback } from '@/components/ErrorBoundary'
+import TaskDetailModal from '@/components/TaskDetailModal'
 
 interface Task {
   id: string
@@ -42,7 +43,10 @@ interface Task {
   due_date: string | null
   tags: string[]
   ai_flag: boolean
+  ai_agent: string | null
+  feedback: string | null
   created_at: string
+  updated_at?: string
 }
 
 interface UserData {
@@ -110,7 +114,9 @@ export default function TasksPage() {
   })
   const [currentDate, setCurrentDate] = useState(new Date())
   const { isOpen, onOpen, onClose } = useDisclosure()
+  const { isOpen: isDetailOpen, onOpen: onDetailOpen, onClose: onDetailClose } = useDisclosure()
   const [editingTask, setEditingTask] = useState<Task | null>(null)
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null)
   const [formData, setFormData] = useState({
     title: '',
     description: '',
@@ -363,6 +369,11 @@ export default function TasksPage() {
     onOpen()
   }
 
+  function handleViewDetails(task: Task) {
+    setSelectedTask(task)
+    onDetailOpen()
+  }
+
   // Filter logic based on view
   const getViewFilteredTasks = () => {
     let filtered = tasks
@@ -491,7 +502,12 @@ export default function TasksPage() {
 
   // Render task card (shared between views)
   const renderTaskCard = (task: Task, compact = false) => (
-    <Card key={task.id} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow">
+    <Card 
+      key={task.id} 
+      className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+      isPressable
+      onPress={() => handleViewDetails(task)}
+    >
       <CardBody className={compact ? "p-3" : "p-4"}>
         <div className="flex items-start gap-3">
           {/* Priority indicator */}
@@ -504,6 +520,16 @@ export default function TasksPage() {
               {task.ai_flag && (
                 <Chip size="sm" className="bg-violet-100 dark:bg-violet-900/50 text-violet-700 dark:text-violet-300">🤖 AI</Chip>
               )}
+              {task.ai_agent && (
+                <Chip size="sm" variant="flat" className="capitalize text-xs">
+                  {task.ai_agent}
+                </Chip>
+              )}
+              {task.feedback && (
+                <Chip size="sm" variant="flat" className="bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300">
+                  💬
+                </Chip>
+              )}
             </div>
             {!compact && task.description && (
               <p className="text-sm text-slate-600 dark:text-slate-400 line-clamp-2">{task.description}</p>
@@ -514,7 +540,11 @@ export default function TasksPage() {
                   size="sm"
                   selectedKeys={[task.status]}
                   className="w-32"
-                  onChange={(e) => handleStatusChange(task.id, e.target.value)}
+                  onChange={(e) => {
+                    e.stopPropagation()
+                    handleStatusChange(task.id, e.target.value)
+                  }}
+                  onClick={(e) => e.stopPropagation()}
                 >
                   {statusOptions.map(s => (
                     <SelectItem key={s.key}>{s.label}</SelectItem>
@@ -534,7 +564,7 @@ export default function TasksPage() {
 
           {/* Actions */}
           {!compact && (
-            <div className="flex gap-2 flex-shrink-0">
+            <div className="flex gap-2 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
               <Button 
                 size="sm" 
                 variant="flat" 
@@ -613,7 +643,11 @@ export default function TasksPage() {
           </TableHeader>
           <TableBody items={sortedTasks} emptyContent="No tasks to display">
             {(task) => (
-              <TableRow key={task.id}>
+              <TableRow 
+                key={task.id} 
+                className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/50"
+                onClick={() => handleViewDetails(task)}
+              >
                 <TableCell>
                   <div className="flex items-center gap-2">
                     <div className={`w-2 h-2 rounded-full flex-shrink-0 ${getPriorityColor(task.priority)}`} />
@@ -621,9 +655,12 @@ export default function TasksPage() {
                     {task.ai_flag && (
                       <Chip size="sm" className="bg-violet-100 text-violet-700 flex-shrink-0">🤖</Chip>
                     )}
+                    {task.feedback && (
+                      <Chip size="sm" className="bg-amber-100 text-amber-700 flex-shrink-0">💬</Chip>
+                    )}
                   </div>
                 </TableCell>
-                <TableCell>
+                <TableCell onClick={(e) => e.stopPropagation()}>
                   <Select
                     size="sm"
                     selectedKeys={[task.status]}
@@ -654,7 +691,7 @@ export default function TasksPage() {
                     <span className="text-slate-400">—</span>
                   )}
                 </TableCell>
-                <TableCell>
+                <TableCell onClick={(e) => e.stopPropagation()}>
                   <div className="flex gap-2">
                     <Button 
                       size="sm" 
@@ -742,9 +779,9 @@ export default function TasksPage() {
                           : 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300'
                       }`}
                       title={task.title}
-                      onClick={() => handleEdit(task)}
+                      onClick={() => handleViewDetails(task)}
                     >
-                      {task.ai_flag ? '🤖 ' : '📋 '}{task.title}
+                      {task.ai_flag ? '🤖 ' : '📋 '}{task.title}{task.feedback ? ' 💬' : ''}
                     </div>
                   ))}
                   
@@ -1055,6 +1092,15 @@ export default function TasksPage() {
           </ModalFooter>
         </ModalContent>
       </Modal>
+
+      {/* Task Detail Modal */}
+      <TaskDetailModal
+        task={selectedTask}
+        isOpen={isDetailOpen}
+        onClose={onDetailClose}
+        onTaskUpdated={loadTasks}
+        userId={user?.id}
+      />
     </div>
   )
 }
