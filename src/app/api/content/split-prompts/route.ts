@@ -29,24 +29,35 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Gemini API key not configured' }, { status: 500 })
     }
 
-    // Call Gemini to split the script
-    const systemPrompt = `You are a content editor for TikTok-style short videos. 
-Your job is to split a script into individual prompts/scenes for video production.
+    // Call Gemini to split the script into video prompts
+    const systemPrompt = `You are a video production editor for TikTok-style testimony videos.
+Your job is to split a script into individual video prompts/scenes for AI video generation.
 
-Rules:
-- Each prompt should be 2-5 seconds when spoken
-- Keep natural sentence breaks
-- Don't split mid-sentence
-- Aim for 3-8 prompts total depending on script length
-- Each prompt should be a complete thought
+RULES:
+- Each prompt should be approximately 7 seconds when spoken (about 15-20 words)
+- Keep natural sentence breaks - don't split mid-sentence
+- Number of prompts depends on script length (longer scripts = more prompts)
+- Each prompt needs a complete, detailed video generation prompt
+
+ACTOR CONTEXT: ${actor_prompt_base || 'Person speaking directly to camera in an intimate, documentary-style setting'}
+
+FOR EACH SCENE, generate a detailed video prompt following this format:
+- Dialogue: The exact script text for this scene
+- Context & Action: What the actor is doing, their expression, any movements
+- Cinematography: Camera angle (medium shot), framing (waist up), movement (static)
+- Style & Ambiance: Cinematic iPhone feel, moody lighting, intimate confession booth vibe
 
 Return ONLY valid JSON array with this structure:
 [
-  {"scene_number": 1, "text": "First prompt text here", "duration_seconds": 3},
-  {"scene_number": 2, "text": "Second prompt text here", "duration_seconds": 4},
-  ...
+  {
+    "scene_number": 1,
+    "text": "The dialogue text here",
+    "duration_seconds": 7,
+    "actor_prompt": "Full video generation prompt including: Dialogue, Context & Action, Cinematography details, Style & Ambiance. All in one detailed paragraph."
+  }
 ]
 
+The actor_prompt should be a complete, detailed prompt ready for AI video generation (like Veo).
 No markdown, no explanation, just the JSON array.`
 
     const response = await fetch(`${GEMINI_URL}?key=${GEMINI_API_KEY}`, {
@@ -59,8 +70,8 @@ No markdown, no explanation, just the JSON array.`
           }]
         }],
         generationConfig: {
-          temperature: 0.3,
-          maxOutputTokens: 4096,
+          temperature: 0.4,
+          maxOutputTokens: 8192,
         }
       })
     })
@@ -96,8 +107,8 @@ No markdown, no explanation, just the JSON array.`
       content_id,
       scene_number: p.scene_number || index + 1,
       text: p.text,
-      duration_seconds: p.duration_seconds || 3,
-      actor_prompt: actor_prompt_base || null,
+      duration_seconds: p.duration_seconds || 7,
+      actor_prompt: p.actor_prompt || actor_prompt_base || null,
       image_status: 'pending',
     }))
 
