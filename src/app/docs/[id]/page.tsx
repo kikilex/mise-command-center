@@ -596,14 +596,9 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
         {/* Awaiting Approval Alert */}
         {document.status === 'in_review' && (
           <div className="mb-6 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded-lg p-4">
-            <div className="flex items-start gap-3">
-              <Clock className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
-              <div className="flex-1">
-                <p className="font-medium text-blue-800 dark:text-blue-200">Awaiting Approval</p>
-                <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
-                  This document is ready for review. Click "Approve" to finalize it.
-                </p>
-              </div>
+            <div className="flex items-center gap-3">
+              <Clock className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0" />
+              <p className="font-medium text-blue-800 dark:text-blue-200 flex-1">Awaiting Approval</p>
               <Button
                 color="success"
                 size="sm"
@@ -635,13 +630,15 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
         {/* Document Header */}
         <div className="mb-8">
           <div className="flex flex-wrap items-center gap-3 mb-3">
-            <Chip
-              color={getStatusColor(document.status) as any}
-              variant="flat"
-              size="sm"
-            >
-              {getStatusLabel(document.status)}
-            </Chip>
+            {document.status !== 'in_review' && (
+              <Chip
+                color={getStatusColor(document.status) as any}
+                variant="flat"
+                size="sm"
+              >
+                {getStatusLabel(document.status)}
+              </Chip>
+            )}
             {document.version > 1 && (
               <Chip variant="dot" size="sm">v{document.version}</Chip>
             )}
