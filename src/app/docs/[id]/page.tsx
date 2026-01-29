@@ -8,7 +8,7 @@ import remarkGfm from 'remark-gfm'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import { useTheme } from 'next-themes'
-import { ArrowLeft, Edit, FileText, List, ExternalLink, Share2, Check, RotateCcw, MessageSquare, Send, AlertCircle, Trash2, CheckCircle2, Clock, ChevronDown, ChevronRight, ArrowUp, ArrowDown } from 'lucide-react'
+import { ArrowLeft, Edit, FileText, List, ExternalLink, Share2, Check, RotateCcw, MessageSquare, Send, AlertCircle, Trash2, CheckCircle2, Clock, ChevronDown, ChevronRight, ArrowUp, ArrowDown, ChevronsDownUp, ChevronsUpDown } from 'lucide-react'
 import {
   Button,
   Chip,
@@ -159,6 +159,30 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
       return newSet
     })
   }, [])
+
+  // Get all collapsible section IDs (sections with children)
+  const collapsibleSectionIds = useMemo(() => {
+    return groupedTOC.sections
+      .filter(section => section.children.length > 0)
+      .map(section => section.parent.id)
+  }, [groupedTOC])
+
+  // Check if all collapsible sections are collapsed
+  const allCollapsed = useMemo(() => {
+    if (collapsibleSectionIds.length === 0) return false
+    return collapsibleSectionIds.every(id => collapsedSections.has(id))
+  }, [collapsibleSectionIds, collapsedSections])
+
+  // Toggle all sections collapsed/expanded
+  const toggleAllSections = useCallback(() => {
+    if (allCollapsed) {
+      // Expand all
+      setCollapsedSections(new Set())
+    } else {
+      // Collapse all
+      setCollapsedSections(new Set(collapsibleSectionIds))
+    }
+  }, [allCollapsed, collapsibleSectionIds])
 
   // Scroll to top or bottom
   const handleScrollButton = useCallback(() => {
@@ -661,10 +685,26 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
           {tableOfContents.length > 2 && (
             <aside className="hidden lg:block w-56 flex-shrink-0">
               <div className="sticky top-8 max-h-[calc(100vh-6rem)] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-slate-600 scrollbar-track-transparent">
-                <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3 flex items-center gap-2">
-                  <List className="w-4 h-4" />
-                  Contents
-                </h4>
+                <div className="flex items-center justify-between mb-3">
+                  <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                    <List className="w-4 h-4" />
+                    Contents
+                  </h4>
+                  {collapsibleSectionIds.length > 0 && (
+                    <button
+                      onClick={toggleAllSections}
+                      className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                      aria-label={allCollapsed ? 'Expand all sections' : 'Collapse all sections'}
+                      title={allCollapsed ? 'Expand all' : 'Collapse all'}
+                    >
+                      {allCollapsed ? (
+                        <ChevronsUpDown className="w-4 h-4" />
+                      ) : (
+                        <ChevronsDownUp className="w-4 h-4" />
+                      )}
+                    </button>
+                  )}
+                </div>
                 <nav className="space-y-1">
                   {/* Document title (h1) - not collapsible */}
                   {groupedTOC.title && (
@@ -732,10 +772,29 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
                 className="absolute right-0 top-0 h-full w-64 bg-white dark:bg-slate-800 p-6 shadow-xl overflow-y-auto"
                 onClick={e => e.stopPropagation()}
               >
-                <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-4 flex items-center gap-2">
-                  <List className="w-4 h-4" />
-                  Contents
-                </h4>
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 flex items-center gap-2">
+                    <List className="w-4 h-4" />
+                    Contents
+                  </h4>
+                  {collapsibleSectionIds.length > 0 && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        toggleAllSections()
+                      }}
+                      className="p-1 rounded hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+                      aria-label={allCollapsed ? 'Expand all sections' : 'Collapse all sections'}
+                      title={allCollapsed ? 'Expand all' : 'Collapse all'}
+                    >
+                      {allCollapsed ? (
+                        <ChevronsUpDown className="w-4 h-4" />
+                      ) : (
+                        <ChevronsDownUp className="w-4 h-4" />
+                      )}
+                    </button>
+                  )}
+                </div>
                 <nav className="space-y-2">
                   {/* Document title (h1) - not collapsible */}
                   {groupedTOC.title && (
