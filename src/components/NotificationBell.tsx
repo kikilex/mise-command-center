@@ -3,15 +3,7 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { Button, Spinner } from '@heroui/react'
-import { 
-  BellIcon, 
-  CheckIcon, 
-  ClipboardDocumentListIcon,
-  ChatBubbleLeftIcon,
-  ArrowPathIcon,
-  ClockIcon,
-  PencilSquareIcon,
-} from '@heroicons/react/24/outline'
+import { Bell, Check, ClipboardList, MessageCircle, RefreshCw, Clock, PenSquare } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 
 interface Notification {
@@ -31,11 +23,11 @@ interface NotificationBellProps {
 }
 
 const typeIcons: Record<string, React.ReactNode> = {
-  task_assigned: <ClipboardDocumentListIcon className="w-4 h-4" />,
-  feedback_received: <ChatBubbleLeftIcon className="w-4 h-4" />,
-  status_changed: <ArrowPathIcon className="w-4 h-4" />,
-  due_soon: <ClockIcon className="w-4 h-4" />,
-  revision_requested: <PencilSquareIcon className="w-4 h-4" />,
+  task_assigned: <ClipboardList className="w-4 h-4" />,
+  feedback_received: <MessageCircle className="w-4 h-4" />,
+  status_changed: <RefreshCw className="w-4 h-4" />,
+  due_soon: <Clock className="w-4 h-4" />,
+  revision_requested: <PenSquare className="w-4 h-4" />,
 }
 
 const typeColors: Record<string, string> = {
@@ -209,7 +201,7 @@ export default function NotificationBell({ userId, onNotificationClick }: Notifi
   if (!userId) {
     return (
       <Button isIconOnly variant="light" className="hidden sm:flex text-default-500 min-w-[44px] min-h-[44px]">
-        <BellIcon className="w-5 h-5" />
+        <Bell className="w-5 h-5" />
       </Button>
     )
   }
@@ -223,7 +215,7 @@ export default function NotificationBell({ userId, onNotificationClick }: Notifi
         className="hidden sm:flex text-default-500 min-w-[44px] min-h-[44px] relative"
         onPress={() => setIsOpen(!isOpen)}
       >
-        <BellIcon className="w-5 h-5" />
+        <Bell className="w-5 h-5" />
         {unreadCount > 0 && (
           <span className="absolute -top-1 -right-1 min-w-[18px] h-[18px] bg-red-500 text-white text-xs font-bold rounded-full flex items-center justify-center px-1">
             {unreadCount > 9 ? '9+' : unreadCount}
@@ -237,7 +229,7 @@ export default function NotificationBell({ userId, onNotificationClick }: Notifi
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 bg-slate-50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700">
             <h3 className="font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-              <BellIcon className="w-5 h-5" />
+              <Bell className="w-5 h-5" />
               Notifications
               {unreadCount > 0 && (
                 <span className="text-xs bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-400 px-2 py-0.5 rounded-full">
@@ -253,7 +245,7 @@ export default function NotificationBell({ userId, onNotificationClick }: Notifi
                 onPress={markAllAsRead}
                 isLoading={markingRead}
               >
-                <CheckIcon className="w-3 h-3 mr-1" />
+                <Check className="w-3 h-3 mr-1" />
                 Mark all read
               </Button>
             )}
@@ -268,7 +260,7 @@ export default function NotificationBell({ userId, onNotificationClick }: Notifi
               </div>
             ) : notifications.length === 0 ? (
               <div className="text-center py-8 text-slate-400 dark:text-slate-500">
-                <BellIcon className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                <Bell className="w-8 h-8 mx-auto mb-2 opacity-50" />
                 <p>No notifications yet</p>
               </div>
             ) : (
