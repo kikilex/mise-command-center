@@ -160,30 +160,6 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
     })
   }, [])
 
-  // Get all collapsible section IDs (sections with children)
-  const collapsibleSectionIds = useMemo(() => {
-    return groupedTOC.sections
-      .filter(section => section.children.length > 0)
-      .map(section => section.parent.id)
-  }, [groupedTOC])
-
-  // Check if all collapsible sections are collapsed
-  const allCollapsed = useMemo(() => {
-    if (collapsibleSectionIds.length === 0) return false
-    return collapsibleSectionIds.every(id => collapsedSections.has(id))
-  }, [collapsibleSectionIds, collapsedSections])
-
-  // Toggle all sections collapsed/expanded
-  const toggleAllSections = useCallback(() => {
-    if (allCollapsed) {
-      // Expand all
-      setCollapsedSections(new Set())
-    } else {
-      // Collapse all
-      setCollapsedSections(new Set(collapsibleSectionIds))
-    }
-  }, [allCollapsed, collapsibleSectionIds])
-
   // Scroll to top or bottom
   const handleScrollButton = useCallback(() => {
     if (isAtBottom) {
@@ -475,6 +451,30 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
 
     return result
   }, [tableOfContents])
+
+  // Get all collapsible section IDs (sections with children)
+  const collapsibleSectionIds = useMemo(() => {
+    return groupedTOC.sections
+      .filter(section => section.children.length > 0)
+      .map(section => section.parent.id)
+  }, [groupedTOC])
+
+  // Check if all collapsible sections are collapsed
+  const allCollapsed = useMemo(() => {
+    if (collapsibleSectionIds.length === 0) return false
+    return collapsibleSectionIds.every(id => collapsedSections.has(id))
+  }, [collapsibleSectionIds, collapsedSections])
+
+  // Toggle all sections collapsed/expanded
+  const toggleAllSections = useCallback(() => {
+    if (allCollapsed) {
+      // Expand all
+      setCollapsedSections(new Set())
+    } else {
+      // Collapse all
+      setCollapsedSections(new Set(collapsibleSectionIds))
+    }
+  }, [allCollapsed, collapsibleSectionIds])
 
   const handleShare = async () => {
     const url = window.location.href
