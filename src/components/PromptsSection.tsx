@@ -323,7 +323,10 @@ export default function PromptsSection({
                       </div>
                     ) : (
                       <>
-                        <p className="text-slate-800 mb-2">{prompt.text}</p>
+                        <p className="text-slate-800 font-medium mb-1">"{prompt.text}"</p>
+                        {prompt.actor_prompt && (
+                          <p className="text-slate-600 text-sm mb-2 whitespace-pre-wrap">{prompt.actor_prompt}</p>
+                        )}
                         <div className="flex items-center gap-2 flex-wrap">
                           <Chip size="sm" variant="flat">
                             {prompt.duration_seconds}s
