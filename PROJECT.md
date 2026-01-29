@@ -201,6 +201,21 @@ NEXT_PUBLIC_SUPABASE_ANON_KEY=xxx
 - **URL**: https://mise-command-center.vercel.app
 - **Git**: Push to main triggers auto-deploy
 
+## ⚠️ Don't Revert These Fixes
+
+These are intentional simplifications. Do NOT add back removed features:
+
+1. **Docs "Awaiting Approval" banner** (`src/app/docs/[id]/page.tsx`)
+   - Keep it simple: just "Awaiting Approval" text + Approve button
+   - NO description text like "This document is ready for review..."
+   - NO redundant "In Review" status chip when banner is shown
+
+2. **Status chips** - Hide when a banner already communicates the status
+
+3. **Calendar dropdown in Command Center** - Only show valid calendars: `Ax`, `Alex's Work`, `Mise Family`
+
+---
+
 ## Known Issues / Tech Debt
 
 1. **Mixed icon libraries** - Some components still use Heroicons, should migrate to Lucide
