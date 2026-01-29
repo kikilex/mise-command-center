@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { MessageCircle, Eye, Download, Trash2, FileText } from 'lucide-react'
+import { MessageCircle, Eye, Download, Trash2, FileText, ClipboardList, Bot, RotateCcw, Paperclip, User, File } from 'lucide-react'
 import {
   Modal,
   ModalContent,
@@ -434,11 +434,7 @@ export default function TaskDetailModal({
   }
 
   const getFileIcon = (fileType: string | null) => {
-    if (!fileType) return '📄'
-    if (fileType.startsWith('image/')) return '🖼️'
-    if (fileType === 'application/pdf') return '📕'
-    if (fileType === 'text/markdown') return '📝'
-    return '📄'
+    return <File className="w-5 h-5 text-slate-500" />
   }
 
   const formatTimestamp = (timestamp: string) => {
@@ -471,11 +467,11 @@ export default function TaskDetailModal({
       <ModalContent>
         <ModalHeader className="flex flex-col gap-1">
           <div className="flex items-center gap-2">
-            <span className="text-xl">📋</span>
+            <ClipboardList className="w-5 h-5 text-slate-600 dark:text-slate-400" />
             <span>Task Details</span>
             {task.ai_flag && (
               <Chip size="sm" className="bg-violet-100 dark:bg-violet-900/50 text-violet-700 dark:text-violet-300">
-                🤖 AI Task
+                <Bot className="w-3 h-3 inline mr-1" /> AI Task
               </Chip>
             )}
             {task.ai_agent && (
@@ -541,7 +537,7 @@ export default function TaskDetailModal({
                   onChange={(e) => setFormData({ ...formData, ai_flag: e.target.checked })}
                   className="w-4 h-4 rounded border-slate-300"
                 />
-                <span className="text-sm text-slate-700 dark:text-slate-300">🤖 Allow AI to work on this task</span>
+                <span className="text-sm text-slate-700 dark:text-slate-300 flex items-center gap-1"><Bot className="w-4 h-4" /> Allow AI to work on this task</span>
               </label>
             </div>
 
@@ -586,7 +582,7 @@ export default function TaskDetailModal({
                         </div>
                         <div className={`flex items-center gap-1 mt-1 ${isAxMessage(msg.author) ? '' : 'flex-row-reverse'}`}>
                           <span className="text-xs text-slate-500 dark:text-slate-400">
-                            {isAxMessage(msg.author) ? '🤖 Ax' : '👤 Alex'}
+                            {isAxMessage(msg.author) ? <><Bot className="w-3 h-3 inline" /> Ax</> : <><User className="w-3 h-3 inline" /> Alex</>}
                           </span>
                           <span className="text-xs text-slate-400 dark:text-slate-500">
                             • {formatTimestamp(msg.created_at)}
@@ -630,7 +626,7 @@ export default function TaskDetailModal({
                 isDisabled={saving}
                 className="w-full"
               >
-                🔄 Send back to Ax for revision
+                <RotateCcw className="w-4 h-4" /> Send back to Ax for revision
               </Button>
             </div>
 
@@ -651,7 +647,7 @@ export default function TaskDetailModal({
             {/* File Attachments */}
             <div className="space-y-3">
               <h3 className="text-md font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-2">
-                📎 Attachments
+                <Paperclip className="w-4 h-4" /> Attachments
                 {files.length > 0 && (
                   <Chip size="sm" variant="flat">{files.length}</Chip>
                 )}
@@ -685,7 +681,11 @@ export default function TaskDetailModal({
                   </div>
                 ) : (
                   <>
-                    <div className="text-3xl mb-2">📤</div>
+                    <div className="mb-2 text-slate-400">
+                      <svg xmlns="http://www.w3.org/2000/svg" className="w-10 h-10 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
+                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
+                      </svg>
+                    </div>
                     <p className="text-slate-600 dark:text-slate-300">
                       Drag & drop files here, or click to browse
                     </p>
@@ -713,7 +713,7 @@ export default function TaskDetailModal({
                         onClick={() => canView && handleViewFile(file)}
                       >
                         <div className="flex items-center gap-3 min-w-0">
-                          <span className="text-xl">{getFileIcon(file.file_type)}</span>
+                          {getFileIcon(file.file_type)}
                           <div className="min-w-0">
                             <div className="flex items-center gap-2">
                               <p className="font-medium text-slate-700 dark:text-slate-200 truncate">
