@@ -212,7 +212,7 @@ export default function NotificationBell({ userId, onNotificationClick }: Notifi
       <Button
         isIconOnly
         variant="light"
-        className="flex text-default-500 min-w-[44px] min-h-[44px] relative"
+        className="flex text-default-500 min-w-[44px] min-h-[44px] relative overflow-visible"
         onPress={() => setIsOpen(!isOpen)}
       >
         <Bell className="w-5 h-5" />

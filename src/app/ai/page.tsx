@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { Bot } from 'lucide-react'
 import { 
   Button, 
   Card, 
@@ -362,7 +363,7 @@ export default function AIWorkspacePage() {
                   <p className="text-sm text-slate-500 dark:text-slate-400">{agent.role.replace('_', ' ')} • {agent.model}</p>
                   <div className="flex items-center gap-4 mt-2 text-xs text-slate-400 dark:text-slate-500">
                     <span>Autonomy: {agent.settings?.autonomy_level || 'medium'}</span>
-                    {agent.settings?.can_spawn_agents && <span>🤖 Can spawn</span>}
+                    {agent.settings?.can_spawn_agents && <span className="flex items-center gap-1"><Bot className="w-3 h-3" /> Can spawn</span>}
                     {agent.settings?.daily_token_budget && <span>💰 {agent.settings.daily_token_budget.toLocaleString()} tokens/day</span>}
                   </div>
                 </div>
@@ -388,7 +389,7 @@ export default function AIWorkspacePage() {
       <CardBody className="px-6 pb-6">
         {aiTasks.length === 0 ? (
           <div className="text-center py-12">
-            <div className="text-4xl mb-4">🤖</div>
+            <Bot className="w-12 h-12 mx-auto mb-4 text-slate-400" />
             <p className="text-slate-400 dark:text-slate-500 mb-2">No tasks flagged for AI</p>
             <p className="text-sm text-slate-400 dark:text-slate-500">
               Enable "AI Flag" on tasks to add them to the queue
@@ -419,7 +420,7 @@ export default function AIWorkspacePage() {
                   </div>
                 </div>
                 <Chip size="sm" className="bg-violet-100 dark:bg-violet-900/50 text-violet-700 dark:text-violet-300 flex-shrink-0">
-                  🤖 AI
+                  <Bot className="w-3 h-3 mr-1" /> AI
                 </Chip>
               </div>
             ))}
@@ -481,7 +482,7 @@ export default function AIWorkspacePage() {
               } />
               <Tab key="agents" title={
                 <div className="flex items-center gap-2">
-                  <span>🤖</span>
+                  <Bot className="w-4 h-4" />
                   <span>Agents</span>
                   <Chip size="sm" variant="flat">
                     {agents.filter(a => a.is_active).length}/{agents.length}

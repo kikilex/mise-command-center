@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
+import { MessageCircle } from 'lucide-react'
 import {
   Modal,
   ModalContent,
@@ -531,7 +532,7 @@ export default function TaskDetailModal({
             {/* Chat-Style Feedback Section */}
             <div className="space-y-3">
               <h3 className="text-md font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-2">
-                💬 Feedback Thread
+                <MessageCircle className="w-4 h-4" /> Feedback Thread
                 {feedbackMessages.length > 0 && (
                   <Chip size="sm" variant="flat">{feedbackMessages.length}</Chip>
                 )}

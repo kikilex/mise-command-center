@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
-import { BellRing } from 'lucide-react'
+import { BellRing, Bot, ClipboardList, MessageCircle, List, CalendarDays, User } from 'lucide-react'
 import { 
   Button, 
   Card, 
@@ -574,7 +574,7 @@ function TasksPageContent() {
             <div className="flex items-center gap-2 mb-1 flex-wrap">
               <h3 className={`font-medium text-slate-900 dark:text-slate-100 ${compact ? 'text-sm' : ''} truncate`}>{task.title}</h3>
               {task.ai_flag && (
-                <Chip size="sm" className="bg-violet-100 dark:bg-violet-900/50 text-violet-700 dark:text-violet-300">🤖 AI</Chip>
+                <Chip size="sm" className="bg-violet-100 dark:bg-violet-900/50 text-violet-700 dark:text-violet-300"><Bot className="w-3 h-3 inline mr-1" />AI</Chip>
               )}
               {task.ai_agent && (
                 <Chip size="sm" variant="flat" className="capitalize text-xs">
@@ -583,7 +583,7 @@ function TasksPageContent() {
               )}
               {task.feedback && (
                 <Chip size="sm" variant="flat" className="bg-amber-100 dark:bg-amber-900/50 text-amber-700 dark:text-amber-300">
-                  💬
+                  <MessageCircle className="w-3 h-3" />
                 </Chip>
               )}
             </div>
@@ -709,10 +709,10 @@ function TasksPageContent() {
                     <div className={`w-2 h-2 rounded-full flex-shrink-0 ${getPriorityColor(task.priority)}`} />
                     <span className="font-medium truncate max-w-[300px]">{task.title}</span>
                     {task.ai_flag && (
-                      <Chip size="sm" className="bg-violet-100 text-violet-700 flex-shrink-0">🤖</Chip>
+                      <Chip size="sm" className="bg-violet-100 text-violet-700 flex-shrink-0"><Bot className="w-3 h-3" /></Chip>
                     )}
                     {task.feedback && (
-                      <Chip size="sm" className="bg-amber-100 text-amber-700 flex-shrink-0">💬</Chip>
+                      <Chip size="sm" className="bg-amber-100 text-amber-700 flex-shrink-0"><MessageCircle className="w-3 h-3" /></Chip>
                     )}
                   </div>
                 </TableCell>
@@ -837,7 +837,7 @@ function TasksPageContent() {
                       title={task.title}
                       onClick={() => handleViewDetails(task)}
                     >
-                      {task.ai_flag ? '🤖 ' : '📋 '}{task.title}{task.feedback ? ' 💬' : ''}
+                      {task.ai_flag ? <Bot className="w-3 h-3 inline mr-1" /> : <ClipboardList className="w-3 h-3 inline mr-1" />}{task.title}{task.feedback ? <MessageCircle className="w-3 h-3 inline ml-1" /> : null}
                     </div>
                   ))}
                   
@@ -903,7 +903,7 @@ function TasksPageContent() {
       {filteredTasks.length === 0 ? (
         <Card className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
           <CardBody className="text-center py-12">
-            <div className="text-4xl mb-4">🤖</div>
+            <Bot className="w-12 h-12 mx-auto mb-4 text-slate-400" />
             <p className="text-slate-500 dark:text-slate-400 mb-4">No tasks in the AI queue</p>
             <p className="text-sm text-slate-400 dark:text-slate-500 mb-4">
               Tasks with the AI flag enabled will appear here
@@ -914,7 +914,7 @@ function TasksPageContent() {
       ) : (
         <>
           <div className="flex items-center gap-2 mb-4 px-1">
-            <span className="text-lg">🤖</span>
+            <Bot className="w-5 h-5 text-violet-600" />
             <span className="text-slate-600 dark:text-slate-300 font-medium">
               {filteredTasks.length} task{filteredTasks.length !== 1 ? 's' : ''} ready for AI
             </span>
@@ -971,19 +971,19 @@ function TasksPageContent() {
               } />
               <Tab key="list" title={
                 <div className="flex items-center gap-2">
-                  <span>📋</span>
+                  <List className="w-4 h-4" />
                   <span>List</span>
                 </div>
               } />
               <Tab key="calendar" title={
                 <div className="flex items-center gap-2">
-                  <span>📅</span>
+                  <CalendarDays className="w-4 h-4" />
                   <span>Calendar</span>
                 </div>
               } />
               <Tab key="my-tasks" title={
                 <div className="flex items-center gap-2">
-                  <span>👤</span>
+                  <User className="w-4 h-4" />
                   <span>My Tasks</span>
                   {user && (
                     <Chip size="sm" variant="flat">
@@ -994,7 +994,7 @@ function TasksPageContent() {
               } />
               <Tab key="ai-queue" title={
                 <div className="flex items-center gap-2">
-                  <span>🤖</span>
+                  <Bot className="w-4 h-4" />
                   <span>AI Queue</span>
                   <Chip size="sm" variant="flat" className="bg-violet-100 text-violet-700">
                     {tasks.filter(t => t.ai_flag).length}
@@ -1107,7 +1107,7 @@ function TasksPageContent() {
                   onChange={(e) => setFormData({ ...formData, ai_flag: e.target.checked })}
                   className="w-4 h-4 rounded border-slate-300"
                 />
-                <span className="text-sm text-slate-700">🤖 Allow AI to work on this task</span>
+                <span className="text-sm text-slate-700 flex items-center gap-1"><Bot className="w-4 h-4" /> Allow AI to work on this task</span>
               </label>
               
               {/* Reminder Preview */}
