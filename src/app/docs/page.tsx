@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, Suspense } from 'react'
 import { useRouter } from 'next/navigation'
-import { FileText, Search, Plus, Filter } from 'lucide-react'
+import { FileText, Search, Plus, Filter, Clock } from 'lucide-react'
 import {
   Button,
   Card,
@@ -184,6 +184,11 @@ function DocsPageContent() {
     })
   }, [documents, searchQuery, statusFilter])
 
+  // Count documents needing approval
+  const needsApprovalCount = useMemo(() => {
+    return documents.filter(doc => doc.status === 'in_review').length
+  }, [documents])
+
   // Get content preview (first 150 chars, strip markdown)
   const getPreview = (content: string) => {
     const stripped = content
@@ -226,6 +231,26 @@ function DocsPageContent() {
             New Document
           </Button>
         </div>
+
+        {/* Needs Approval Banner */}
+        {needsApprovalCount > 0 && statusFilter !== 'in_review' && (
+          <div 
+            className="mb-4 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded-lg p-3 cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors"
+            onClick={() => setStatusFilter('in_review')}
+          >
+            <div className="flex items-center gap-3">
+              <Clock className="w-5 h-5 text-blue-600 dark:text-blue-400" />
+              <div className="flex-1">
+                <span className="font-medium text-blue-800 dark:text-blue-200">
+                  {needsApprovalCount} document{needsApprovalCount > 1 ? 's' : ''} awaiting approval
+                </span>
+                <span className="text-sm text-blue-600 dark:text-blue-400 ml-2">
+                  Click to filter
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
 
         {/* Filters */}
         <div className="flex flex-col sm:flex-row gap-3 mb-6">
@@ -282,9 +307,20 @@ function DocsPageContent() {
                 key={doc.id}
                 isPressable
                 onPress={() => router.push(`/docs/${doc.id}`)}
-                className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-violet-300 dark:hover:border-violet-600 transition-colors"
+                className={`bg-white dark:bg-slate-800 border transition-colors ${
+                  doc.status === 'in_review' 
+                    ? 'border-blue-300 dark:border-blue-600 ring-2 ring-blue-100 dark:ring-blue-900/50 hover:border-blue-400 dark:hover:border-blue-500' 
+                    : 'border-slate-200 dark:border-slate-700 hover:border-violet-300 dark:hover:border-violet-600'
+                }`}
               >
                 <CardBody className="p-4">
+                  {/* Needs Approval Indicator */}
+                  {doc.status === 'in_review' && (
+                    <div className="flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400 mb-2 font-medium">
+                      <Clock className="w-3.5 h-3.5" />
+                      <span>Needs Approval</span>
+                    </div>
+                  )}
                   <div className="flex items-start justify-between gap-2 mb-2">
                     <h3 className="font-semibold text-slate-800 dark:text-slate-100 line-clamp-1">
                       {doc.title}
@@ -292,7 +328,7 @@ function DocsPageContent() {
                     <Chip
                       size="sm"
                       color={getStatusColor(doc.status) as any}
-                      variant="flat"
+                      variant={doc.status === 'in_review' ? 'solid' : 'flat'}
                     >
                       {getStatusLabel(doc.status)}
                     </Chip>

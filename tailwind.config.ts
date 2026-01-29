@@ -1,5 +1,6 @@
 import type { Config } from "tailwindcss";
 import { heroui } from "@heroui/react";
+import typography from "@tailwindcss/typography";
 
 export default {
   content: [
@@ -12,7 +13,7 @@ export default {
     extend: {},
   },
   darkMode: "class",
-  plugins: [heroui({
+  plugins: [typography, heroui({
     defaultTheme: "dark",
     themes: {
       light: {

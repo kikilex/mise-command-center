@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { ArrowLeft, Edit, FileText, List, ExternalLink, Share2, Check, RotateCcw, MessageSquare, Send, AlertCircle, Trash2 } from 'lucide-react'
+import { ArrowLeft, Edit, FileText, List, ExternalLink, Share2, Check, RotateCcw, MessageSquare, Send, AlertCircle, Trash2, CheckCircle2, Clock } from 'lucide-react'
 import {
   Button,
   Chip,
@@ -101,6 +101,9 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
   const [deleting, setDeleting] = useState(false)
   const [revisionFeedback, setRevisionFeedback] = useState('')
   const [submittingRevision, setSubmittingRevision] = useState(false)
+  
+  // Approval state
+  const [approving, setApproving] = useState(false)
   
   const supabase = createClient()
   const router = useRouter()
@@ -271,6 +274,47 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
     }
   }
 
+  async function handleApprove() {
+    if (!user || !document) return
+    
+    setApproving(true)
+    try {
+      // Update document status to approved and increment version
+      const { error: docError } = await supabase
+        .from('documents')
+        .update({ 
+          status: 'approved',
+          version: (document.version || 1) + 1,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', id)
+
+      if (docError) throw docError
+
+      // Add approval comment for audit trail
+      await supabase
+        .from('document_comments')
+        .insert({
+          document_id: id,
+          content: 'Document approved',
+          author_id: user.id,
+          author_name: user.name || user.email,
+          comment_type: 'status_change',
+        })
+
+      // Update local state
+      setDocument(prev => prev ? { ...prev, status: 'approved', version: (prev.version || 1) + 1 } : null)
+      loadComments() // Reload to show the approval comment
+      
+      showSuccessToast('Document approved')
+    } catch (error) {
+      console.error('Approve document error:', error)
+      showErrorToast(error, 'Failed to approve document')
+    } finally {
+      setApproving(false)
+    }
+  }
+
   async function handleDelete() {
     setDeleting(true)
     try {
@@ -406,6 +450,18 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
               </Button>
             )}
             
+            {/* Approve Button - Only visible for draft/in_review status */}
+            {(document.status === 'draft' || document.status === 'in_review') && (
+              <Button
+                color="success"
+                startContent={approving ? null : <CheckCircle2 className="w-4 h-4" />}
+                onPress={handleApprove}
+                isLoading={approving}
+              >
+                Approve
+              </Button>
+            )}
+            
             {/* Request Revision Button */}
             {document.status !== 'needs_revision' && (
               <Button
@@ -440,6 +496,30 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
             </Button>
           </div>
         </div>
+
+        {/* Awaiting Approval Alert */}
+        {document.status === 'in_review' && (
+          <div className="mb-6 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded-lg p-4">
+            <div className="flex items-start gap-3">
+              <Clock className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0 mt-0.5" />
+              <div className="flex-1">
+                <p className="font-medium text-blue-800 dark:text-blue-200">Awaiting Approval</p>
+                <p className="text-sm text-blue-700 dark:text-blue-300 mt-1">
+                  This document is ready for review. Click "Approve" to finalize it.
+                </p>
+              </div>
+              <Button
+                color="success"
+                size="sm"
+                startContent={approving ? null : <CheckCircle2 className="w-4 h-4" />}
+                onPress={handleApprove}
+                isLoading={approving}
+              >
+                Approve
+              </Button>
+            </div>
+          </div>
+        )}
 
         {/* Needs Revision Alert */}
         {document.status === 'needs_revision' && (
