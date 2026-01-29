@@ -72,6 +72,14 @@ export default function AIWorkspacePage() {
     loadData()
   }, [])
 
+  // Auto-refresh work logs every 30 seconds
+  useEffect(() => {
+    const interval = setInterval(() => {
+      refreshWorkLogs()
+    }, 30000)
+    return () => clearInterval(interval)
+  }, [])
+
   async function loadData() {
     setLoading(true)
     setLoadError(null)
@@ -318,15 +326,7 @@ export default function AIWorkspacePage() {
         </Card>
       </div>
 
-      {/* Right Column - Recent Work Log */}
-      <div className="lg:col-span-2">
-        <WorkLogPanel 
-          workLogs={workLogs.slice(0, 50)} 
-          loading={logsLoading}
-          onRefresh={refreshWorkLogs}
-        />
       </div>
-    </div>
   )
 
   // Render Full Work Log Tab
