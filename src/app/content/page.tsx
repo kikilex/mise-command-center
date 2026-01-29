@@ -29,6 +29,7 @@ import {
   Heart, BookOpen, ShoppingBag, Zap, FileText, 
   Plus, ChevronRight, Edit, Video
 } from '@/lib/icons'
+import PromptsSection from '@/components/PromptsSection'
 
 type ViewMode = 'board' | 'list'
 
@@ -871,6 +872,17 @@ export default function ContentPage() {
                     minRows={4}
                   />
                 </>
+              )}
+              
+              {/* Prompts Section - only show when editing existing content with a script */}
+              {editingItem && (formData.custom_fields.script || editingItem.script) && (
+                <div className="border-t pt-4 mt-2">
+                  <PromptsSection
+                    contentId={editingItem.id}
+                    script={formData.custom_fields.script || editingItem.script || ''}
+                    actorPromptBase={formData.custom_fields.actor_prompt || editingItem.actor_prompt || ''}
+                  />
+                </div>
               )}
             </div>
           </ModalBody>
