@@ -19,6 +19,13 @@ import {
   useDisclosure,
   Tabs,
   Tab,
+  Table,
+  TableHeader,
+  TableColumn,
+  TableBody,
+  TableRow,
+  TableCell,
+  SortDescriptor,
   Spinner,
 } from "@heroui/react"
 import { createClient } from '@/lib/supabase/client'
@@ -34,16 +41,11 @@ import {
   Zap, 
   FileText, 
   Plus, 
-  ChevronRight, 
-  Edit,
   Video,
   LayoutGrid,
   List,
   Mic,
-  Calendar,
   Search,
-  Filter,
-  GripVertical,
 } from 'lucide-react'
 import PromptsSection from '@/components/PromptsSection'
 
@@ -110,14 +112,14 @@ interface UserData {
 }
 
 const pipelineStages = [
-  { key: 'idea', label: 'Ideas', color: 'default', bgColor: 'bg-slate-100 dark:bg-slate-800', textColor: 'text-slate-700 dark:text-slate-300' },
-  { key: 'script', label: 'Script', color: 'primary', bgColor: 'bg-blue-100 dark:bg-blue-900/30', textColor: 'text-blue-700 dark:text-blue-300' },
-  { key: 'review', label: 'Review', color: 'warning', bgColor: 'bg-amber-100 dark:bg-amber-900/30', textColor: 'text-amber-700 dark:text-amber-300' },
-  { key: 'approved', label: 'Approved', color: 'success', bgColor: 'bg-emerald-100 dark:bg-emerald-900/30', textColor: 'text-emerald-700 dark:text-emerald-300' },
-  { key: 'voiceover', label: 'Voiceover', color: 'secondary', bgColor: 'bg-purple-100 dark:bg-purple-900/30', textColor: 'text-purple-700 dark:text-purple-300' },
-  { key: 'video', label: 'Video', color: 'danger', bgColor: 'bg-pink-100 dark:bg-pink-900/30', textColor: 'text-pink-700 dark:text-pink-300' },
-  { key: 'scheduled', label: 'Scheduled', color: 'primary', bgColor: 'bg-cyan-100 dark:bg-cyan-900/30', textColor: 'text-cyan-700 dark:text-cyan-300' },
-  { key: 'posted', label: 'Posted', color: 'success', bgColor: 'bg-green-100 dark:bg-green-900/30', textColor: 'text-green-700 dark:text-green-300' },
+  { key: 'idea', label: 'Ideas' },
+  { key: 'script', label: 'Script' },
+  { key: 'review', label: 'Review' },
+  { key: 'approved', label: 'Approved' },
+  { key: 'voiceover', label: 'Voiceover' },
+  { key: 'video', label: 'Video' },
+  { key: 'scheduled', label: 'Scheduled' },
+  { key: 'posted', label: 'Posted' },
 ]
 
 // Map template names to Lucide icons
@@ -150,9 +152,12 @@ function ContentPageContent() {
   const [editingItem, setEditingItem] = useState<ContentItem | null>(null)
   const [selectedTemplate, setSelectedTemplate] = useState<ContentTemplate | null>(null)
   const [viewMode, setViewMode] = useState<ViewMode>('board')
-  const [collapsedStages, setCollapsedStages] = useState<Set<string>>(new Set())
   const [searchQuery, setSearchQuery] = useState('')
   const [filterStage, setFilterStage] = useState<string>('all')
+  const [sortDescriptor, setSortDescriptor] = useState<SortDescriptor>({
+    column: 'created_at',
+    direction: 'descending',
+  })
   
   // Detail panel state
   const [selectedItem, setSelectedItem] = useState<ContentItem | null>(null)
@@ -595,106 +600,73 @@ function ContentPageContent() {
     return filtered
   }, [content, searchQuery, filterStage])
 
+  // Sorted content for list view
+  const sortedContent = useMemo(() => {
+    const sorted = [...filteredContent]
+    
+    if (sortDescriptor.column) {
+      sorted.sort((a, b) => {
+        let aValue: any = a[sortDescriptor.column as keyof ContentItem]
+        let bValue: any = b[sortDescriptor.column as keyof ContentItem]
+        
+        // Handle null/undefined values
+        if (aValue == null) aValue = ''
+        if (bValue == null) bValue = ''
+        
+        let cmp = 0
+        if (typeof aValue === 'string' && typeof bValue === 'string') {
+          cmp = aValue.localeCompare(bValue)
+        } else {
+          cmp = aValue < bValue ? -1 : aValue > bValue ? 1 : 0
+        }
+        
+        return sortDescriptor.direction === 'descending' ? -cmp : cmp
+      })
+    }
+    
+    return sorted
+  }, [filteredContent, sortDescriptor])
+
   const getItemsByStatus = (status: string) => filteredContent.filter(c => c.status === status)
 
-  const totalContent = content.length
-
-  const toggleStageCollapse = (stageKey: string) => {
-    setCollapsedStages(prev => {
-      const newSet = new Set(prev)
-      if (newSet.has(stageKey)) {
-        newSet.delete(stageKey)
-      } else {
-        newSet.add(stageKey)
-      }
-      return newSet
+  // Group tasks by status for Kanban view
+  const contentByStatus = useMemo(() => {
+    const grouped: Record<string, ContentItem[]> = {}
+    pipelineStages.forEach(s => {
+      grouped[s.key] = filteredContent.filter(c => c.status === s.key)
     })
-  }
+    return grouped
+  }, [filteredContent])
 
-  // Content card component
-  const ContentCard = ({ item, compact = false }: { item: ContentItem; compact?: boolean }) => {
-    const IconComponent = getContentIcon(item.template?.name, item.type)
-    const stage = pipelineStages.find(s => s.key === item.status)
-    const hook = item.hook || item.custom_fields?.hook
+  // Content card component - simplified like Tasks
+  const ContentCard = ({ item }: { item: ContentItem }) => {
     const voice = item.voice || item.custom_fields?.voice
     
     return (
       <Card 
-        className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md hover:border-slate-300 dark:hover:border-slate-600 transition-all cursor-pointer"
+        className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow cursor-pointer"
         isPressable
         onPress={() => handleViewDetails(item)}
       >
-        <CardBody className={compact ? "p-3" : "p-4"}>
+        <CardBody className="p-3">
           <div className="flex items-start gap-3">
-            {/* Icon */}
-            <div className={`w-10 h-10 rounded-lg ${stage?.bgColor || 'bg-slate-100'} flex items-center justify-center flex-shrink-0`}>
-              <IconComponent className={`w-5 h-5 ${stage?.textColor || 'text-slate-600'}`} />
-            </div>
-            
             {/* Content */}
             <div className="flex-1 min-w-0">
-              <div className="flex items-center gap-2 mb-1 flex-wrap">
-                <h3 className={`font-semibold text-slate-900 dark:text-slate-100 ${compact ? 'text-sm' : ''} truncate`}>
-                  {item.title}
-                </h3>
-              </div>
+              <h3 className="font-medium text-sm text-slate-900 dark:text-slate-100 truncate mb-2">
+                {item.title}
+              </h3>
               
-              <div className="flex items-center gap-2 flex-wrap mb-2">
+              <div className="flex items-center gap-2 flex-wrap">
                 {item.template?.name && (
-                  <Chip size="sm" variant="flat" className="text-xs">
+                  <Chip size="sm" variant="flat" className="text-xs capitalize">
                     {item.template.name}
                   </Chip>
                 )}
                 {voice && (
-                  <Chip size="sm" variant="flat" className="text-xs bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300">
+                  <Chip size="sm" variant="flat" className="text-xs">
                     <Mic className="w-3 h-3 mr-1" />
                     {voice}
                   </Chip>
-                )}
-              </div>
-              
-              {hook && !compact && (
-                <p className="text-sm text-slate-500 dark:text-slate-400 line-clamp-2 italic mb-2">
-                  "{hook}"
-                </p>
-              )}
-              
-              {/* Quick Actions */}
-              <div className="flex items-center gap-2 mt-2" onClick={e => e.stopPropagation()}>
-                {item.status === 'script' && (
-                  <Button 
-                    size="sm" 
-                    color="warning" 
-                    variant="flat"
-                    className="text-xs"
-                    onPress={() => handleStatusChange(item.id, 'review')}
-                  >
-                    Send for Review
-                  </Button>
-                )}
-                {item.status === 'review' && (
-                  <Button 
-                    size="sm" 
-                    color="success" 
-                    variant="flat"
-                    className="text-xs"
-                    onPress={() => handleStatusChange(item.id, 'approved')}
-                  >
-                    Approve
-                  </Button>
-                )}
-                {!['script', 'review'].includes(item.status) && (
-                  <Select
-                    size="sm"
-                    selectedKeys={[item.status]}
-                    className="w-32"
-                    onChange={(e) => handleStatusChange(item.id, e.target.value)}
-                    aria-label="Change status"
-                  >
-                    {pipelineStages.map(s => (
-                      <SelectItem key={s.key}>{s.label}</SelectItem>
-                    ))}
-                  </Select>
                 )}
               </div>
             </div>
@@ -704,78 +676,133 @@ function ContentPageContent() {
     )
   }
 
-  // Render Board View (Kanban Style - Stacked Grid)
+  // Render Board View (Kanban Style - matching Tasks)
   const renderBoardView = () => (
     <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-      {pipelineStages.map(stage => {
-        const stageItems = getItemsByStatus(stage.key)
-        return (
-          <div key={stage.key} className="w-full">
-            <div className={`rounded-t-xl px-4 py-3 ${stage.bgColor}`}>
-              <div className="flex items-center justify-between">
-                <h3 className={`font-semibold ${stage.textColor}`}>{stage.label}</h3>
-                <Chip size="sm" variant="flat" className={stage.textColor}>
-                  {stageItems.length}
-                </Chip>
-              </div>
-            </div>
-            <div className="bg-slate-100/80 dark:bg-slate-800/50 rounded-b-xl p-2 min-h-[200px] space-y-2 border border-t-0 border-slate-200/50 dark:border-slate-700/50">
-              {stageItems.map(item => (
-                <ContentCard key={item.id} item={item} compact={true} />
-              ))}
-              {stageItems.length === 0 && (
-                <div className="text-center py-8 text-slate-400 dark:text-slate-500 text-sm">
-                  No items
-                </div>
-              )}
+      {pipelineStages.map(stage => (
+        <div key={stage.key} className="w-full">
+          <div className="flex items-center justify-between mb-3 px-1">
+            <div className="flex items-center gap-2">
+              <span className="font-medium text-slate-700 dark:text-slate-300">
+                {stage.label}
+              </span>
+              <span className="text-sm text-slate-500 dark:text-slate-400">
+                ({contentByStatus[stage.key]?.length || 0})
+              </span>
             </div>
           </div>
-        )
-      })}
-    </div>
-  )
-
-  // Render List View
-  const renderListView = () => (
-    <div className="space-y-3">
-      {pipelineStages.map(stage => {
-        const stageItems = getItemsByStatus(stage.key)
-        const isCollapsed = collapsedStages.has(stage.key)
-        
-        if (filterStage !== 'all' && filterStage !== stage.key) return null
-        
-        return (
-          <div key={stage.key} className="rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
-            <button
-              onClick={() => toggleStageCollapse(stage.key)}
-              className={`w-full px-4 py-3 ${stage.bgColor} flex items-center justify-between hover:opacity-90 transition-opacity`}
-            >
-              <div className="flex items-center gap-3">
-                <ChevronRight className={`w-5 h-5 transition-transform ${isCollapsed ? '' : 'rotate-90'} ${stage.textColor}`} />
-                <h3 className={`font-semibold ${stage.textColor}`}>{stage.label}</h3>
-              </div>
-              <Chip size="sm" variant="flat" className={stage.textColor}>
-                {stageItems.length}
-              </Chip>
-            </button>
-            
-            {!isCollapsed && (
-              <div className="p-3 space-y-3 bg-slate-50 dark:bg-slate-900/50">
-                {stageItems.length > 0 ? (
-                  stageItems.map(item => (
-                    <ContentCard key={item.id} item={item} compact={false} />
-                  ))
-                ) : (
-                  <div className="text-center py-6 text-slate-400 dark:text-slate-500 text-sm">
-                    No items in this stage
-                  </div>
-                )}
+          <div className="space-y-2 min-h-[150px] bg-slate-100/80 dark:bg-slate-800/50 rounded-lg p-2 border border-slate-200/50 dark:border-slate-700/50">
+            {contentByStatus[stage.key]?.map(item => (
+              <ContentCard key={item.id} item={item} />
+            ))}
+            {contentByStatus[stage.key]?.length === 0 && (
+              <div className="text-center text-slate-400 dark:text-slate-500 text-sm py-8">
+                No items
               </div>
             )}
           </div>
-        )
-      })}
+        </div>
+      ))}
     </div>
+  )
+
+  // Render List View - Table like Tasks
+  const renderListView = () => (
+    <Card className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+      <CardBody className="p-0">
+        <Table
+          aria-label="Content table"
+          sortDescriptor={sortDescriptor}
+          onSortChange={setSortDescriptor}
+          classNames={{
+            wrapper: "min-h-[400px]",
+          }}
+        >
+          <TableHeader>
+            <TableColumn key="title" allowsSorting>Title</TableColumn>
+            <TableColumn key="status" allowsSorting width={140}>Status</TableColumn>
+            <TableColumn key="template" width={120}>Template</TableColumn>
+            <TableColumn key="voice" width={100}>Voice</TableColumn>
+            <TableColumn key="platforms" width={120}>Platforms</TableColumn>
+            <TableColumn key="created_at" allowsSorting width={120}>Created</TableColumn>
+            <TableColumn key="actions" width={150}>Actions</TableColumn>
+          </TableHeader>
+          <TableBody items={sortedContent} emptyContent="No content to display">
+            {(item) => (
+              <TableRow 
+                key={item.id} 
+                className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/50"
+                onClick={() => handleViewDetails(item)}
+              >
+                <TableCell>
+                  <span className="font-medium truncate max-w-[300px]">{item.title}</span>
+                </TableCell>
+                <TableCell onClick={(e) => e.stopPropagation()}>
+                  <Select
+                    size="sm"
+                    selectedKeys={[item.status]}
+                    className="w-full"
+                    onChange={(e) => handleStatusChange(item.id, e.target.value)}
+                    aria-label="Change status"
+                  >
+                    {pipelineStages.map(s => (
+                      <SelectItem key={s.key}>{s.label}</SelectItem>
+                    ))}
+                  </Select>
+                </TableCell>
+                <TableCell>
+                  {item.template?.name ? (
+                    <Chip size="sm" variant="flat" className="capitalize">
+                      {item.template.name}
+                    </Chip>
+                  ) : (
+                    <span className="text-slate-400">—</span>
+                  )}
+                </TableCell>
+                <TableCell>
+                  {item.voice || item.custom_fields?.voice ? (
+                    <span className="text-sm">{item.voice || item.custom_fields?.voice}</span>
+                  ) : (
+                    <span className="text-slate-400">—</span>
+                  )}
+                </TableCell>
+                <TableCell>
+                  {item.platforms?.length > 0 ? (
+                    <span className="text-sm">{item.platforms.join(', ')}</span>
+                  ) : (
+                    <span className="text-slate-400">—</span>
+                  )}
+                </TableCell>
+                <TableCell>
+                  <span className="text-sm">
+                    {new Date(item.created_at).toLocaleDateString()}
+                  </span>
+                </TableCell>
+                <TableCell onClick={(e) => e.stopPropagation()}>
+                  <div className="flex gap-2">
+                    <Button 
+                      size="sm" 
+                      variant="flat" 
+                      onPress={() => handleEdit(item)}
+                    >
+                      Edit
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant="flat" 
+                      color="danger"
+                      onPress={() => handleDelete(item.id)}
+                    >
+                      Delete
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </CardBody>
+    </Card>
   )
 
   return (
@@ -783,77 +810,20 @@ function ContentPageContent() {
       <Navbar user={user} />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
-        {/* Header */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
-          <div>
-            <div className="flex items-center gap-3 mb-2">
-              <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Content Pipeline</h1>
-              {selectedBusiness && (
-                <Chip 
-                  size="sm" 
-                  variant="flat"
-                  style={{ backgroundColor: `${selectedBusiness.color}20`, color: selectedBusiness.color }}
-                >
-                  {selectedBusiness.name}
-                </Chip>
-              )}
-            </div>
-            {selectedBusinessId && (
-              <p className="text-slate-500 dark:text-slate-400 text-sm">{totalContent} items in pipeline</p>
-            )}
-          </div>
-          
-          <Button 
-            color="primary" 
-            onPress={handleNew}
-            isDisabled={!selectedBusinessId}
-            startContent={<Plus className="w-4 h-4" />}
-            className="font-semibold"
-          >
-            New Content
-          </Button>
-        </div>
-
-        {/* Controls Bar */}
-        {selectedBusinessId && (
-          <div className="flex flex-col sm:flex-row gap-4 mb-6">
-            {/* Search */}
-            <div className="flex-1">
-              <Input
-                placeholder="Search content..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                startContent={<Search className="w-4 h-4 text-slate-400" />}
-                classNames={{
-                  input: "bg-transparent",
-                  inputWrapper: "bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700",
-                }}
-              />
-            </div>
-            
-            {/* Stage Filter (for list view) */}
-            {viewMode === 'list' && (
-              <Select
-                placeholder="Filter by stage"
-                selectedKeys={[filterStage]}
-                onChange={(e) => setFilterStage(e.target.value)}
-                className="w-40"
-                startContent={<Filter className="w-4 h-4" />}
-              >
-                <SelectItem key="all">All Stages</SelectItem>
-                {pipelineStages.map(s => (
-                  <SelectItem key={s.key}>{s.label}</SelectItem>
-                ))}
-              </Select>
-            )}
-            
-            {/* View Toggle */}
+        {/* View Tabs and Controls - matching Tasks page layout */}
+        <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center mb-6">
+          {/* Left side: View toggle */}
+          <div className="w-full sm:w-auto overflow-x-auto pb-2 sm:pb-0 -mx-4 px-4 sm:mx-0 sm:px-0">
             <Tabs 
               selectedKey={viewMode} 
               onSelectionChange={(key) => handleViewChange(key as ViewMode)}
               color="primary"
               variant="solid"
               size="md"
+              classNames={{
+                tabList: "flex-nowrap",
+                tab: "whitespace-nowrap",
+              }}
             >
               <Tab key="board" title={
                 <div className="flex items-center gap-2">
@@ -866,6 +836,57 @@ function ContentPageContent() {
                 </div>
               } />
             </Tabs>
+          </div>
+          
+          <Button 
+            color="success" 
+            onPress={handleNew}
+            isDisabled={!selectedBusinessId}
+            className="font-semibold flex-shrink-0"
+          >
+            + New Content
+          </Button>
+        </div>
+
+        {/* Filter chips - like Tasks page */}
+        {selectedBusinessId && (
+          <div className="flex gap-2 flex-wrap mb-6">
+            <Button 
+              size="sm" 
+              variant={filterStage === 'all' ? 'solid' : 'flat'}
+              color={filterStage === 'all' ? 'success' : 'default'}
+              onPress={() => setFilterStage('all')}
+            >
+              All ({content.length})
+            </Button>
+            {pipelineStages.map(stage => (
+              <Button
+                key={stage.key}
+                size="sm"
+                variant={filterStage === stage.key ? 'solid' : 'flat'}
+                color={filterStage === stage.key ? 'success' : 'default'}
+                onPress={() => setFilterStage(stage.key)}
+              >
+                {stage.label} ({content.filter(c => c.status === stage.key).length})
+              </Button>
+            ))}
+          </div>
+        )}
+
+        {/* Search */}
+        {selectedBusinessId && (
+          <div className="mb-6">
+            <Input
+              placeholder="Search content..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              startContent={<Search className="w-4 h-4 text-slate-400" />}
+              classNames={{
+                input: "bg-transparent",
+                inputWrapper: "bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700",
+              }}
+              className="max-w-md"
+            />
           </div>
         )}
 
@@ -897,10 +918,7 @@ function ContentPageContent() {
         {/* Pipeline View */}
         {selectedBusinessId && !loadError && (
           loading ? (
-            <div className="flex items-center justify-center py-12">
-              <Spinner size="lg" />
-              <span className="ml-3 text-slate-500 dark:text-slate-400">Loading content pipeline...</span>
-            </div>
+            <div className="text-center py-12 text-slate-500 dark:text-slate-400">Loading content...</div>
           ) : filteredContent.length === 0 && searchQuery ? (
             <Card className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
               <CardBody className="text-center py-12">
@@ -926,7 +944,7 @@ function ContentPageContent() {
                 <p className="text-slate-500 dark:text-slate-400 mb-4">
                   Start building your content pipeline
                 </p>
-                <Button color="primary" onPress={handleNew}>
+                <Button color="success" onPress={handleNew}>
                   Create First Content
                 </Button>
               </CardBody>
