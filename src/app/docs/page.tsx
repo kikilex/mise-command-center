@@ -1,8 +1,11 @@
 'use client'
 
-import { useState, useEffect, useMemo, Suspense } from 'react'
+import { useState, useEffect, useMemo, Suspense, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { FileText, Search, Plus, Filter, Clock } from 'lucide-react'
+import { 
+  FileText, Search, Plus, Filter, Clock, Tag, Archive, Eye, EyeOff,
+  X, Check, Folder
+} from 'lucide-react'
 import {
   Button,
   Card,
@@ -12,11 +15,24 @@ import {
   Select,
   SelectItem,
   Spinner,
+  Tabs,
+  Tab,
+  Modal,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+  Checkbox,
+  Dropdown,
+  DropdownTrigger,
+  DropdownMenu,
+  DropdownItem,
 } from '@heroui/react'
 import { createClient } from '@/lib/supabase/client'
 import { useBusiness } from '@/lib/business-context'
 import Navbar from '@/components/Navbar'
 import { showErrorToast } from '@/lib/errors'
+import toast from 'react-hot-toast'
 
 interface Document {
   id: string
@@ -29,6 +45,10 @@ interface Document {
   updated_at: string
   status: 'draft' | 'in_review' | 'approved' | 'needs_revision'
   version: number
+  category: string
+  tags: string[]
+  visibility: 'normal' | 'hidden'
+  archived: boolean
   tasks?: { title: string } | null
 }
 
@@ -45,6 +65,14 @@ const statusOptions = [
   { key: 'in_review', label: 'In Review', color: 'warning' },
   { key: 'approved', label: 'Approved', color: 'success' },
   { key: 'needs_revision', label: 'Needs Revision', color: 'danger' },
+]
+
+const categoryOptions = [
+  { key: 'all', label: 'All', icon: Folder },
+  { key: 'research', label: 'Research', icon: Search },
+  { key: 'content', label: 'Content', icon: FileText },
+  { key: 'guides', label: 'Guides', icon: FileText },
+  { key: 'business', label: 'Business', icon: Folder },
 ]
 
 const getStatusColor = (status: string) => {
@@ -67,6 +95,16 @@ const getStatusLabel = (status: string) => {
   }
 }
 
+const getCategoryColor = (category: string) => {
+  switch (category) {
+    case 'research': return 'secondary'
+    case 'content': return 'primary'
+    case 'guides': return 'success'
+    case 'business': return 'warning'
+    default: return 'default'
+  }
+}
+
 export default function DocsPage() {
   return (
     <Suspense fallback={
@@ -85,6 +123,18 @@ function DocsPageContent() {
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
+  const [categoryTab, setCategoryTab] = useState('all')
+  const [selectedTags, setSelectedTags] = useState<string[]>([])
+  const [showArchived, setShowArchived] = useState(false)
+  
+  // Edit modal state
+  const [editModalOpen, setEditModalOpen] = useState(false)
+  const [editingDoc, setEditingDoc] = useState<Document | null>(null)
+  const [editCategory, setEditCategory] = useState('all')
+  const [editTags, setEditTags] = useState('')
+  const [editVisibility, setEditVisibility] = useState<'normal' | 'hidden'>('normal')
+  const [editArchived, setEditArchived] = useState(false)
+  const [saving, setSaving] = useState(false)
   
   const supabase = createClient()
   const router = useRouter()
@@ -140,7 +190,15 @@ function DocsPageContent() {
       const { data, error } = await query
 
       if (error) throw error
-      setDocuments(data || [])
+      // Ensure tags is always an array
+      const docs = (data || []).map(doc => ({
+        ...doc,
+        tags: doc.tags || [],
+        category: doc.category || 'all',
+        visibility: doc.visibility || 'normal',
+        archived: doc.archived || false,
+      }))
+      setDocuments(docs)
     } catch (error) {
       console.error('Load documents error:', error)
       showErrorToast(error, 'Failed to load documents')
@@ -164,6 +222,10 @@ function DocsPageContent() {
           status: 'draft',
           created_by: user.id,
           business_id: selectedBusinessId,
+          category: categoryTab !== 'all' ? categoryTab : 'all',
+          tags: [],
+          visibility: 'normal',
+          archived: false,
         })
         .select()
         .single()
@@ -176,17 +238,94 @@ function DocsPageContent() {
     }
   }
 
-  const filteredDocuments = useMemo(() => {
-    return documents.filter(doc => {
-      const matchesSearch = doc.title.toLowerCase().includes(searchQuery.toLowerCase())
-      const matchesStatus = statusFilter === 'all' || doc.status === statusFilter
-      return matchesSearch && matchesStatus
+  // Get all unique tags from documents
+  const allTags = useMemo(() => {
+    const tagSet = new Set<string>()
+    documents.forEach(doc => {
+      (doc.tags || []).forEach(tag => tagSet.add(tag))
     })
-  }, [documents, searchQuery, statusFilter])
+    return Array.from(tagSet).sort()
+  }, [documents])
+
+  // Check if search query contains special filters
+  const parseSearchQuery = useCallback((query: string) => {
+    const isArchived = query.includes('is:archived')
+    const isHidden = query.includes('is:hidden')
+    const cleanQuery = query
+      .replace(/is:archived/g, '')
+      .replace(/is:hidden/g, '')
+      .trim()
+    return { cleanQuery, isArchived, isHidden }
+  }, [])
+
+  const filteredDocuments = useMemo(() => {
+    const { cleanQuery, isArchived, isHidden } = parseSearchQuery(searchQuery)
+    
+    return documents.filter(doc => {
+      // Handle archived filter
+      if (isArchived) {
+        if (!doc.archived) return false
+      } else if (!showArchived && doc.archived) {
+        return false
+      }
+      
+      // Handle visibility filter
+      if (isHidden) {
+        if (doc.visibility !== 'hidden') return false
+      } else if (!cleanQuery && !isArchived) {
+        // Only hide hidden docs when not searching
+        if (doc.visibility === 'hidden') return false
+      }
+      
+      // Category filter (tab)
+      if (categoryTab !== 'all') {
+        if (doc.category !== categoryTab) return false
+      }
+      
+      // Status filter
+      if (statusFilter !== 'all' && doc.status !== statusFilter) return false
+      
+      // Tag filter
+      if (selectedTags.length > 0) {
+        const docTags = doc.tags || []
+        if (!selectedTags.some(tag => docTags.includes(tag))) return false
+      }
+      
+      // Search filter (title, content, tags)
+      if (cleanQuery) {
+        const searchLower = cleanQuery.toLowerCase()
+        const titleMatch = doc.title.toLowerCase().includes(searchLower)
+        const contentMatch = doc.content.toLowerCase().includes(searchLower)
+        const tagMatch = (doc.tags || []).some(tag => 
+          tag.toLowerCase().includes(searchLower)
+        )
+        if (!titleMatch && !contentMatch && !tagMatch) return false
+      }
+      
+      return true
+    })
+  }, [documents, searchQuery, statusFilter, categoryTab, selectedTags, showArchived, parseSearchQuery])
 
   // Count documents needing approval
   const needsApprovalCount = useMemo(() => {
-    return documents.filter(doc => doc.status === 'in_review').length
+    return documents.filter(doc => 
+      doc.status === 'in_review' && 
+      !doc.archived && 
+      doc.visibility !== 'hidden'
+    ).length
+  }, [documents])
+
+  // Count by category for tabs
+  const categoryCounts = useMemo(() => {
+    const counts: Record<string, number> = { all: 0 }
+    documents.forEach(doc => {
+      if (!doc.archived && doc.visibility !== 'hidden') {
+        counts.all++
+        const cat = doc.category || 'all'
+        counts[cat] = (counts[cat] || 0) + 1
+      }
+    })
+    return counts
   }, [documents])
 
   // Get content preview (first 150 chars, strip markdown)
@@ -211,6 +350,57 @@ function DocsPageContent() {
     })
   }
 
+  // Edit modal handlers
+  const openEditModal = (doc: Document, e: React.MouseEvent) => {
+    e.stopPropagation()
+    setEditingDoc(doc)
+    setEditCategory(doc.category || 'all')
+    setEditTags((doc.tags || []).join(', '))
+    setEditVisibility(doc.visibility || 'normal')
+    setEditArchived(doc.archived || false)
+    setEditModalOpen(true)
+  }
+
+  const saveDocumentMeta = async () => {
+    if (!editingDoc) return
+    setSaving(true)
+    try {
+      const tagsArray = editTags
+        .split(',')
+        .map(t => t.trim().toLowerCase())
+        .filter(t => t.length > 0)
+      
+      const { error } = await supabase
+        .from('documents')
+        .update({
+          category: editCategory,
+          tags: tagsArray,
+          visibility: editVisibility,
+          archived: editArchived,
+        })
+        .eq('id', editingDoc.id)
+      
+      if (error) throw error
+      
+      toast.success('Document updated')
+      setEditModalOpen(false)
+      loadDocuments()
+    } catch (error) {
+      console.error('Save document error:', error)
+      showErrorToast(error, 'Failed to save document')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  const toggleTag = (tag: string) => {
+    setSelectedTags(prev => 
+      prev.includes(tag) 
+        ? prev.filter(t => t !== tag)
+        : [...prev, tag]
+    )
+  }
+
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
       <Navbar user={user} />
@@ -230,6 +420,36 @@ function DocsPageContent() {
           >
             New Document
           </Button>
+        </div>
+
+        {/* Category Tabs */}
+        <div className="mb-4 overflow-x-auto">
+          <Tabs 
+            selectedKey={categoryTab} 
+            onSelectionChange={(key) => setCategoryTab(key as string)}
+            color="primary"
+            variant="underlined"
+            classNames={{
+              tabList: "gap-4",
+              tab: "px-0 h-10",
+            }}
+          >
+            {categoryOptions.map(cat => (
+              <Tab 
+                key={cat.key} 
+                title={
+                  <div className="flex items-center gap-2">
+                    <span>{cat.label}</span>
+                    {categoryCounts[cat.key] !== undefined && (
+                      <Chip size="sm" variant="flat" className="text-xs">
+                        {categoryCounts[cat.key] || 0}
+                      </Chip>
+                    )}
+                  </div>
+                }
+              />
+            ))}
+          </Tabs>
         </div>
 
         {/* Needs Approval Banner */}
@@ -253,26 +473,71 @@ function DocsPageContent() {
         )}
 
         {/* Filters */}
-        <div className="flex flex-col sm:flex-row gap-3 mb-6">
-          <Input
-            placeholder="Search documents..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            startContent={<Search className="w-4 h-4 text-slate-400" />}
-            className="flex-1"
-            isClearable
-            onClear={() => setSearchQuery('')}
-          />
-          <Select
-            selectedKeys={[statusFilter]}
-            onChange={(e) => setStatusFilter(e.target.value)}
-            startContent={<Filter className="w-4 h-4" />}
-            className="w-full sm:w-48"
-          >
-            {statusOptions.map(s => (
-              <SelectItem key={s.key}>{s.label}</SelectItem>
-            ))}
-          </Select>
+        <div className="flex flex-col gap-3 mb-6">
+          <div className="flex flex-col sm:flex-row gap-3">
+            <Input
+              placeholder="Search documents... (use is:archived or is:hidden)"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              startContent={<Search className="w-4 h-4 text-slate-400" />}
+              className="flex-1"
+              isClearable
+              onClear={() => setSearchQuery('')}
+            />
+            <Select
+              selectedKeys={[statusFilter]}
+              onChange={(e) => setStatusFilter(e.target.value)}
+              startContent={<Filter className="w-4 h-4" />}
+              className="w-full sm:w-48"
+            >
+              {statusOptions.map(s => (
+                <SelectItem key={s.key}>{s.label}</SelectItem>
+              ))}
+            </Select>
+          </div>
+          
+          {/* Tag Filters */}
+          {allTags.length > 0 && (
+            <div className="flex items-center gap-2 flex-wrap">
+              <Tag className="w-4 h-4 text-slate-400" />
+              {allTags.map(tag => (
+                <Chip
+                  key={tag}
+                  size="sm"
+                  variant={selectedTags.includes(tag) ? 'solid' : 'flat'}
+                  color={selectedTags.includes(tag) ? 'primary' : 'default'}
+                  className="cursor-pointer"
+                  onClick={() => toggleTag(tag)}
+                >
+                  {tag}
+                </Chip>
+              ))}
+              {selectedTags.length > 0 && (
+                <Button
+                  size="sm"
+                  variant="light"
+                  onPress={() => setSelectedTags([])}
+                  startContent={<X className="w-3 h-3" />}
+                >
+                  Clear
+                </Button>
+              )}
+            </div>
+          )}
+          
+          {/* Show Archived Toggle */}
+          <div className="flex items-center gap-2">
+            <Checkbox
+              size="sm"
+              isSelected={showArchived}
+              onValueChange={setShowArchived}
+            >
+              <span className="text-sm text-slate-500 dark:text-slate-400 flex items-center gap-1">
+                <Archive className="w-3.5 h-3.5" />
+                Show archived
+              </span>
+            </Checkbox>
+          </div>
         </div>
 
         {/* Document Grid */}
@@ -285,14 +550,16 @@ function DocsPageContent() {
             <CardBody className="text-center py-16">
               <FileText className="w-16 h-16 mx-auto mb-4 text-slate-300 dark:text-slate-600" />
               <h3 className="text-lg font-medium text-slate-700 dark:text-slate-300 mb-2">
-                {searchQuery || statusFilter !== 'all' ? 'No documents match your filters' : 'No documents yet'}
+                {searchQuery || statusFilter !== 'all' || selectedTags.length > 0 
+                  ? 'No documents match your filters' 
+                  : 'No documents yet'}
               </h3>
               <p className="text-slate-500 dark:text-slate-400 mb-6">
-                {searchQuery || statusFilter !== 'all' 
+                {searchQuery || statusFilter !== 'all' || selectedTags.length > 0
                   ? 'Try adjusting your search or filters'
                   : 'Create your first document to get started'}
               </p>
-              {!searchQuery && statusFilter === 'all' && (
+              {!searchQuery && statusFilter === 'all' && selectedTags.length === 0 && (
                 <Button color="primary" onPress={handleCreateDocument}>
                   <Plus className="w-4 h-4 mr-2" />
                   Create Document
@@ -310,17 +577,51 @@ function DocsPageContent() {
                 className={`bg-white dark:bg-slate-800 border transition-colors ${
                   doc.status === 'in_review' 
                     ? 'border-blue-300 dark:border-blue-600 ring-2 ring-blue-100 dark:ring-blue-900/50 hover:border-blue-400 dark:hover:border-blue-500' 
+                    : doc.archived
+                    ? 'border-slate-300 dark:border-slate-600 opacity-60'
+                    : doc.visibility === 'hidden'
+                    ? 'border-dashed border-slate-300 dark:border-slate-600'
                     : 'border-slate-200 dark:border-slate-700 hover:border-violet-300 dark:hover:border-violet-600'
                 }`}
               >
                 <CardBody className="p-4">
-                  {/* Needs Approval Indicator */}
-                  {doc.status === 'in_review' && (
-                    <div className="flex items-center gap-1.5 text-xs text-blue-600 dark:text-blue-400 mb-2 font-medium">
-                      <Clock className="w-3.5 h-3.5" />
-                      <span>Needs Approval</span>
+                  {/* Top indicators row */}
+                  <div className="flex items-center justify-between gap-2 mb-2">
+                    <div className="flex items-center gap-1.5">
+                      {/* Needs Approval Indicator */}
+                      {doc.status === 'in_review' && (
+                        <div className="flex items-center gap-1 text-xs text-blue-600 dark:text-blue-400 font-medium">
+                          <Clock className="w-3.5 h-3.5" />
+                          <span>Needs Approval</span>
+                        </div>
+                      )}
+                      {/* Hidden Indicator */}
+                      {doc.visibility === 'hidden' && (
+                        <div className="flex items-center gap-1 text-xs text-slate-400">
+                          <EyeOff className="w-3.5 h-3.5" />
+                          <span>Hidden</span>
+                        </div>
+                      )}
+                      {/* Archived Indicator */}
+                      {doc.archived && (
+                        <div className="flex items-center gap-1 text-xs text-slate-400">
+                          <Archive className="w-3.5 h-3.5" />
+                          <span>Archived</span>
+                        </div>
+                      )}
                     </div>
-                  )}
+                    {/* Edit button */}
+                    <Button
+                      size="sm"
+                      variant="light"
+                      isIconOnly
+                      onPress={(e: any) => openEditModal(doc, e)}
+                      className="min-w-6 w-6 h-6"
+                    >
+                      <Filter className="w-3 h-3" />
+                    </Button>
+                  </div>
+                  
                   <div className="flex items-start justify-between gap-2 mb-2">
                     <h3 className="font-semibold text-slate-800 dark:text-slate-100 line-clamp-1">
                       {doc.title}
@@ -338,8 +639,36 @@ function DocsPageContent() {
                     {getPreview(doc.content)}
                   </p>
                   
+                  {/* Tags */}
+                  {doc.tags && doc.tags.length > 0 && (
+                    <div className="flex flex-wrap gap-1 mb-2">
+                      {doc.tags.slice(0, 3).map(tag => (
+                        <Chip key={tag} size="sm" variant="flat" className="text-xs">
+                          {tag}
+                        </Chip>
+                      ))}
+                      {doc.tags.length > 3 && (
+                        <Chip size="sm" variant="flat" className="text-xs">
+                          +{doc.tags.length - 3}
+                        </Chip>
+                      )}
+                    </div>
+                  )}
+                  
                   <div className="flex items-center justify-between text-xs text-slate-400 dark:text-slate-500">
-                    <span>Updated {formatDate(doc.updated_at)}</span>
+                    <div className="flex items-center gap-2">
+                      <span>Updated {formatDate(doc.updated_at)}</span>
+                      {doc.category && doc.category !== 'all' && (
+                        <Chip 
+                          size="sm" 
+                          variant="dot" 
+                          color={getCategoryColor(doc.category) as any}
+                          className="text-xs"
+                        >
+                          {doc.category}
+                        </Chip>
+                      )}
+                    </div>
                     {doc.tasks && (
                       <Chip size="sm" variant="flat" className="text-xs">
                         📋 {doc.tasks.title}
@@ -360,6 +689,86 @@ function DocsPageContent() {
           </div>
         )}
       </main>
+
+      {/* Edit Modal */}
+      <Modal isOpen={editModalOpen} onClose={() => setEditModalOpen(false)} size="md">
+        <ModalContent>
+          <ModalHeader className="flex items-center gap-2">
+            <Filter className="w-5 h-5" />
+            Edit Document Properties
+          </ModalHeader>
+          <ModalBody>
+            {editingDoc && (
+              <div className="space-y-4">
+                <div className="text-sm text-slate-500 dark:text-slate-400 mb-2">
+                  {editingDoc.title}
+                </div>
+                
+                {/* Category */}
+                <Select
+                  label="Category"
+                  selectedKeys={[editCategory]}
+                  onChange={(e) => setEditCategory(e.target.value)}
+                  startContent={<Folder className="w-4 h-4" />}
+                >
+                  {categoryOptions.map(cat => (
+                    <SelectItem key={cat.key}>{cat.label}</SelectItem>
+                  ))}
+                </Select>
+                
+                {/* Tags */}
+                <Input
+                  label="Tags"
+                  placeholder="research, competitor, urgent"
+                  description="Comma-separated tags"
+                  value={editTags}
+                  onChange={(e) => setEditTags(e.target.value)}
+                  startContent={<Tag className="w-4 h-4 text-slate-400" />}
+                />
+                
+                {/* Visibility */}
+                <Select
+                  label="Visibility"
+                  selectedKeys={[editVisibility]}
+                  onChange={(e) => setEditVisibility(e.target.value as 'normal' | 'hidden')}
+                  startContent={editVisibility === 'hidden' ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                >
+                  <SelectItem key="normal" startContent={<Eye className="w-4 h-4" />}>
+                    Normal
+                  </SelectItem>
+                  <SelectItem key="hidden" startContent={<EyeOff className="w-4 h-4" />}>
+                    Hidden
+                  </SelectItem>
+                </Select>
+                
+                {/* Archived */}
+                <Checkbox
+                  isSelected={editArchived}
+                  onValueChange={setEditArchived}
+                >
+                  <span className="flex items-center gap-2">
+                    <Archive className="w-4 h-4" />
+                    Archive this document
+                  </span>
+                </Checkbox>
+              </div>
+            )}
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="flat" onPress={() => setEditModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button 
+              color="primary" 
+              onPress={saveDocumentMeta}
+              isLoading={saving}
+              startContent={!saving && <Check className="w-4 h-4" />}
+            >
+              Save
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
     </div>
   )
 }
