@@ -1,11 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, Suspense } from 'react'
+import { useRouter } from 'next/navigation'
 import { 
   Button, 
   Card, 
   CardBody,
-  CardHeader,
   Chip,
   Input,
   Modal,
@@ -17,21 +17,52 @@ import {
   SelectItem,
   Textarea,
   useDisclosure,
-  Avatar,
-  ButtonGroup
+  Tabs,
+  Tab,
+  Spinner,
 } from "@heroui/react"
 import { createClient } from '@/lib/supabase/client'
 import Navbar from '@/components/Navbar'
+import ContentDetailPanel from '@/components/ContentDetailPanel'
 import { useBusiness } from '@/lib/business-context'
 import { showErrorToast, showSuccessToast, getErrorMessage } from '@/lib/errors'
 import { ErrorFallback } from '@/components/ErrorBoundary'
 import { 
-  Heart, BookOpen, ShoppingBag, Zap, FileText, 
-  Plus, ChevronRight, Edit, Video
-} from '@/lib/icons'
+  Heart, 
+  BookOpen, 
+  ShoppingBag, 
+  Zap, 
+  FileText, 
+  Plus, 
+  ChevronRight, 
+  Edit,
+  Video,
+  LayoutGrid,
+  List,
+  Mic,
+  Calendar,
+  Search,
+  Filter,
+  GripVertical,
+} from 'lucide-react'
 import PromptsSection from '@/components/PromptsSection'
 
+// Main export with Suspense wrapper
+export default function ContentPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center">
+        <Spinner size="lg" />
+      </div>
+    }>
+      <ContentPageContent />
+    </Suspense>
+  )
+}
+
 type ViewMode = 'board' | 'list'
+
+const VIEW_STORAGE_KEY = 'mise-content-view'
 
 interface FieldDefinition {
   name: string
@@ -79,14 +110,14 @@ interface UserData {
 }
 
 const pipelineStages = [
-  { key: 'idea', label: 'Ideas', color: 'bg-slate-200', textColor: 'text-slate-700' },
-  { key: 'script', label: 'Script', color: 'bg-blue-200', textColor: 'text-blue-700' },
-  { key: 'review', label: 'Review', color: 'bg-amber-200', textColor: 'text-amber-700' },
-  { key: 'approved', label: 'Approved', color: 'bg-emerald-200', textColor: 'text-emerald-700' },
-  { key: 'voiceover', label: 'Voiceover', color: 'bg-purple-200', textColor: 'text-purple-700' },
-  { key: 'video', label: 'Video', color: 'bg-pink-200', textColor: 'text-pink-700' },
-  { key: 'scheduled', label: 'Scheduled', color: 'bg-cyan-200', textColor: 'text-cyan-700' },
-  { key: 'posted', label: 'Posted', color: 'bg-green-200', textColor: 'text-green-700' },
+  { key: 'idea', label: 'Ideas', color: 'default', bgColor: 'bg-slate-100 dark:bg-slate-800', textColor: 'text-slate-700 dark:text-slate-300' },
+  { key: 'script', label: 'Script', color: 'primary', bgColor: 'bg-blue-100 dark:bg-blue-900/30', textColor: 'text-blue-700 dark:text-blue-300' },
+  { key: 'review', label: 'Review', color: 'warning', bgColor: 'bg-amber-100 dark:bg-amber-900/30', textColor: 'text-amber-700 dark:text-amber-300' },
+  { key: 'approved', label: 'Approved', color: 'success', bgColor: 'bg-emerald-100 dark:bg-emerald-900/30', textColor: 'text-emerald-700 dark:text-emerald-300' },
+  { key: 'voiceover', label: 'Voiceover', color: 'secondary', bgColor: 'bg-purple-100 dark:bg-purple-900/30', textColor: 'text-purple-700 dark:text-purple-300' },
+  { key: 'video', label: 'Video', color: 'danger', bgColor: 'bg-pink-100 dark:bg-pink-900/30', textColor: 'text-pink-700 dark:text-pink-300' },
+  { key: 'scheduled', label: 'Scheduled', color: 'primary', bgColor: 'bg-cyan-100 dark:bg-cyan-900/30', textColor: 'text-cyan-700 dark:text-cyan-300' },
+  { key: 'posted', label: 'Posted', color: 'success', bgColor: 'bg-green-100 dark:bg-green-900/30', textColor: 'text-green-700 dark:text-green-300' },
 ]
 
 // Map template names to Lucide icons
@@ -108,7 +139,7 @@ function getContentIcon(templateName?: string | null, type?: string | null) {
   return FileText
 }
 
-export default function ContentPage() {
+function ContentPageContent() {
   const [content, setContent] = useState<ContentItem[]>([])
   const [templates, setTemplates] = useState<ContentTemplate[]>([])
   const [user, setUser] = useState<UserData | null>(null)
@@ -118,8 +149,15 @@ export default function ContentPage() {
   const { isOpen, onOpen, onClose } = useDisclosure()
   const [editingItem, setEditingItem] = useState<ContentItem | null>(null)
   const [selectedTemplate, setSelectedTemplate] = useState<ContentTemplate | null>(null)
-  const [viewMode, setViewMode] = useState<ViewMode>('list')
+  const [viewMode, setViewMode] = useState<ViewMode>('board')
   const [collapsedStages, setCollapsedStages] = useState<Set<string>>(new Set())
+  const [searchQuery, setSearchQuery] = useState('')
+  const [filterStage, setFilterStage] = useState<string>('all')
+  
+  // Detail panel state
+  const [selectedItem, setSelectedItem] = useState<ContentItem | null>(null)
+  const [isPanelOpen, setIsPanelOpen] = useState(false)
+  
   const [formData, setFormData] = useState({
     title: '',
     status: 'idea',
@@ -129,6 +167,21 @@ export default function ContentPage() {
   
   const { selectedBusinessId, selectedBusiness, businesses } = useBusiness()
   const supabase = createClient()
+  const router = useRouter()
+
+  // Load saved view from localStorage
+  useEffect(() => {
+    const savedView = localStorage.getItem(VIEW_STORAGE_KEY) as ViewMode | null
+    if (savedView && ['board', 'list'].includes(savedView)) {
+      setViewMode(savedView)
+    }
+  }, [])
+
+  // Save view to localStorage when changed
+  const handleViewChange = (view: ViewMode) => {
+    setViewMode(view)
+    localStorage.setItem(VIEW_STORAGE_KEY, view)
+  }
 
   useEffect(() => {
     loadUser()
@@ -364,6 +417,7 @@ export default function ContentPage() {
       template_id: item.template_id || '',
       custom_fields: customFields,
     })
+    setIsPanelOpen(false)
     onOpen()
   }
 
@@ -413,6 +467,11 @@ export default function ContentPage() {
         [fieldName]: value,
       },
     }))
+  }
+
+  function handleViewDetails(item: ContentItem) {
+    setSelectedItem(item)
+    setIsPanelOpen(true)
   }
 
   function renderField(field: FieldDefinition) {
@@ -491,9 +550,9 @@ export default function ContentPage() {
               type="checkbox"
               checked={!!value}
               onChange={(e) => handleCustomFieldChange(field.name, e.target.checked)}
-              className="w-4 h-4 rounded border-slate-300"
+              className="w-4 h-4 rounded border-slate-300 dark:border-slate-600"
             />
-            <span className="text-sm text-slate-700">{field.label}</span>
+            <span className="text-sm text-slate-700 dark:text-slate-300">{field.label}</span>
           </label>
         )
       
@@ -515,7 +574,28 @@ export default function ContentPage() {
     }
   }
 
-  const getItemsByStatus = (status: string) => content.filter(c => c.status === status)
+  // Filter content based on search and stage filter
+  const filteredContent = useMemo(() => {
+    let filtered = content
+
+    if (searchQuery.trim()) {
+      const query = searchQuery.toLowerCase()
+      filtered = filtered.filter(item => 
+        item.title.toLowerCase().includes(query) ||
+        item.hook?.toLowerCase().includes(query) ||
+        item.script?.toLowerCase().includes(query) ||
+        item.template?.name?.toLowerCase().includes(query)
+      )
+    }
+
+    if (filterStage !== 'all') {
+      filtered = filtered.filter(item => item.status === filterStage)
+    }
+
+    return filtered
+  }, [content, searchQuery, filterStage])
+
+  const getItemsByStatus = (status: string) => filteredContent.filter(c => c.status === status)
 
   const totalContent = content.length
 
@@ -534,149 +614,272 @@ export default function ContentPage() {
   // Content card component
   const ContentCard = ({ item, compact = false }: { item: ContentItem; compact?: boolean }) => {
     const IconComponent = getContentIcon(item.template?.name, item.type)
+    const stage = pipelineStages.find(s => s.key === item.status)
+    const hook = item.hook || item.custom_fields?.hook
+    const voice = item.voice || item.custom_fields?.voice
+    
     return (
-      <Card className="bg-white shadow-sm cursor-pointer hover:shadow-md transition-shadow">
+      <Card 
+        className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md hover:border-slate-300 dark:hover:border-slate-600 transition-all cursor-pointer"
+        isPressable
+        onPress={() => handleViewDetails(item)}
+      >
         <CardBody className={compact ? "p-3" : "p-4"}>
-          <div className="flex items-start justify-between mb-2">
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-lg bg-primary-50 flex items-center justify-center">
-                <IconComponent className="w-4 h-4 text-primary-600" />
-              </div>
-              <Chip size="sm" variant="flat" className="text-xs capitalize">
-                {item.template?.name || item.type}
-              </Chip>
-              {compact && (
-                <Chip 
-                  size="sm" 
-                  variant="flat" 
-                  className={`text-xs ${pipelineStages.find(s => s.key === item.status)?.textColor}`}
-                >
-                  {pipelineStages.find(s => s.key === item.status)?.label}
-                </Chip>
-              )}
+          <div className="flex items-start gap-3">
+            {/* Icon */}
+            <div className={`w-10 h-10 rounded-lg ${stage?.bgColor || 'bg-slate-100'} flex items-center justify-center flex-shrink-0`}>
+              <IconComponent className={`w-5 h-5 ${stage?.textColor || 'text-slate-600'}`} />
             </div>
-            <button 
-              onClick={() => handleEdit(item)}
-              className="text-slate-400 hover:text-slate-600"
-            >
-              <Edit className="w-4 h-4" />
-            </button>
-          </div>
-          <h4 className="font-medium text-slate-800 text-sm mb-2">{item.title}</h4>
-          {(item.custom_fields?.hook || item.hook) && (
-            <p className="text-xs text-slate-500 line-clamp-2 mb-2">"{item.custom_fields?.hook || item.hook}"</p>
-          )}
-          <div className="flex gap-1 mt-2">
-            {item.status === 'script' && (
-              <Button 
-                size="sm" 
-                color="warning" 
-                variant="flat"
-                className="flex-1 text-xs"
-                onPress={() => handleStatusChange(item.id, 'review')}
-              >
-                Send for Review
-              </Button>
-            )}
-            {item.status === 'review' && (
-              <Button 
-                size="sm" 
-                color="success" 
-                variant="flat"
-                className="flex-1 text-xs"
-                onPress={() => handleStatusChange(item.id, 'approved')}
-              >
-                Approve
-              </Button>
-            )}
-            {item.status !== 'script' && item.status !== 'review' && (
-              <Select
-                size="sm"
-                selectedKeys={[item.status]}
-                className="w-full"
-                onChange={(e) => handleStatusChange(item.id, e.target.value)}
-              >
-                {pipelineStages.map(s => (
-                  <SelectItem key={s.key}>{s.label}</SelectItem>
-                ))}
-              </Select>
-            )}
+            
+            {/* Content */}
+            <div className="flex-1 min-w-0">
+              <div className="flex items-center gap-2 mb-1 flex-wrap">
+                <h3 className={`font-semibold text-slate-900 dark:text-slate-100 ${compact ? 'text-sm' : ''} truncate`}>
+                  {item.title}
+                </h3>
+              </div>
+              
+              <div className="flex items-center gap-2 flex-wrap mb-2">
+                {item.template?.name && (
+                  <Chip size="sm" variant="flat" className="text-xs">
+                    {item.template.name}
+                  </Chip>
+                )}
+                {voice && (
+                  <Chip size="sm" variant="flat" className="text-xs bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300">
+                    <Mic className="w-3 h-3 mr-1" />
+                    {voice}
+                  </Chip>
+                )}
+              </div>
+              
+              {hook && !compact && (
+                <p className="text-sm text-slate-500 dark:text-slate-400 line-clamp-2 italic mb-2">
+                  "{hook}"
+                </p>
+              )}
+              
+              {/* Quick Actions */}
+              <div className="flex items-center gap-2 mt-2" onClick={e => e.stopPropagation()}>
+                {item.status === 'script' && (
+                  <Button 
+                    size="sm" 
+                    color="warning" 
+                    variant="flat"
+                    className="text-xs"
+                    onPress={() => handleStatusChange(item.id, 'review')}
+                  >
+                    Send for Review
+                  </Button>
+                )}
+                {item.status === 'review' && (
+                  <Button 
+                    size="sm" 
+                    color="success" 
+                    variant="flat"
+                    className="text-xs"
+                    onPress={() => handleStatusChange(item.id, 'approved')}
+                  >
+                    Approve
+                  </Button>
+                )}
+                {!['script', 'review'].includes(item.status) && (
+                  <Select
+                    size="sm"
+                    selectedKeys={[item.status]}
+                    className="w-32"
+                    onChange={(e) => handleStatusChange(item.id, e.target.value)}
+                    aria-label="Change status"
+                  >
+                    {pipelineStages.map(s => (
+                      <SelectItem key={s.key}>{s.label}</SelectItem>
+                    ))}
+                  </Select>
+                )}
+              </div>
+            </div>
           </div>
         </CardBody>
       </Card>
     )
   }
 
+  // Render Board View (Kanban Style - Stacked Grid)
+  const renderBoardView = () => (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
+      {pipelineStages.map(stage => {
+        const stageItems = getItemsByStatus(stage.key)
+        return (
+          <div key={stage.key} className="w-full">
+            <div className={`rounded-t-xl px-4 py-3 ${stage.bgColor}`}>
+              <div className="flex items-center justify-between">
+                <h3 className={`font-semibold ${stage.textColor}`}>{stage.label}</h3>
+                <Chip size="sm" variant="flat" className={stage.textColor}>
+                  {stageItems.length}
+                </Chip>
+              </div>
+            </div>
+            <div className="bg-slate-100/80 dark:bg-slate-800/50 rounded-b-xl p-2 min-h-[200px] space-y-2 border border-t-0 border-slate-200/50 dark:border-slate-700/50">
+              {stageItems.map(item => (
+                <ContentCard key={item.id} item={item} compact={true} />
+              ))}
+              {stageItems.length === 0 && (
+                <div className="text-center py-8 text-slate-400 dark:text-slate-500 text-sm">
+                  No items
+                </div>
+              )}
+            </div>
+          </div>
+        )
+      })}
+    </div>
+  )
+
+  // Render List View
+  const renderListView = () => (
+    <div className="space-y-3">
+      {pipelineStages.map(stage => {
+        const stageItems = getItemsByStatus(stage.key)
+        const isCollapsed = collapsedStages.has(stage.key)
+        
+        if (filterStage !== 'all' && filterStage !== stage.key) return null
+        
+        return (
+          <div key={stage.key} className="rounded-xl overflow-hidden border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
+            <button
+              onClick={() => toggleStageCollapse(stage.key)}
+              className={`w-full px-4 py-3 ${stage.bgColor} flex items-center justify-between hover:opacity-90 transition-opacity`}
+            >
+              <div className="flex items-center gap-3">
+                <ChevronRight className={`w-5 h-5 transition-transform ${isCollapsed ? '' : 'rotate-90'} ${stage.textColor}`} />
+                <h3 className={`font-semibold ${stage.textColor}`}>{stage.label}</h3>
+              </div>
+              <Chip size="sm" variant="flat" className={stage.textColor}>
+                {stageItems.length}
+              </Chip>
+            </button>
+            
+            {!isCollapsed && (
+              <div className="p-3 space-y-3 bg-slate-50 dark:bg-slate-900/50">
+                {stageItems.length > 0 ? (
+                  stageItems.map(item => (
+                    <ContentCard key={item.id} item={item} compact={false} />
+                  ))
+                ) : (
+                  <div className="text-center py-6 text-slate-400 dark:text-slate-500 text-sm">
+                    No items in this stage
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+
   return (
-    <div className="min-h-screen bg-background">
-      <Navbar 
-        user={user} 
-        actions={
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
+      <Navbar user={user} />
+
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+        {/* Header */}
+        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 mb-6">
+          <div>
+            <div className="flex items-center gap-3 mb-2">
+              <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">Content Pipeline</h1>
+              {selectedBusiness && (
+                <Chip 
+                  size="sm" 
+                  variant="flat"
+                  style={{ backgroundColor: `${selectedBusiness.color}20`, color: selectedBusiness.color }}
+                >
+                  {selectedBusiness.name}
+                </Chip>
+              )}
+            </div>
+            {selectedBusinessId && (
+              <p className="text-slate-500 dark:text-slate-400 text-sm">{totalContent} items in pipeline</p>
+            )}
+          </div>
+          
           <Button 
             color="primary" 
-            size="sm" 
             onPress={handleNew}
             isDisabled={!selectedBusinessId}
             startContent={<Plus className="w-4 h-4" />}
+            className="font-semibold"
           >
             New Content
           </Button>
-        }
-      />
+        </div>
 
-      <main className="p-4 sm:p-6">
-        {/* Header with business context */}
-        <div className="mb-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-3 mb-2">
-                <h1 className="text-2xl font-bold text-slate-800">Content Pipeline</h1>
-                {selectedBusiness && (
-                  <Chip 
-                    size="sm" 
-                    variant="flat"
-                    style={{ backgroundColor: `${selectedBusiness.color}20`, color: selectedBusiness.color }}
-                  >
-                    {selectedBusiness.name}
-                  </Chip>
-                )}
-              </div>
-              {selectedBusinessId && (
-                <p className="text-slate-500 text-sm">{totalContent} items in pipeline</p>
-              )}
+        {/* Controls Bar */}
+        {selectedBusinessId && (
+          <div className="flex flex-col sm:flex-row gap-4 mb-6">
+            {/* Search */}
+            <div className="flex-1">
+              <Input
+                placeholder="Search content..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                startContent={<Search className="w-4 h-4 text-slate-400" />}
+                classNames={{
+                  input: "bg-transparent",
+                  inputWrapper: "bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700",
+                }}
+              />
             </div>
             
-            {/* View Toggle */}
-            {selectedBusinessId && (
-              <ButtonGroup size="sm" variant="flat">
-                <Button
-                  className={viewMode === 'list' ? 'bg-primary-100 text-primary-700' : ''}
-                  onPress={() => setViewMode('list')}
-                >
-                  List
-                </Button>
-                <Button
-                  className={viewMode === 'board' ? 'bg-primary-100 text-primary-700' : ''}
-                  onPress={() => setViewMode('board')}
-                >
-                  Board
-                </Button>
-              </ButtonGroup>
+            {/* Stage Filter (for list view) */}
+            {viewMode === 'list' && (
+              <Select
+                placeholder="Filter by stage"
+                selectedKeys={[filterStage]}
+                onChange={(e) => setFilterStage(e.target.value)}
+                className="w-40"
+                startContent={<Filter className="w-4 h-4" />}
+              >
+                <SelectItem key="all">All Stages</SelectItem>
+                {pipelineStages.map(s => (
+                  <SelectItem key={s.key}>{s.label}</SelectItem>
+                ))}
+              </Select>
             )}
+            
+            {/* View Toggle */}
+            <Tabs 
+              selectedKey={viewMode} 
+              onSelectionChange={(key) => handleViewChange(key as ViewMode)}
+              color="primary"
+              variant="solid"
+              size="md"
+            >
+              <Tab key="board" title={
+                <div className="flex items-center gap-2">
+                  <LayoutGrid className="w-4 h-4" />
+                </div>
+              } />
+              <Tab key="list" title={
+                <div className="flex items-center gap-2">
+                  <List className="w-4 h-4" />
+                </div>
+              } />
+            </Tabs>
           </div>
-        </div>
+        )}
 
         {/* No business selected state */}
         {!selectedBusinessId && (
-          <Card className="bg-white">
+          <Card className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
             <CardBody className="text-center py-12">
-              <Video className="w-12 h-12 mx-auto mb-4 text-slate-300" />
-              <h3 className="text-lg font-semibold text-slate-800 mb-2">Select a Business</h3>
-              <p className="text-slate-500 mb-4">
+              <Video className="w-12 h-12 mx-auto mb-4 text-slate-300 dark:text-slate-600" />
+              <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-2">Select a Business</h3>
+              <p className="text-slate-500 dark:text-slate-400 mb-4">
                 Content is organized by business. Use the business selector in the navbar to choose a business.
               </p>
               {businesses.length === 0 && (
-                <p className="text-sm text-slate-400">
+                <p className="text-sm text-slate-400 dark:text-slate-500">
                   No businesses found. Create one in the Business Hub first.
                 </p>
               )}
@@ -694,81 +897,58 @@ export default function ContentPage() {
         {/* Pipeline View */}
         {selectedBusinessId && !loadError && (
           loading ? (
-            <div className="text-center py-12 text-slate-500">Loading content pipeline...</div>
-          ) : (
-            <div className="max-w-7xl mx-auto">
-              {/* List View - Mobile Friendly */}
-              {viewMode === 'list' && (
-                <div className="space-y-4">
-                  {pipelineStages.map(stage => {
-                    const stageItems = getItemsByStatus(stage.key)
-                    const isCollapsed = collapsedStages.has(stage.key)
-                    
-                    return (
-                      <div key={stage.key} className="rounded-xl overflow-hidden border border-slate-200">
-                        <button
-                          onClick={() => toggleStageCollapse(stage.key)}
-                          className={`w-full px-4 py-3 ${stage.color} flex items-center justify-between`}
-                        >
-                          <div className="flex items-center gap-3">
-                            <ChevronRight className={`w-5 h-5 transition-transform ${isCollapsed ? '' : 'rotate-90'}`} />
-                            <h3 className={`font-semibold ${stage.textColor}`}>{stage.label}</h3>
-                          </div>
-                          <Chip size="sm" variant="flat" className={stage.textColor}>
-                            {stageItems.length}
-                          </Chip>
-                        </button>
-                        
-                        {!isCollapsed && (
-                          <div className="bg-slate-50 p-3 space-y-3">
-                            {stageItems.length > 0 ? (
-                              stageItems.map(item => (
-                                <ContentCard key={item.id} item={item} compact={false} />
-                              ))
-                            ) : (
-                              <div className="text-center py-6 text-slate-400 text-sm">
-                                No items in this stage
-                              </div>
-                            )}
-                          </div>
-                        )}
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-
-              {/* Board View - Kanban Style (Stacked Grid) */}
-              {viewMode === 'board' && (
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
-                  {pipelineStages.map(stage => (
-                    <div key={stage.key} className="w-full">
-                      <div className={`rounded-t-xl px-4 py-2 ${stage.color}`}>
-                        <div className="flex items-center justify-between">
-                          <h3 className={`font-semibold ${stage.textColor}`}>{stage.label}</h3>
-                          <Chip size="sm" variant="flat" className={stage.textColor}>
-                            {getItemsByStatus(stage.key).length}
-                          </Chip>
-                        </div>
-                      </div>
-                      <div className="bg-slate-100/50 rounded-b-xl p-2 min-h-[200px] space-y-2">
-                        {getItemsByStatus(stage.key).map(item => (
-                          <ContentCard key={item.id} item={item} compact={true} />
-                        ))}
-                        {getItemsByStatus(stage.key).length === 0 && (
-                          <div className="text-center py-8 text-slate-400 text-sm">
-                            No items
-                          </div>
-                        )}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              )}
+            <div className="flex items-center justify-center py-12">
+              <Spinner size="lg" />
+              <span className="ml-3 text-slate-500 dark:text-slate-400">Loading content pipeline...</span>
             </div>
+          ) : filteredContent.length === 0 && searchQuery ? (
+            <Card className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+              <CardBody className="text-center py-12">
+                <Search className="w-12 h-12 mx-auto mb-4 text-slate-300 dark:text-slate-600" />
+                <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-2">No Results</h3>
+                <p className="text-slate-500 dark:text-slate-400">
+                  No content found matching "{searchQuery}"
+                </p>
+                <Button 
+                  variant="flat" 
+                  className="mt-4"
+                  onPress={() => setSearchQuery('')}
+                >
+                  Clear Search
+                </Button>
+              </CardBody>
+            </Card>
+          ) : content.length === 0 ? (
+            <Card className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+              <CardBody className="text-center py-12">
+                <FileText className="w-12 h-12 mx-auto mb-4 text-slate-300 dark:text-slate-600" />
+                <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-200 mb-2">No Content Yet</h3>
+                <p className="text-slate-500 dark:text-slate-400 mb-4">
+                  Start building your content pipeline
+                </p>
+                <Button color="primary" onPress={handleNew}>
+                  Create First Content
+                </Button>
+              </CardBody>
+            </Card>
+          ) : (
+            viewMode === 'board' ? renderBoardView() : renderListView()
           )
         )}
       </main>
+
+      {/* Detail Panel */}
+      <ContentDetailPanel
+        item={selectedItem}
+        isOpen={isPanelOpen}
+        onClose={() => {
+          setIsPanelOpen(false)
+          setSelectedItem(null)
+        }}
+        onStatusChange={handleStatusChange}
+        onDelete={handleDelete}
+        onEdit={handleEdit}
+      />
 
       {/* Create/Edit Modal */}
       <Modal isOpen={isOpen} onClose={handleClose} size="2xl" scrollBehavior="inside">
@@ -797,7 +977,7 @@ export default function ContentPage() {
               {/* Template Picker */}
               {templates.length > 0 && (
                 <div>
-                  <label className="text-sm font-medium text-slate-700 mb-2 block">
+                  <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 block">
                     Content Type
                   </label>
                   <div className="grid grid-cols-2 sm:grid-cols-3 gap-2">
@@ -807,16 +987,16 @@ export default function ContentPage() {
                         <Card
                           key={template.id}
                           isPressable
-                          className={`cursor-pointer transition-all ${
+                          className={`cursor-pointer transition-all border ${
                             formData.template_id === template.id 
-                              ? 'ring-2 ring-primary bg-primary-50' 
-                              : 'hover:bg-slate-50'
+                              ? 'ring-2 ring-primary bg-primary-50 dark:bg-primary-900/20 border-primary' 
+                              : 'border-slate-200 dark:border-slate-700 hover:bg-slate-50 dark:hover:bg-slate-800'
                           }`}
                           onPress={() => handleTemplateChange(template.id)}
                         >
                           <CardBody className="p-3 text-center">
-                            <IconComponent className="w-6 h-6 mx-auto mb-1 text-slate-600" />
-                            <div className="text-sm font-medium">{template.name}</div>
+                            <IconComponent className="w-6 h-6 mx-auto mb-1 text-slate-600 dark:text-slate-400" />
+                            <div className="text-sm font-medium text-slate-800 dark:text-slate-200">{template.name}</div>
                           </CardBody>
                         </Card>
                       )
@@ -845,8 +1025,8 @@ export default function ContentPage() {
               
               {/* Dynamic Fields from Template */}
               {selectedTemplate && selectedTemplate.fields.length > 0 && (
-                <div className="border-t pt-4 mt-2">
-                  <h4 className="text-sm font-medium text-slate-700 mb-3">
+                <div className="border-t border-slate-200 dark:border-slate-700 pt-4 mt-2">
+                  <h4 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">
                     {selectedTemplate.name} Details
                   </h4>
                   <div className="flex flex-col gap-4">
@@ -876,7 +1056,7 @@ export default function ContentPage() {
               
               {/* Prompts Section - only show when editing existing content with a script */}
               {editingItem && (formData.custom_fields.script || editingItem.script) && (
-                <div className="border-t pt-4 mt-2">
+                <div className="border-t border-slate-200 dark:border-slate-700 pt-4 mt-2">
                   <PromptsSection
                     contentId={editingItem.id}
                     script={formData.custom_fields.script || editingItem.script || ''}
