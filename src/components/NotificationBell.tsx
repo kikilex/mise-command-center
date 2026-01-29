@@ -263,7 +263,7 @@ export default function NotificationBell({ userId, onNotificationClick }: Notifi
               </div>
             ) : notifications.length === 0 ? (
               <div className="text-center py-8 text-slate-400 dark:text-slate-500">
-                <Bell className="w-8 h-8 mx-auto mb-2 opacity-50" />
+                <BellIcon className="w-8 h-8 mx-auto mb-2 opacity-50" />
                 <p>No notifications yet</p>
               </div>
             ) : (
@@ -278,8 +278,8 @@ export default function NotificationBell({ userId, onNotificationClick }: Notifi
                   >
                     <div className="flex items-start gap-3">
                       {/* Type Icon */}
-                      <div className={`flex-shrink-0 w-8 h-8 rounded-full ${typeColors[notification.type]} flex items-center justify-center text-sm`}>
-                        {typeIcons[notification.type]}
+                      <div className={`flex-shrink-0 w-8 h-8 rounded-full ${typeColors[notification.type]} flex items-center justify-center`}>
+                        <TypeIcon type={notification.type} />
                       </div>
 
                       {/* Content */}

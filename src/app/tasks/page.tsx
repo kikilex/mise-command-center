@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
+import { BellAlertIcon } from '@heroicons/react/24/outline'
 import { 
   Button, 
   Card, 
@@ -1113,7 +1114,7 @@ function TasksPageContent() {
               {formData.due_date && (
                 <div className="bg-violet-50 border border-violet-200 rounded-lg p-4">
                   <div className="flex items-start gap-2">
-                    <span className="text-violet-500">🔔</span>
+                    <BellAlertIcon className="w-5 h-5 text-violet-500" />
                     <div>
                       <p className="text-sm font-medium text-violet-700 mb-1">
                         Reminders for this task:
