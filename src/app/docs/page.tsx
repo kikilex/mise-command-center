@@ -3,8 +3,8 @@
 import { useState, useEffect, useMemo, Suspense, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { 
-  FileText, Search, Plus, Filter, Clock, Tag, Archive, Eye, EyeOff,
-  X, Check, Folder
+  FileText, Search, Plus, Clock, Tag, Archive, Eye, EyeOff,
+  X, Check, Folder, Settings, Pencil, ListFilter
 } from 'lucide-react'
 import {
   Button,
@@ -27,6 +27,10 @@ import {
   DropdownTrigger,
   DropdownMenu,
   DropdownItem,
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
+  Switch,
 } from '@heroui/react'
 import { createClient } from '@/lib/supabase/client'
 import { useBusiness } from '@/lib/business-context'
@@ -126,6 +130,7 @@ function DocsPageContent() {
   const [categoryTab, setCategoryTab] = useState('all')
   const [selectedTags, setSelectedTags] = useState<string[]>([])
   const [showArchived, setShowArchived] = useState(false)
+  const [showHidden, setShowHidden] = useState(false)
   
   // Edit modal state
   const [editModalOpen, setEditModalOpen] = useState(false)
@@ -272,8 +277,8 @@ function DocsPageContent() {
       // Handle visibility filter
       if (isHidden) {
         if (doc.visibility !== 'hidden') return false
-      } else if (!cleanQuery && !isArchived) {
-        // Only hide hidden docs when not searching
+      } else if (!showHidden && !cleanQuery && !isArchived) {
+        // Only hide hidden docs when not searching and showHidden is off
         if (doc.visibility === 'hidden') return false
       }
       
@@ -304,16 +309,7 @@ function DocsPageContent() {
       
       return true
     })
-  }, [documents, searchQuery, statusFilter, categoryTab, selectedTags, showArchived, parseSearchQuery])
-
-  // Count documents needing approval
-  const needsApprovalCount = useMemo(() => {
-    return documents.filter(doc => 
-      doc.status === 'in_review' && 
-      !doc.archived && 
-      doc.visibility !== 'hidden'
-    ).length
-  }, [documents])
+  }, [documents, searchQuery, statusFilter, categoryTab, selectedTags, showArchived, showHidden, parseSearchQuery])
 
   // Count by category for tabs
   const categoryCounts = useMemo(() => {
@@ -424,53 +420,74 @@ function DocsPageContent() {
 
         {/* Category Tabs */}
         <div className="mb-4 overflow-x-auto">
-          <Tabs 
-            selectedKey={categoryTab} 
-            onSelectionChange={(key) => setCategoryTab(key as string)}
-            color="primary"
-            variant="underlined"
-            classNames={{
-              tabList: "gap-4",
-              tab: "px-0 h-10",
-            }}
-          >
-            {categoryOptions.map(cat => (
-              <Tab 
-                key={cat.key} 
-                title={
-                  <div className="flex items-center gap-2">
-                    <span>{cat.label}</span>
-                    {categoryCounts[cat.key] !== undefined && (
-                      <Chip size="sm" variant="flat" className="text-xs">
-                        {categoryCounts[cat.key] || 0}
-                      </Chip>
-                    )}
+          <div className="flex items-center gap-2">
+            <Tabs 
+              selectedKey={categoryTab} 
+              onSelectionChange={(key) => setCategoryTab(key as string)}
+              color="primary"
+              variant="underlined"
+              classNames={{
+                tabList: "gap-4",
+                tab: "px-0 h-10",
+              }}
+            >
+              {categoryOptions.map(cat => (
+                <Tab 
+                  key={cat.key} 
+                  title={
+                    <div className="flex items-center gap-2">
+                      <span>{cat.label}</span>
+                      {categoryCounts[cat.key] !== undefined && (
+                        <Chip size="sm" variant="flat" className="text-xs">
+                          {categoryCounts[cat.key] || 0}
+                        </Chip>
+                      )}
+                    </div>
+                  }
+                />
+              ))}
+            </Tabs>
+            <Popover placement="bottom-end">
+              <PopoverTrigger>
+                <Button
+                  size="sm"
+                  variant="light"
+                  isIconOnly
+                  className="ml-2"
+                >
+                  <Settings className="w-4 h-4" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="p-3">
+                <div className="space-y-3">
+                  <div className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">
+                    Display Settings
                   </div>
-                }
-              />
-            ))}
-          </Tabs>
-        </div>
-
-        {/* Needs Approval Banner */}
-        {needsApprovalCount > 0 && statusFilter !== 'in_review' && (
-          <div 
-            className="mb-4 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded-lg p-3 cursor-pointer hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors"
-            onClick={() => setStatusFilter('in_review')}
-          >
-            <div className="flex items-center gap-3">
-              <Clock className="w-5 h-5 text-blue-600 dark:text-blue-400" />
-              <div className="flex-1">
-                <span className="font-medium text-blue-800 dark:text-blue-200">
-                  {needsApprovalCount} document{needsApprovalCount > 1 ? 's' : ''} awaiting approval
-                </span>
-                <span className="text-sm text-blue-600 dark:text-blue-400 ml-2">
-                  Click to filter
-                </span>
-              </div>
-            </div>
+                  <Switch
+                    size="sm"
+                    isSelected={showArchived}
+                    onValueChange={setShowArchived}
+                  >
+                    <span className="text-sm flex items-center gap-2">
+                      <Archive className="w-4 h-4" />
+                      Show archived documents
+                    </span>
+                  </Switch>
+                  <Switch
+                    size="sm"
+                    isSelected={showHidden}
+                    onValueChange={setShowHidden}
+                  >
+                    <span className="text-sm flex items-center gap-2">
+                      <EyeOff className="w-4 h-4" />
+                      Show hidden documents
+                    </span>
+                  </Switch>
+                </div>
+              </PopoverContent>
+            </Popover>
           </div>
-        )}
+        </div>
 
         {/* Filters */}
         <div className="flex flex-col gap-3 mb-6">
@@ -487,7 +504,7 @@ function DocsPageContent() {
             <Select
               selectedKeys={[statusFilter]}
               onChange={(e) => setStatusFilter(e.target.value)}
-              startContent={<Filter className="w-4 h-4" />}
+              startContent={<ListFilter className="w-4 h-4" />}
               className="w-full sm:w-48"
             >
               {statusOptions.map(s => (
@@ -525,19 +542,6 @@ function DocsPageContent() {
             </div>
           )}
           
-          {/* Show Archived Toggle */}
-          <div className="flex items-center gap-2">
-            <Checkbox
-              size="sm"
-              isSelected={showArchived}
-              onValueChange={setShowArchived}
-            >
-              <span className="text-sm text-slate-500 dark:text-slate-400 flex items-center gap-1">
-                <Archive className="w-3.5 h-3.5" />
-                Show archived
-              </span>
-            </Checkbox>
-          </div>
         </div>
 
         {/* Document Grid */}
@@ -618,7 +622,7 @@ function DocsPageContent() {
                       onPress={(e: any) => openEditModal(doc, e)}
                       className="min-w-6 w-6 h-6"
                     >
-                      <Filter className="w-3 h-3" />
+                      <Pencil className="w-3 h-3" />
                     </Button>
                   </div>
                   
@@ -694,7 +698,7 @@ function DocsPageContent() {
       <Modal isOpen={editModalOpen} onClose={() => setEditModalOpen(false)} size="md">
         <ModalContent>
           <ModalHeader className="flex items-center gap-2">
-            <Filter className="w-5 h-5" />
+            <Pencil className="w-5 h-5" />
             Edit Document Properties
           </ModalHeader>
           <ModalBody>
