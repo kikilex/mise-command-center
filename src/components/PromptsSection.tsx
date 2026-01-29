@@ -12,7 +12,7 @@ import {
 } from '@heroui/react'
 import { createClient } from '@/lib/supabase/client'
 import { showErrorToast, showSuccessToast } from '@/lib/errors'
-import { Sparkles, Plus, Trash2, RefreshCw, ChevronUp, ChevronDown } from '@/lib/icons'
+import { Sparkles, Plus, Trash2, RefreshCw, ChevronUp, ChevronDown, Copy } from '@/lib/icons'
 
 interface ContentPrompt {
   id: string
@@ -233,6 +233,23 @@ export default function PromptsSection({
           >
             {splitting ? 'Splitting...' : 'AI Split'}
           </Button>
+          {prompts.length > 0 && (
+            <Button
+              size="sm"
+              variant="flat"
+              onPress={() => {
+                const allPrompts = prompts
+                  .sort((a, b) => a.scene_number - b.scene_number)
+                  .map(p => p.actor_prompt || p.text)
+                  .join('\n\n')
+                navigator.clipboard.writeText(allPrompts)
+                showSuccessToast('All prompts copied!')
+              }}
+              startContent={<Copy className="w-4 h-4" />}
+            >
+              Copy All
+            </Button>
+          )}
         </div>
       </div>
 
