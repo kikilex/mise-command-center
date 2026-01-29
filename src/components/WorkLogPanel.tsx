@@ -20,6 +20,7 @@ import {
   Tooltip,
   Divider,
 } from "@heroui/react"
+import { Zap } from 'lucide-react'
 import toast from 'react-hot-toast'
 
 interface WorkLog {
@@ -40,7 +41,7 @@ interface WorkLogPanelProps {
 }
 
 // Action type configuration with colors and icons
-const actionConfig: Record<string, { icon: string; color: string; bgColor: string; label: string }> = {
+const actionConfig: Record<string, { icon: React.ReactNode; color: string; bgColor: string; label: string }> = {
   'task_started': { icon: '🚀', color: 'text-blue-700', bgColor: 'bg-blue-100', label: 'Task Started' },
   'task_completed': { icon: '✅', color: 'text-emerald-700', bgColor: 'bg-emerald-100', label: 'Task Completed' },
   'agent_spawned': { icon: '🤖', color: 'text-violet-700', bgColor: 'bg-violet-100', label: 'Agent Spawned' },
@@ -53,7 +54,7 @@ const actionConfig: Record<string, { icon: string; color: string; bgColor: strin
   'message_sent': { icon: '💬', color: 'text-teal-700', bgColor: 'bg-teal-100', label: 'Message Sent' },
   'file_created': { icon: '📄', color: 'text-slate-700', bgColor: 'bg-slate-100', label: 'File Created' },
   'api_call': { icon: '🔗', color: 'text-purple-700', bgColor: 'bg-purple-100', label: 'API Call' },
-  'default': { icon: '⚡', color: 'text-gray-700', bgColor: 'bg-gray-100', label: 'Action' }
+  'default': { icon: <Zap className="w-5 h-5 text-gray-600" />, color: 'text-gray-700', bgColor: 'bg-gray-100', label: 'Action' }
 }
 
 // Date filter options

@@ -424,7 +424,7 @@ export default function AIWorkspacePage() {
                   </div>
                 </div>
                 <Chip size="sm" className="bg-violet-100 dark:bg-violet-900/50 text-violet-700 dark:text-violet-300 flex-shrink-0">
-                  <Bot className="w-3 h-3 mr-1" /> AI
+                  <Bot className="w-3 h-3" />
                 </Chip>
               </div>
             ))}
