@@ -1,11 +1,14 @@
 'use client'
 
-import { useState, useEffect, useMemo, use } from 'react'
+import { useState, useEffect, useMemo, use, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { ArrowLeft, Edit, FileText, List, ExternalLink, Share2, Check, RotateCcw, MessageSquare, Send, AlertCircle, Trash2, CheckCircle2, Clock } from 'lucide-react'
+import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
+import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism'
+import { useTheme } from 'next-themes'
+import { ArrowLeft, Edit, FileText, List, ExternalLink, Share2, Check, RotateCcw, MessageSquare, Send, AlertCircle, Trash2, CheckCircle2, Clock, ChevronDown, ChevronRight, ArrowUp, ArrowDown } from 'lucide-react'
 import {
   Button,
   Chip,
@@ -105,6 +108,17 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
   // Approval state
   const [approving, setApproving] = useState(false)
   
+  // TOC collapsible sections state
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set())
+  
+  // Floating scroll button state
+  const [showScrollButton, setShowScrollButton] = useState(false)
+  const [isAtBottom, setIsAtBottom] = useState(false)
+  
+  // Theme for syntax highlighting
+  const { resolvedTheme } = useTheme()
+  const isDark = resolvedTheme === 'dark'
+  
   const supabase = createClient()
   const router = useRouter()
 
@@ -112,6 +126,48 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
     loadUser()
     loadDocument()
   }, [id])
+
+  // Scroll listener for floating button
+  useEffect(() => {
+    const handleScroll = () => {
+      const scrollTop = window.scrollY
+      const scrollHeight = document ? window.document.documentElement.scrollHeight : 0
+      const clientHeight = window.innerHeight
+      
+      // Show button after scrolling down 300px
+      setShowScrollButton(scrollTop > 300)
+      
+      // Check if at bottom (within 100px)
+      setIsAtBottom(scrollTop + clientHeight >= scrollHeight - 100)
+    }
+    
+    window.addEventListener('scroll', handleScroll)
+    handleScroll() // Initial check
+    
+    return () => window.removeEventListener('scroll', handleScroll)
+  }, [document])
+
+  // Toggle section collapse
+  const toggleSection = useCallback((sectionId: string) => {
+    setCollapsedSections(prev => {
+      const newSet = new Set(prev)
+      if (newSet.has(sectionId)) {
+        newSet.delete(sectionId)
+      } else {
+        newSet.add(sectionId)
+      }
+      return newSet
+    })
+  }, [])
+
+  // Scroll to top or bottom
+  const handleScrollButton = useCallback(() => {
+    if (isAtBottom) {
+      window.scrollTo({ top: 0, behavior: 'smooth' })
+    } else {
+      window.scrollTo({ top: window.document.documentElement.scrollHeight, behavior: 'smooth' })
+    }
+  }, [isAtBottom])
 
   useEffect(() => {
     if (document) {
@@ -336,7 +392,7 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
     }
   }
 
-  // Extract TOC from markdown headings
+  // Extract TOC from markdown headings with hierarchical structure
   const tableOfContents = useMemo((): TOCItem[] => {
     if (!document?.content) return []
     
@@ -355,6 +411,36 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
     
     return headings
   }, [document?.content])
+
+  // Group TOC items by parent headings for collapsible sections
+  const groupedTOC = useMemo(() => {
+    const groups: { parent: TOCItem; children: TOCItem[] }[] = []
+    let currentParent: TOCItem | null = null
+    let currentChildren: TOCItem[] = []
+
+    tableOfContents.forEach((item) => {
+      if (item.level === 1) {
+        // Save previous group if exists
+        if (currentParent) {
+          groups.push({ parent: currentParent, children: currentChildren })
+        }
+        currentParent = item
+        currentChildren = []
+      } else if (currentParent) {
+        currentChildren.push(item)
+      } else {
+        // Orphan heading (no h1 parent) - treat as its own group
+        groups.push({ parent: item, children: [] })
+      }
+    })
+
+    // Don't forget the last group
+    if (currentParent) {
+      groups.push({ parent: currentParent, children: currentChildren })
+    }
+
+    return groups
+  }, [tableOfContents])
 
   const handleShare = async () => {
     const url = window.location.href
@@ -567,22 +653,56 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
           {/* Table of Contents - Desktop Sidebar */}
           {tableOfContents.length > 2 && (
             <aside className="hidden lg:block w-56 flex-shrink-0">
-              <div className="sticky top-8">
+              <div className="sticky top-8 max-h-[calc(100vh-6rem)] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-slate-600 scrollbar-track-transparent">
                 <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3 flex items-center gap-2">
                   <List className="w-4 h-4" />
                   Contents
                 </h4>
                 <nav className="space-y-1">
-                  {tableOfContents.map((item) => (
-                    <a
-                      key={item.id}
-                      href={`#${item.id}`}
-                      className={`block text-sm py-1 text-slate-500 dark:text-slate-400 hover:text-violet-600 dark:hover:text-violet-400 transition-colors ${
-                        item.level === 2 ? 'pl-4' : item.level === 3 ? 'pl-8' : ''
-                      }`}
-                    >
-                      {item.text}
-                    </a>
+                  {groupedTOC.map((group) => (
+                    <div key={group.parent.id}>
+                      {/* Parent heading */}
+                      <div className="flex items-center">
+                        {group.children.length > 0 && (
+                          <button
+                            onClick={() => toggleSection(group.parent.id)}
+                            className="p-0.5 -ml-1 mr-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                            aria-label={collapsedSections.has(group.parent.id) ? 'Expand section' : 'Collapse section'}
+                          >
+                            {collapsedSections.has(group.parent.id) ? (
+                              <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+                            ) : (
+                              <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                            )}
+                          </button>
+                        )}
+                        <a
+                          href={`#${group.parent.id}`}
+                          className={`flex-1 text-sm py-1 text-slate-600 dark:text-slate-300 hover:text-violet-600 dark:hover:text-violet-400 transition-colors font-medium ${
+                            group.children.length === 0 ? 'ml-4' : ''
+                          }`}
+                        >
+                          {group.parent.text}
+                        </a>
+                      </div>
+                      
+                      {/* Children (collapsible) */}
+                      {group.children.length > 0 && !collapsedSections.has(group.parent.id) && (
+                        <div className="ml-4 border-l border-slate-200 dark:border-slate-700 pl-2 mt-1 space-y-0.5">
+                          {group.children.map((child) => (
+                            <a
+                              key={child.id}
+                              href={`#${child.id}`}
+                              className={`block text-sm py-0.5 text-slate-500 dark:text-slate-400 hover:text-violet-600 dark:hover:text-violet-400 transition-colors ${
+                                child.level === 3 ? 'pl-3 text-xs' : ''
+                              }`}
+                            >
+                              {child.text}
+                            </a>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   ))}
                 </nav>
               </div>
@@ -593,7 +713,7 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
           {showTOC && tableOfContents.length > 2 && (
             <div className="lg:hidden fixed inset-0 z-50 bg-black/50" onClick={() => setShowTOC(false)}>
               <div 
-                className="absolute right-0 top-0 h-full w-64 bg-white dark:bg-slate-800 p-6 shadow-xl"
+                className="absolute right-0 top-0 h-full w-64 bg-white dark:bg-slate-800 p-6 shadow-xl overflow-y-auto"
                 onClick={e => e.stopPropagation()}
               >
                 <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-4 flex items-center gap-2">
@@ -601,17 +721,54 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
                   Contents
                 </h4>
                 <nav className="space-y-2">
-                  {tableOfContents.map((item) => (
-                    <a
-                      key={item.id}
-                      href={`#${item.id}`}
-                      onClick={() => setShowTOC(false)}
-                      className={`block text-sm py-1 text-slate-600 dark:text-slate-300 hover:text-violet-600 dark:hover:text-violet-400 ${
-                        item.level === 2 ? 'pl-4' : item.level === 3 ? 'pl-8' : ''
-                      }`}
-                    >
-                      {item.text}
-                    </a>
+                  {groupedTOC.map((group) => (
+                    <div key={group.parent.id}>
+                      {/* Parent heading */}
+                      <div className="flex items-center">
+                        {group.children.length > 0 && (
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              toggleSection(group.parent.id)
+                            }}
+                            className="p-0.5 -ml-1 mr-1 rounded hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                          >
+                            {collapsedSections.has(group.parent.id) ? (
+                              <ChevronRight className="w-3.5 h-3.5 text-slate-400" />
+                            ) : (
+                              <ChevronDown className="w-3.5 h-3.5 text-slate-400" />
+                            )}
+                          </button>
+                        )}
+                        <a
+                          href={`#${group.parent.id}`}
+                          onClick={() => setShowTOC(false)}
+                          className={`flex-1 text-sm py-1 text-slate-600 dark:text-slate-300 hover:text-violet-600 dark:hover:text-violet-400 font-medium ${
+                            group.children.length === 0 ? 'ml-4' : ''
+                          }`}
+                        >
+                          {group.parent.text}
+                        </a>
+                      </div>
+                      
+                      {/* Children (collapsible) */}
+                      {group.children.length > 0 && !collapsedSections.has(group.parent.id) && (
+                        <div className="ml-4 border-l border-slate-200 dark:border-slate-700 pl-2 mt-1 space-y-1">
+                          {group.children.map((child) => (
+                            <a
+                              key={child.id}
+                              href={`#${child.id}`}
+                              onClick={() => setShowTOC(false)}
+                              className={`block text-sm py-0.5 text-slate-500 dark:text-slate-400 hover:text-violet-600 dark:hover:text-violet-400 ${
+                                child.level === 3 ? 'pl-3 text-xs' : ''
+                              }`}
+                            >
+                              {child.text}
+                            </a>
+                          ))}
+                        </div>
+                      )}
+                    </div>
                   ))}
                 </nav>
               </div>
@@ -629,8 +786,8 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
               prose-ul:my-4 prose-ol:my-4
               prose-li:my-1
               prose-a:text-violet-600 dark:prose-a:text-violet-400 prose-a:no-underline hover:prose-a:underline
-              prose-code:bg-slate-100 dark:prose-code:bg-slate-800 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-sm prose-code:before:content-none prose-code:after:content-none
-              prose-pre:bg-slate-900 dark:prose-pre:bg-slate-950 prose-pre:rounded-lg prose-pre:p-4
+              prose-code:bg-slate-200 prose-code:text-slate-800 dark:prose-code:bg-slate-800 dark:prose-code:text-slate-200 prose-code:px-1.5 prose-code:py-0.5 prose-code:rounded prose-code:text-sm prose-code:before:content-none prose-code:after:content-none
+              prose-pre:p-0 prose-pre:bg-transparent prose-pre:rounded-lg prose-pre:overflow-hidden
               prose-blockquote:border-l-violet-500 prose-blockquote:bg-violet-50 dark:prose-blockquote:bg-violet-900/20 prose-blockquote:py-1 prose-blockquote:px-4 prose-blockquote:rounded-r
               prose-table:border prose-table:border-slate-200 dark:prose-table:border-slate-700
               prose-th:bg-slate-100 dark:prose-th:bg-slate-800 prose-th:p-2 prose-th:border prose-th:border-slate-200 dark:prose-th:border-slate-700
@@ -655,6 +812,38 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
                     const id = text.toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '')
                     return <h3 id={id}>{children}</h3>
                   },
+                  code: ({ className, children, ...props }) => {
+                    const match = /language-(\w+)/.exec(className || '')
+                    const codeString = String(children).replace(/\n$/, '')
+                    
+                    // Check if this is an inline code or block code
+                    const isInline = !match && !codeString.includes('\n')
+                    
+                    if (isInline) {
+                      return (
+                        <code className={className} {...props}>
+                          {children}
+                        </code>
+                      )
+                    }
+                    
+                    return (
+                      <SyntaxHighlighter
+                        style={isDark ? oneDark : oneLight}
+                        language={match ? match[1] : 'text'}
+                        PreTag="div"
+                        customStyle={{
+                          margin: 0,
+                          padding: '1rem',
+                          fontSize: '0.875rem',
+                          lineHeight: '1.5',
+                          borderRadius: '0.5rem',
+                        }}
+                      >
+                        {codeString}
+                      </SyntaxHighlighter>
+                    )
+                  },
                 }}
               >
                 {document.content}
@@ -662,6 +851,21 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
             </div>
           </article>
         </div>
+
+        {/* Floating Scroll Button */}
+        {showScrollButton && (
+          <button
+            onClick={handleScrollButton}
+            className="fixed bottom-6 right-6 z-40 p-3 rounded-full bg-violet-600 hover:bg-violet-700 text-white shadow-lg transition-all duration-200 hover:scale-110 focus:outline-none focus:ring-2 focus:ring-violet-500 focus:ring-offset-2 dark:focus:ring-offset-slate-900"
+            aria-label={isAtBottom ? 'Scroll to top' : 'Scroll to bottom'}
+          >
+            {isAtBottom ? (
+              <ArrowUp className="w-5 h-5" />
+            ) : (
+              <ArrowDown className="w-5 h-5" />
+            )}
+          </button>
+        )}
 
         <Divider className="my-8" />
 
