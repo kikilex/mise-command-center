@@ -136,7 +136,7 @@ export default function AIWorkspacePage() {
       
       setWorkLogs(logsData || [])
 
-      // Get AI-flagged tasks
+      // Get AI-flagged tasks (exclude done tasks)
       const { data: tasksData, error: tasksError } = await supabase
         .from('tasks')
         .select('*')

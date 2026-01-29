@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useMemo, useCallback, Suspense } from 'react'
 import { useSearchParams, useRouter } from 'next/navigation'
-import { BellRing, Bot, ClipboardList, MessageCircle, List, CalendarDays, User } from 'lucide-react'
+import { BellRing, Bot, ClipboardList, MessageCircle, User, LayoutGrid, List } from 'lucide-react'
 import { 
   Button, 
   Card, 
@@ -72,7 +72,7 @@ interface UserData {
   avatar_url?: string
 }
 
-type ViewType = 'kanban' | 'list' | 'calendar' | 'my-tasks' | 'ai-queue'
+type ViewType = 'kanban' | 'list' | 'my-tasks' | 'ai-queue'
 
 const VIEW_STORAGE_KEY = 'mise-tasks-view'
 
@@ -161,7 +161,7 @@ function TasksPageContent() {
   // Load saved view from localStorage
   useEffect(() => {
     const savedView = localStorage.getItem(VIEW_STORAGE_KEY) as ViewType | null
-    if (savedView && ['kanban', 'list', 'calendar', 'my-tasks', 'ai-queue'].includes(savedView)) {
+    if (savedView && ['kanban', 'list', 'my-tasks', 'ai-queue'].includes(savedView)) {
       setCurrentView(savedView)
     }
   }, [])
@@ -440,7 +440,8 @@ function TasksPageContent() {
         filtered = tasks.filter(t => t.assignee_id === user?.id)
         break
       case 'ai-queue':
-        filtered = tasks.filter(t => t.ai_flag === true)
+        // Only show AI-flagged tasks that are NOT done
+        filtered = tasks.filter(t => t.ai_flag === true && t.status !== 'done')
         break
       default:
         break
@@ -932,8 +933,6 @@ function TasksPageContent() {
         return renderKanbanView()
       case 'list':
         return renderListView()
-      case 'calendar':
-        return renderCalendarView()
       case 'my-tasks':
         return renderMyTasksView()
       case 'ai-queue':
@@ -965,40 +964,24 @@ function TasksPageContent() {
             >
               <Tab key="kanban" title={
                 <div className="flex items-center gap-2">
-                  <span>📊</span>
-                  <span>Kanban</span>
+                  <LayoutGrid className="w-4 h-4" />
                 </div>
               } />
               <Tab key="list" title={
                 <div className="flex items-center gap-2">
                   <List className="w-4 h-4" />
-                  <span>List</span>
-                </div>
-              } />
-              <Tab key="calendar" title={
-                <div className="flex items-center gap-2">
-                  <CalendarDays className="w-4 h-4" />
-                  <span>Calendar</span>
                 </div>
               } />
               <Tab key="my-tasks" title={
                 <div className="flex items-center gap-2">
                   <User className="w-4 h-4" />
                   <span>My Tasks</span>
-                  {user && (
-                    <Chip size="sm" variant="flat">
-                      {tasks.filter(t => t.assignee_id === user.id).length}
-                    </Chip>
-                  )}
                 </div>
               } />
               <Tab key="ai-queue" title={
                 <div className="flex items-center gap-2">
                   <Bot className="w-4 h-4" />
                   <span>AI Queue</span>
-                  <Chip size="sm" variant="flat" className="bg-violet-100 text-violet-700">
-                    {tasks.filter(t => t.ai_flag).length}
-                  </Chip>
                 </div>
               } />
             </Tabs>
