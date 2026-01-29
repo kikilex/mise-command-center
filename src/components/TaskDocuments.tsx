@@ -2,11 +2,17 @@
 
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
-import { FileText, Plus, ExternalLink } from 'lucide-react'
+import { FileText, Plus, ExternalLink, Trash2 } from 'lucide-react'
 import {
   Button,
   Chip,
   Spinner,
+  Modal,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+  useDisclosure,
 } from '@heroui/react'
 import { createClient } from '@/lib/supabase/client'
 import { showErrorToast, showSuccessToast } from '@/lib/errors'
@@ -50,6 +56,9 @@ export default function TaskDocuments({ taskId, taskTitle, businessId, userId }:
   const [documents, setDocuments] = useState<Document[]>([])
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
+  const [deleting, setDeleting] = useState(false)
+  const [docToDelete, setDocToDelete] = useState<Document | null>(null)
+  const { isOpen: isDeleteOpen, onOpen: onDeleteOpen, onClose: onDeleteClose } = useDisclosure()
   
   const supabase = createClient()
   const router = useRouter()
@@ -74,6 +83,36 @@ export default function TaskDocuments({ taskId, taskTitle, businessId, userId }:
     } finally {
       setLoading(false)
     }
+  }
+
+  async function handleDeleteDocument() {
+    if (!docToDelete) return
+    
+    setDeleting(true)
+    try {
+      const { error } = await supabase
+        .from('documents')
+        .delete()
+        .eq('id', docToDelete.id)
+
+      if (error) throw error
+
+      showSuccessToast('Document deleted')
+      setDocuments(documents.filter(d => d.id !== docToDelete.id))
+      onDeleteClose()
+      setDocToDelete(null)
+    } catch (error) {
+      console.error('Delete document error:', error)
+      showErrorToast(error, 'Failed to delete document')
+    } finally {
+      setDeleting(false)
+    }
+  }
+
+  function openDeleteModal(doc: Document, e: React.MouseEvent) {
+    e.stopPropagation()
+    setDocToDelete(doc)
+    onDeleteOpen()
   }
 
   async function handleCreateDocument() {
@@ -195,12 +234,41 @@ export default function TaskDocuments({ taskId, taskTitle, businessId, userId }:
                 >
                   {getStatusLabel(doc.status)}
                 </Chip>
+                <Button
+                  isIconOnly
+                  size="sm"
+                  variant="light"
+                  className="text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                  onPress={(e: any) => openDeleteModal(doc, e)}
+                >
+                  <Trash2 className="w-4 h-4" />
+                </Button>
                 <ExternalLink className="w-4 h-4 text-slate-400 group-hover:text-violet-500 transition-colors" />
               </div>
             </div>
           ))}
         </div>
       )}
+
+      {/* Delete Confirmation Modal */}
+      <Modal isOpen={isDeleteOpen} onClose={onDeleteClose} size="sm">
+        <ModalContent>
+          <ModalHeader>Delete Document</ModalHeader>
+          <ModalBody>
+            <p className="text-slate-600 dark:text-slate-300">
+              Are you sure you want to delete <strong>{docToDelete?.title}</strong>? This action cannot be undone.
+            </p>
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="light" onPress={onDeleteClose}>
+              Cancel
+            </Button>
+            <Button color="danger" onPress={handleDeleteDocument} isLoading={deleting}>
+              Delete
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
     </div>
   )
 }

@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { ArrowLeft, Edit, FileText, List, ExternalLink, Share2, Check, RotateCcw, MessageSquare, Send, AlertCircle } from 'lucide-react'
+import { ArrowLeft, Edit, FileText, List, ExternalLink, Share2, Check, RotateCcw, MessageSquare, Send, AlertCircle, Trash2 } from 'lucide-react'
 import {
   Button,
   Chip,
@@ -97,6 +97,8 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
   
   // Revision modal state
   const { isOpen: isRevisionOpen, onOpen: onRevisionOpen, onClose: onRevisionClose } = useDisclosure()
+  const { isOpen: isDeleteOpen, onOpen: onDeleteOpen, onClose: onDeleteClose } = useDisclosure()
+  const [deleting, setDeleting] = useState(false)
   const [revisionFeedback, setRevisionFeedback] = useState('')
   const [submittingRevision, setSubmittingRevision] = useState(false)
   
@@ -269,6 +271,27 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
     }
   }
 
+  async function handleDelete() {
+    setDeleting(true)
+    try {
+      const { error } = await supabase
+        .from('documents')
+        .delete()
+        .eq('id', id)
+
+      if (error) throw error
+
+      showSuccessToast('Document deleted')
+      router.push('/docs')
+    } catch (error) {
+      console.error('Delete document error:', error)
+      showErrorToast(error, 'Failed to delete document')
+    } finally {
+      setDeleting(false)
+      onDeleteClose()
+    }
+  }
+
   // Extract TOC from markdown headings
   const tableOfContents = useMemo((): TOCItem[] => {
     if (!document?.content) return []
@@ -407,6 +430,14 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
                 Edit
               </Button>
             </Link>
+            <Button
+              variant="flat"
+              color="danger"
+              startContent={<Trash2 className="w-4 h-4" />}
+              onPress={onDeleteOpen}
+            >
+              Delete
+            </Button>
           </div>
         </div>
 
@@ -695,6 +726,33 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
               isLoading={submittingRevision}
             >
               Request Revision
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+
+      {/* Delete Confirmation Modal */}
+      <Modal isOpen={isDeleteOpen} onClose={onDeleteClose} size="sm">
+        <ModalContent>
+          <ModalHeader className="flex items-center gap-2">
+            <Trash2 className="w-5 h-5 text-red-600" />
+            Delete Document
+          </ModalHeader>
+          <ModalBody>
+            <p className="text-slate-600 dark:text-slate-300">
+              Are you sure you want to delete <strong>{document?.title}</strong>? This action cannot be undone.
+            </p>
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="flat" onPress={onDeleteClose}>
+              Cancel
+            </Button>
+            <Button
+              color="danger"
+              onPress={handleDelete}
+              isLoading={deleting}
+            >
+              Delete
             </Button>
           </ModalFooter>
         </ModalContent>
