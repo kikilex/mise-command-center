@@ -23,6 +23,7 @@ import { useMenuSettings, PERSONAL_MENU_OPTIONS, BUSINESS_MENU_OPTIONS, DEFAULT_
 import AddBusinessModal from '@/components/AddBusinessModal'
 import EditBusinessModal from '@/components/EditBusinessModal'
 import DeleteBusinessModal from '@/components/DeleteBusinessModal'
+import { BUILD_VERSION } from '@/lib/version'
 
 interface UserData {
   id: string
@@ -688,6 +689,13 @@ export default function SettingsPage() {
         onSuccess={refreshBusinesses}
         business={deletingBusiness}
       />
+
+      {/* Build Version */}
+      <div className="mt-8 pt-4 border-t border-slate-200 dark:border-slate-700">
+        <p className="text-xs text-slate-400 dark:text-slate-500 text-center">
+          Build: {BUILD_VERSION}
+        </p>
+      </div>
     </div>
   )
 }

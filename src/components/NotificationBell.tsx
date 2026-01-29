@@ -200,7 +200,7 @@ export default function NotificationBell({ userId, onNotificationClick }: Notifi
 
   if (!userId) {
     return (
-      <Button isIconOnly variant="light" className="hidden sm:flex text-default-500 min-w-[44px] min-h-[44px]">
+      <Button isIconOnly variant="light" className="flex text-default-500 min-w-[44px] min-h-[44px]">
         <Bell className="w-5 h-5" />
       </Button>
     )
@@ -212,7 +212,7 @@ export default function NotificationBell({ userId, onNotificationClick }: Notifi
       <Button
         isIconOnly
         variant="light"
-        className="hidden sm:flex text-default-500 min-w-[44px] min-h-[44px] relative"
+        className="flex text-default-500 min-w-[44px] min-h-[44px] relative"
         onPress={() => setIsOpen(!isOpen)}
       >
         <Bell className="w-5 h-5" />
