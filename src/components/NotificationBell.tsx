@@ -2,8 +2,16 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { Button, Spinner, Divider, Badge } from '@heroui/react'
-import { BellIcon, CheckIcon, XMarkIcon, ClipboardDocumentListIcon, ChatBubbleLeftIcon, ArrowPathIcon, ClockIcon, PencilSquareIcon } from '@heroicons/react/24/outline'
+import { Button, Spinner } from '@heroui/react'
+import { 
+  BellIcon, 
+  CheckIcon, 
+  ClipboardDocumentListIcon,
+  ChatBubbleLeftIcon,
+  ArrowPathIcon,
+  ClockIcon,
+  PencilSquareIcon,
+} from '@heroicons/react/24/outline'
 import { createClient } from '@/lib/supabase/client'
 
 interface Notification {
@@ -22,24 +30,20 @@ interface NotificationBellProps {
   onNotificationClick?: (taskId: string) => void
 }
 
-const TypeIcon = ({ type }: { type: string }) => {
-  const iconClass = "w-4 h-4"
-  switch (type) {
-    case 'task_assigned': return <ClipboardDocumentListIcon className={iconClass} />
-    case 'feedback_received': return <ChatBubbleLeftIcon className={iconClass} />
-    case 'status_changed': return <ArrowPathIcon className={iconClass} />
-    case 'due_soon': return <ClockIcon className={iconClass} />
-    case 'revision_requested': return <PencilSquareIcon className={iconClass} />
-    default: return <BellIcon className={iconClass} />
-  }
+const typeIcons: Record<string, React.ReactNode> = {
+  task_assigned: <ClipboardDocumentListIcon className="w-4 h-4" />,
+  feedback_received: <ChatBubbleLeftIcon className="w-4 h-4" />,
+  status_changed: <ArrowPathIcon className="w-4 h-4" />,
+  due_soon: <ClockIcon className="w-4 h-4" />,
+  revision_requested: <PencilSquareIcon className="w-4 h-4" />,
 }
 
 const typeColors: Record<string, string> = {
-  task_assigned: 'bg-blue-100 dark:bg-blue-900/50',
-  feedback_received: 'bg-green-100 dark:bg-green-900/50',
-  status_changed: 'bg-yellow-100 dark:bg-yellow-900/50',
-  due_soon: 'bg-red-100 dark:bg-red-900/50',
-  revision_requested: 'bg-purple-100 dark:bg-purple-900/50',
+  task_assigned: 'bg-blue-100 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400',
+  feedback_received: 'bg-green-100 dark:bg-green-900/50 text-green-600 dark:text-green-400',
+  status_changed: 'bg-yellow-100 dark:bg-yellow-900/50 text-yellow-600 dark:text-yellow-400',
+  due_soon: 'bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-400',
+  revision_requested: 'bg-purple-100 dark:bg-purple-900/50 text-purple-600 dark:text-purple-400',
 }
 
 export default function NotificationBell({ userId, onNotificationClick }: NotificationBellProps) {
@@ -233,7 +237,8 @@ export default function NotificationBell({ userId, onNotificationClick }: Notifi
           {/* Header */}
           <div className="flex items-center justify-between px-4 py-3 bg-slate-50 dark:bg-slate-900/50 border-b border-slate-200 dark:border-slate-700">
             <h3 className="font-semibold text-slate-900 dark:text-slate-100 flex items-center gap-2">
-              <BellIcon className="w-5 h-5" /> Notifications
+              <BellIcon className="w-5 h-5" />
+              Notifications
               {unreadCount > 0 && (
                 <span className="text-xs bg-red-100 dark:bg-red-900/50 text-red-600 dark:text-red-400 px-2 py-0.5 rounded-full">
                   {unreadCount} new
@@ -279,7 +284,7 @@ export default function NotificationBell({ userId, onNotificationClick }: Notifi
                     <div className="flex items-start gap-3">
                       {/* Type Icon */}
                       <div className={`flex-shrink-0 w-8 h-8 rounded-full ${typeColors[notification.type]} flex items-center justify-center`}>
-                        <TypeIcon type={notification.type} />
+                        {typeIcons[notification.type]}
                       </div>
 
                       {/* Content */}
