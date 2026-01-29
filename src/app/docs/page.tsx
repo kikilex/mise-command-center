@@ -27,7 +27,7 @@ interface Document {
   created_by: string | null
   created_at: string
   updated_at: string
-  status: 'draft' | 'in_review' | 'approved'
+  status: 'draft' | 'in_review' | 'approved' | 'needs_revision'
   version: number
   tasks?: { title: string } | null
 }
@@ -44,6 +44,7 @@ const statusOptions = [
   { key: 'draft', label: 'Draft', color: 'default' },
   { key: 'in_review', label: 'In Review', color: 'warning' },
   { key: 'approved', label: 'Approved', color: 'success' },
+  { key: 'needs_revision', label: 'Needs Revision', color: 'danger' },
 ]
 
 const getStatusColor = (status: string) => {
@@ -51,6 +52,7 @@ const getStatusColor = (status: string) => {
     case 'draft': return 'default'
     case 'in_review': return 'warning'
     case 'approved': return 'success'
+    case 'needs_revision': return 'danger'
     default: return 'default'
   }
 }
@@ -60,6 +62,7 @@ const getStatusLabel = (status: string) => {
     case 'draft': return 'Draft'
     case 'in_review': return 'In Review'
     case 'approved': return 'Approved'
+    case 'needs_revision': return 'Needs Revision'
     default: return status
   }
 }

@@ -34,7 +34,7 @@ interface Document {
   created_by: string | null
   created_at: string
   updated_at: string
-  status: 'draft' | 'in_review' | 'approved'
+  status: 'draft' | 'in_review' | 'approved' | 'needs_revision'
   version: number
 }
 
@@ -48,6 +48,7 @@ const statusOptions = [
   { key: 'draft', label: 'Draft' },
   { key: 'in_review', label: 'In Review' },
   { key: 'approved', label: 'Approved' },
+  { key: 'needs_revision', label: 'Needs Revision' },
 ]
 
 export default function DocumentEditPage({ params }: { params: Promise<{ id: string }> }) {
