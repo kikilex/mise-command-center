@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { MessageCircle } from 'lucide-react'
+import { MessageCircle, Eye, Download, Trash2, FileText } from 'lucide-react'
 import {
   Modal,
   ModalContent,
@@ -19,6 +19,8 @@ import {
 } from '@heroui/react'
 import { createClient } from '@/lib/supabase/client'
 import { showErrorToast, showSuccessToast } from '@/lib/errors'
+import FileViewerModal, { isViewableFile } from './FileViewerModal'
+import TaskDocuments from './TaskDocuments'
 
 interface Task {
   id: string
@@ -115,6 +117,8 @@ export default function TaskDetailModal({
   const [loadingFeedback, setLoadingFeedback] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
+  const [viewingFile, setViewingFile] = useState<TaskFile | null>(null)
+  const [viewFileUrl, setViewFileUrl] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const chatEndRef = useRef<HTMLDivElement>(null)
   
@@ -392,6 +396,19 @@ export default function TaskDetailModal({
     }
   }
 
+  async function handleViewFile(file: TaskFile) {
+    const url = await getDownloadUrl(file)
+    if (url) {
+      setViewFileUrl(url)
+      setViewingFile(file)
+    }
+  }
+
+  function closeFileViewer() {
+    setViewingFile(null)
+    setViewFileUrl(null)
+  }
+
   // Drag and drop handlers
   const handleDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault()
@@ -444,6 +461,7 @@ export default function TaskDetailModal({
   if (!task) return null
 
   return (
+    <>
     <Modal 
       isOpen={isOpen} 
       onClose={onClose} 
@@ -618,6 +636,18 @@ export default function TaskDetailModal({
 
             <Divider />
 
+            {/* Documents Section */}
+            {task && (
+              <TaskDocuments
+                taskId={task.id}
+                taskTitle={task.title}
+                businessId={null}
+                userId={userId || null}
+              />
+            )}
+
+            <Divider />
+
             {/* File Attachments */}
             <div className="space-y-3">
               <h3 className="text-md font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-2">
@@ -674,42 +704,101 @@ export default function TaskDetailModal({
                 </div>
               ) : files.length > 0 ? (
                 <div className="space-y-2">
-                  {files.map((file) => (
-                    <div
-                      key={file.id}
-                      className="flex items-center justify-between p-3 bg-slate-100 dark:bg-slate-800 rounded-lg"
-                    >
-                      <div className="flex items-center gap-3 min-w-0">
-                        <span className="text-xl">{getFileIcon(file.file_type)}</span>
-                        <div className="min-w-0">
-                          <p className="font-medium text-slate-700 dark:text-slate-200 truncate">
-                            {file.file_name}
-                          </p>
-                          <p className="text-xs text-slate-500">
-                            {formatFileSize(file.file_size)} • {new Date(file.uploaded_at).toLocaleDateString()}
-                          </p>
+                  {files.map((file) => {
+                    const canView = isViewableFile(file.file_name, file.file_type)
+                    return (
+                      <div
+                        key={file.id}
+                        className={`flex items-center justify-between p-3 bg-slate-100 dark:bg-slate-800 rounded-lg ${canView ? 'cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors' : ''}`}
+                        onClick={() => canView && handleViewFile(file)}
+                      >
+                        <div className="flex items-center gap-3 min-w-0">
+                          <span className="text-xl">{getFileIcon(file.file_type)}</span>
+                          <div className="min-w-0">
+                            <div className="flex items-center gap-2">
+                              <p className="font-medium text-slate-700 dark:text-slate-200 truncate">
+                                {file.file_name}
+                              </p>
+                              {canView && (
+                                <Chip size="sm" variant="flat" className="bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-xs">
+                                  <Eye className="w-3 h-3 mr-1 inline" />
+                                  Viewable
+                                </Chip>
+                              )}
+                            </div>
+                            <p className="text-xs text-slate-500">
+                              {formatFileSize(file.file_size)} • {new Date(file.uploaded_at).toLocaleDateString()}
+                            </p>
+                          </div>
+                        </div>
+                        <div className="flex gap-1 sm:gap-2 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+                          {canView && (
+                            <Button
+                              size="sm"
+                              variant="flat"
+                              color="primary"
+                              onPress={() => handleViewFile(file)}
+                              className="hidden sm:flex"
+                              startContent={<Eye className="w-4 h-4" />}
+                            >
+                              View
+                            </Button>
+                          )}
+                          <Button
+                            size="sm"
+                            variant="flat"
+                            onPress={() => handleDownload(file)}
+                            className="hidden sm:flex"
+                            startContent={<Download className="w-4 h-4" />}
+                          >
+                            Download
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="flat"
+                            color="danger"
+                            onPress={() => handleDeleteFile(file)}
+                            className="hidden sm:flex"
+                            startContent={<Trash2 className="w-4 h-4" />}
+                          >
+                            Delete
+                          </Button>
+                          {/* Mobile icon-only buttons */}
+                          {canView && (
+                            <Button
+                              size="sm"
+                              variant="flat"
+                              color="primary"
+                              isIconOnly
+                              onPress={() => handleViewFile(file)}
+                              className="sm:hidden min-w-[36px]"
+                            >
+                              <Eye className="w-4 h-4" />
+                            </Button>
+                          )}
+                          <Button
+                            size="sm"
+                            variant="flat"
+                            isIconOnly
+                            onPress={() => handleDownload(file)}
+                            className="sm:hidden min-w-[36px]"
+                          >
+                            <Download className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            size="sm"
+                            variant="flat"
+                            color="danger"
+                            isIconOnly
+                            onPress={() => handleDeleteFile(file)}
+                            className="sm:hidden min-w-[36px]"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
                         </div>
                       </div>
-                      <div className="flex gap-2 flex-shrink-0">
-                        <Button
-                          size="sm"
-                          variant="flat"
-                          color="primary"
-                          onPress={() => handleDownload(file)}
-                        >
-                          Download
-                        </Button>
-                        <Button
-                          size="sm"
-                          variant="flat"
-                          color="danger"
-                          onPress={() => handleDeleteFile(file)}
-                        >
-                          Delete
-                        </Button>
-                      </div>
-                    </div>
-                  ))}
+                    )
+                  })}
                 </div>
               ) : (
                 <p className="text-center text-slate-400 py-4">No attachments yet</p>
@@ -741,5 +830,15 @@ export default function TaskDetailModal({
         </ModalFooter>
       </ModalContent>
     </Modal>
+    
+    {/* File Viewer Modal */}
+    <FileViewerModal
+      isOpen={!!viewingFile}
+      onClose={closeFileViewer}
+      fileName={viewingFile?.file_name || ''}
+      fileUrl={viewFileUrl}
+      fileType={viewingFile?.file_type || null}
+    />
+    </>
   )
 }
