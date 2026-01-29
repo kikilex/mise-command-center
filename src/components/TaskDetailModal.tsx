@@ -46,6 +46,14 @@ interface TaskFile {
   uploaded_by: string | null
 }
 
+interface FeedbackMessage {
+  id: string
+  task_id: string
+  author: string
+  message: string
+  created_at: string
+}
+
 interface TaskDetailModalProps {
   task: Task | null
   isOpen: boolean
@@ -96,16 +104,25 @@ export default function TaskDetailModal({
     priority: 'medium',
     due_date: '',
     ai_flag: false,
-    feedback: '',
   })
   const [files, setFiles] = useState<TaskFile[]>([])
+  const [feedbackMessages, setFeedbackMessages] = useState<FeedbackMessage[]>([])
+  const [newMessage, setNewMessage] = useState('')
   const [saving, setSaving] = useState(false)
+  const [sendingMessage, setSendingMessage] = useState(false)
   const [loadingFiles, setLoadingFiles] = useState(false)
+  const [loadingFeedback, setLoadingFeedback] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const chatEndRef = useRef<HTMLDivElement>(null)
   
   const supabase = createClient()
+
+  // Scroll to bottom of chat
+  const scrollToBottom = useCallback(() => {
+    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
+  }, [])
 
   // Load task data when modal opens
   useEffect(() => {
@@ -117,11 +134,35 @@ export default function TaskDetailModal({
         priority: task.priority || 'medium',
         due_date: task.due_date ? task.due_date.split('T')[0] : '',
         ai_flag: task.ai_flag || false,
-        feedback: task.feedback || '',
       })
       loadFiles(task.id)
+      loadFeedbackMessages(task.id)
     }
   }, [task, isOpen])
+
+  // Scroll to bottom when messages change
+  useEffect(() => {
+    scrollToBottom()
+  }, [feedbackMessages, scrollToBottom])
+
+  async function loadFeedbackMessages(taskId: string) {
+    setLoadingFeedback(true)
+    try {
+      const { data, error } = await supabase
+        .from('task_feedback')
+        .select('*')
+        .eq('task_id', taskId)
+        .order('created_at', { ascending: true })
+
+      if (error) throw error
+      setFeedbackMessages(data || [])
+    } catch (error) {
+      console.error('Load feedback error:', error)
+      showErrorToast(error, 'Failed to load feedback')
+    } finally {
+      setLoadingFeedback(false)
+    }
+  }
 
   async function loadFiles(taskId: string) {
     setLoadingFiles(true)
@@ -142,6 +183,40 @@ export default function TaskDetailModal({
     }
   }
 
+  async function handleSendMessage() {
+    if (!task || !newMessage.trim()) return
+    
+    setSendingMessage(true)
+    try {
+      const { data, error } = await supabase
+        .from('task_feedback')
+        .insert({
+          task_id: task.id,
+          author: userId || 'unknown',
+          message: newMessage.trim(),
+        })
+        .select()
+        .single()
+
+      if (error) throw error
+      
+      setFeedbackMessages(prev => [...prev, data])
+      setNewMessage('')
+    } catch (error) {
+      console.error('Send message error:', error)
+      showErrorToast(error, 'Failed to send message')
+    } finally {
+      setSendingMessage(false)
+    }
+  }
+
+  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      handleSendMessage()
+    }
+  }
+
   async function handleSave() {
     if (!task) return
     setSaving(true)
@@ -156,7 +231,6 @@ export default function TaskDetailModal({
           priority: formData.priority,
           due_date: formData.due_date || null,
           ai_flag: formData.ai_flag,
-          feedback: formData.feedback || null,
         })
         .eq('id', task.id)
 
@@ -164,7 +238,6 @@ export default function TaskDetailModal({
       
       showSuccessToast('Task updated successfully')
       onTaskUpdated()
-      onClose()
     } catch (error) {
       console.error('Save task error:', error)
       showErrorToast(error, 'Failed to update task')
@@ -176,7 +249,8 @@ export default function TaskDetailModal({
   async function handleSendBackToAx() {
     if (!task) return
     
-    if (!formData.feedback.trim()) {
+    // Check if there's any feedback in the chat
+    if (feedbackMessages.length === 0 && !newMessage.trim()) {
       showErrorToast(null, 'Please add feedback before sending back for revision')
       return
     }
@@ -184,12 +258,23 @@ export default function TaskDetailModal({
     setSaving(true)
     
     try {
+      // If there's a pending message, send it first
+      if (newMessage.trim()) {
+        await supabase
+          .from('task_feedback')
+          .insert({
+            task_id: task.id,
+            author: userId || 'unknown',
+            message: newMessage.trim(),
+          })
+        setNewMessage('')
+      }
+      
       const { error } = await supabase
         .from('tasks')
         .update({
           status: 'in_progress',
           ai_agent: 'ax',
-          feedback: formData.feedback,
         })
         .eq('id', task.id)
 
@@ -197,7 +282,6 @@ export default function TaskDetailModal({
       
       showSuccessToast('Task sent back to Ax for revision')
       onTaskUpdated()
-      onClose()
     } catch (error) {
       console.error('Send back error:', error)
       showErrorToast(error, 'Failed to send back for revision')
@@ -339,6 +423,23 @@ export default function TaskDetailModal({
     return '📄'
   }
 
+  const formatTimestamp = (timestamp: string) => {
+    const date = new Date(timestamp)
+    const now = new Date()
+    const diffMs = now.getTime() - date.getTime()
+    const diffMins = Math.floor(diffMs / 60000)
+    const diffHours = Math.floor(diffMs / 3600000)
+    const diffDays = Math.floor(diffMs / 86400000)
+    
+    if (diffMins < 1) return 'just now'
+    if (diffMins < 60) return `${diffMins}m ago`
+    if (diffHours < 24) return `${diffHours}h ago`
+    if (diffDays < 7) return `${diffDays}d ago`
+    return date.toLocaleDateString()
+  }
+
+  const isAxMessage = (author: string) => author === 'ax'
+
   if (!task) return null
 
   return (
@@ -427,26 +528,88 @@ export default function TaskDetailModal({
 
             <Divider />
 
-            {/* Feedback Section */}
-            <div className="space-y-2">
+            {/* Chat-Style Feedback Section */}
+            <div className="space-y-3">
               <h3 className="text-md font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-2">
-                💬 Feedback
+                💬 Feedback Thread
+                {feedbackMessages.length > 0 && (
+                  <Chip size="sm" variant="flat">{feedbackMessages.length}</Chip>
+                )}
               </h3>
-              <Textarea
-                placeholder="Leave feedback for Ax or notes about what needs to be fixed..."
-                value={formData.feedback}
-                onChange={(e) => setFormData({ ...formData, feedback: e.target.value })}
-                minRows={3}
-                description="This feedback will be visible when the task is sent back for revision"
-              />
+              
+              {/* Chat Window */}
+              <div className="border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900/50">
+                {/* Messages Container */}
+                <div className="h-64 overflow-y-auto p-4 space-y-3">
+                  {loadingFeedback ? (
+                    <div className="flex items-center justify-center h-full">
+                      <Spinner size="sm" />
+                      <span className="ml-2 text-slate-500">Loading messages...</span>
+                    </div>
+                  ) : feedbackMessages.length === 0 ? (
+                    <div className="flex items-center justify-center h-full text-slate-400">
+                      <p>No feedback yet. Start the conversation!</p>
+                    </div>
+                  ) : (
+                    feedbackMessages.map((msg) => (
+                      <div
+                        key={msg.id}
+                        className={`flex flex-col ${isAxMessage(msg.author) ? 'items-start' : 'items-end'}`}
+                      >
+                        <div
+                          className={`max-w-[80%] rounded-2xl px-4 py-2 ${
+                            isAxMessage(msg.author)
+                              ? 'bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-bl-md'
+                              : 'bg-blue-500 text-white rounded-br-md'
+                          }`}
+                        >
+                          <p className="text-sm whitespace-pre-wrap">{msg.message}</p>
+                        </div>
+                        <div className={`flex items-center gap-1 mt-1 ${isAxMessage(msg.author) ? '' : 'flex-row-reverse'}`}>
+                          <span className="text-xs text-slate-500 dark:text-slate-400">
+                            {isAxMessage(msg.author) ? '🤖 Ax' : '👤 Alex'}
+                          </span>
+                          <span className="text-xs text-slate-400 dark:text-slate-500">
+                            • {formatTimestamp(msg.created_at)}
+                          </span>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                  <div ref={chatEndRef} />
+                </div>
+                
+                {/* Message Input */}
+                <div className="border-t border-slate-200 dark:border-slate-700 p-3 flex gap-2">
+                  <Input
+                    placeholder="Type your feedback..."
+                    value={newMessage}
+                    onChange={(e) => setNewMessage(e.target.value)}
+                    onKeyDown={handleKeyDown}
+                    isDisabled={sendingMessage}
+                    classNames={{
+                      input: "text-sm",
+                    }}
+                  />
+                  <Button
+                    color="primary"
+                    isIconOnly
+                    onPress={handleSendMessage}
+                    isDisabled={!newMessage.trim() || sendingMessage}
+                    isLoading={sendingMessage}
+                  >
+                    {!sendingMessage && '↑'}
+                  </Button>
+                </div>
+              </div>
               
               {/* Send Back Button */}
               <Button
                 color="warning"
                 variant="flat"
                 onPress={handleSendBackToAx}
-                isDisabled={saving || !formData.feedback.trim()}
-                className="mt-2"
+                isDisabled={saving}
+                className="w-full"
               >
                 🔄 Send back to Ax for revision
               </Button>
@@ -564,7 +727,7 @@ export default function TaskDetailModal({
 
         <ModalFooter>
           <Button variant="flat" onPress={onClose}>
-            Cancel
+            Close
           </Button>
           <Button
             color="primary"
