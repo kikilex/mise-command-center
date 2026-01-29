@@ -6,9 +6,10 @@ import { Button, Avatar } from "@heroui/react"
 import { usePathname } from 'next/navigation'
 import UserMenu from './UserMenu'
 import BusinessSelector from './BusinessSelector'
+import NotificationBell from './NotificationBell'
 import { useBusiness } from '@/lib/business-context'
 import { useMenuSettings } from '@/lib/menu-settings'
-import { navIcons, Menu, X, Bell } from '@/lib/icons'
+import { navIcons, Menu, X } from '@/lib/icons'
 
 interface UserData {
   id?: string
@@ -21,9 +22,10 @@ interface UserData {
 interface NavbarProps {
   user: UserData | null
   actions?: React.ReactNode
+  onOpenTask?: (taskId: string) => void
 }
 
-export default function Navbar({ user, actions }: NavbarProps) {
+export default function Navbar({ user, actions, onOpenTask }: NavbarProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const pathname = usePathname()
   const { selectedBusiness } = useBusiness()
@@ -113,10 +115,11 @@ export default function Navbar({ user, actions }: NavbarProps) {
             {/* Page-specific actions */}
             {actions}
             
-            {/* Notifications (hidden on small screens) */}
-            <Button isIconOnly variant="light" className="hidden sm:flex text-default-500 min-w-[44px] min-h-[44px]">
-              <Bell className="w-5 h-5" />
-            </Button>
+            {/* Notifications Bell */}
+            <NotificationBell 
+              userId={user?.id} 
+              onNotificationClick={onOpenTask}
+            />
             
             {user ? (
               <UserMenu user={user} />

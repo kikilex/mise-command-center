@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useEffect, useMemo } from 'react'
+import { useState, useEffect, useMemo, useCallback, Suspense } from 'react'
+import { useSearchParams, useRouter } from 'next/navigation'
 import { 
   Button, 
   Card, 
@@ -25,6 +26,7 @@ import {
   TableRow,
   TableCell,
   SortDescriptor,
+  Spinner,
 } from "@heroui/react"
 import { createClient } from '@/lib/supabase/client'
 import { useBusiness } from '@/lib/business-context'
@@ -32,6 +34,19 @@ import Navbar from '@/components/Navbar'
 import { showErrorToast, showSuccessToast, getErrorMessage } from '@/lib/errors'
 import { ErrorFallback } from '@/components/ErrorBoundary'
 import TaskDetailModal from '@/components/TaskDetailModal'
+
+// Main export with Suspense wrapper
+export default function TasksPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center">
+        <Spinner size="lg" />
+      </div>
+    }>
+      <TasksPageContent />
+    </Suspense>
+  )
+}
 
 interface Task {
   id: string
@@ -100,7 +115,7 @@ const reminderWindowsByPriority: Record<string, string[]> = {
   low: ['Morning of due date'],
 }
 
-export default function TasksPage() {
+function TasksPageContent() {
   const [tasks, setTasks] = useState<Task[]>([])
   const [user, setUser] = useState<UserData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -128,6 +143,19 @@ export default function TasksPage() {
   
   const supabase = createClient()
   const { selectedBusinessId } = useBusiness()
+  const searchParams = useSearchParams()
+  const router = useRouter()
+
+  // Handle opening task from URL query param (e.g., from notification)
+  useEffect(() => {
+    const openTaskId = searchParams.get('openTask')
+    if (openTaskId && !loading) {
+      // Clear the query param to prevent re-opening on refresh
+      router.replace('/tasks', { scroll: false })
+      // Open the task
+      handleOpenTaskById(openTaskId)
+    }
+  }, [searchParams, loading])
 
   // Load saved view from localStorage
   useEffect(() => {
@@ -372,6 +400,33 @@ export default function TasksPage() {
   function handleViewDetails(task: Task) {
     setSelectedTask(task)
     onDetailOpen()
+  }
+
+  // Open task by ID (used by notification clicks)
+  async function handleOpenTaskById(taskId: string) {
+    // First check if task is already loaded
+    const existingTask = tasks.find(t => t.id === taskId)
+    if (existingTask) {
+      handleViewDetails(existingTask)
+      return
+    }
+
+    // Otherwise fetch it from the database
+    try {
+      const { data, error } = await supabase
+        .from('tasks')
+        .select('*')
+        .eq('id', taskId)
+        .single()
+
+      if (error) throw error
+      if (data) {
+        handleViewDetails(data as Task)
+      }
+    } catch (error) {
+      console.error('Failed to load task:', error)
+      showErrorToast(error, 'Failed to open task')
+    }
   }
 
   // Filter logic based on view
@@ -889,7 +944,7 @@ export default function TasksPage() {
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
-      <Navbar user={user} />
+      <Navbar user={user} onOpenTask={handleOpenTaskById} />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
         {/* View Tabs */}
