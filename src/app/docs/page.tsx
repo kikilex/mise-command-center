@@ -614,16 +614,6 @@ function DocsPageContent() {
                         </div>
                       )}
                     </div>
-                    {/* Edit button */}
-                    <Button
-                      size="sm"
-                      variant="light"
-                      isIconOnly
-                      onPress={(e: any) => openEditModal(doc, e)}
-                      className="min-w-6 w-6 h-6"
-                    >
-                      <Pencil className="w-3 h-3" />
-                    </Button>
                   </div>
                   
                   <div className="flex items-start justify-between gap-2 mb-2">

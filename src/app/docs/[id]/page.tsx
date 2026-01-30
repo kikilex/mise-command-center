@@ -8,7 +8,7 @@ import remarkGfm from 'remark-gfm'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import { useTheme } from 'next-themes'
-import { ArrowLeft, Edit, FileText, List, ExternalLink, Share2, Check, RotateCcw, MessageSquare, Send, AlertCircle, Trash2, CheckCircle2, Clock, ChevronDown, ChevronRight, ArrowUp, ArrowDown, ChevronsDownUp, ChevronsUpDown } from 'lucide-react'
+import { ArrowLeft, Edit, FileText, List, ExternalLink, Share2, Check, RotateCcw, MessageSquare, Send, AlertCircle, Trash2, CheckCircle2, Clock, ChevronDown, ChevronRight, ArrowUp, ArrowDown, ChevronsDownUp, ChevronsUpDown, Folder, Tag as TagIcon, X, Plus } from 'lucide-react'
 import {
   Button,
   Chip,
@@ -21,6 +21,8 @@ import {
   ModalFooter,
   Textarea,
   Input,
+  Select,
+  SelectItem,
   useDisclosure,
 } from '@heroui/react'
 import { createClient } from '@/lib/supabase/client'
@@ -38,6 +40,10 @@ interface Document {
   updated_at: string
   status: 'draft' | 'in_review' | 'approved' | 'needs_revision'
   version: number
+  category: string
+  tags: string[]
+  visibility: 'normal' | 'hidden'
+  archived: boolean
   tasks?: { id: string; title: string } | null
 }
 
@@ -84,6 +90,14 @@ const getStatusLabel = (status: string) => {
   }
 }
 
+const categoryOptions = [
+  { key: 'all', label: 'Uncategorized' },
+  { key: 'research', label: 'Research' },
+  { key: 'scripts', label: 'Scripts' },
+  { key: 'notes', label: 'Notes' },
+  { key: 'reference', label: 'Reference' },
+]
+
 export default function DocumentReaderPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const [document, setDocument] = useState<Document | null>(null)
@@ -114,6 +128,12 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
   // Floating scroll button state
   const [showScrollButton, setShowScrollButton] = useState(false)
   const [isAtBottom, setIsAtBottom] = useState(false)
+  
+  // Category and tag editing state
+  const [editCategory, setEditCategory] = useState('all')
+  const [editTags, setEditTags] = useState<string[]>([])
+  const [newTag, setNewTag] = useState('')
+  const [savingMeta, setSavingMeta] = useState(false)
   
   // Theme for syntax highlighting
   const { resolvedTheme } = useTheme()
@@ -211,6 +231,9 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
 
       if (error) throw error
       setDocument(data)
+      // Initialize edit state with document data
+      setEditCategory(data.category || 'all')
+      setEditTags(data.tags || [])
     } catch (error) {
       console.error('Load document error:', error)
       showErrorToast(error, 'Failed to load document')
@@ -236,6 +259,48 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
     } finally {
       setLoadingComments(false)
     }
+  }
+
+  async function saveDocumentMeta() {
+    if (!document) return
+    setSavingMeta(true)
+    try {
+      const { error } = await supabase
+        .from('documents')
+        .update({
+          category: editCategory,
+          tags: editTags,
+        })
+        .eq('id', document.id)
+      
+      if (error) throw error
+      
+      // Update local document state
+      setDocument(prev => prev ? {
+        ...prev,
+        category: editCategory,
+        tags: editTags,
+      } : null)
+      
+      showSuccessToast('Document updated')
+    } catch (error) {
+      console.error('Save document error:', error)
+      showErrorToast(error, 'Failed to save document')
+    } finally {
+      setSavingMeta(false)
+    }
+  }
+
+  const addTag = () => {
+    const trimmedTag = newTag.trim().toLowerCase()
+    if (trimmedTag && !editTags.includes(trimmedTag)) {
+      setEditTags(prev => [...prev, trimmedTag])
+      setNewTag('')
+    }
+  }
+
+  const removeTag = (tagToRemove: string) => {
+    setEditTags(prev => prev.filter(tag => tag !== tagToRemove))
   }
 
   async function handleAddComment() {
@@ -679,6 +744,107 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
 
         <Divider className="mb-8" />
 
+        {/* Mobile Category & Tag Editor (shown on small screens) */}
+        <div className="lg:hidden mb-6">
+          <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-4">
+            <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-4 flex items-center gap-2">
+              <Folder className="w-4 h-4" />
+              Document Properties
+            </h4>
+            
+            <div className="space-y-4">
+              {/* Category */}
+              <div>
+                <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">
+                  Category
+                </label>
+                <Select
+                  size="sm"
+                  selectedKeys={[editCategory]}
+                  onChange={(e) => setEditCategory(e.target.value)}
+                  className="w-full"
+                >
+                  {categoryOptions.map(cat => (
+                    <SelectItem key={cat.key}>{cat.label}</SelectItem>
+                  ))}
+                </Select>
+              </div>
+              
+              {/* Tags */}
+              <div>
+                <div className="flex items-center justify-between mb-1">
+                  <label className="block text-xs font-medium text-slate-500 dark:text-slate-400">
+                    Tags
+                  </label>
+                  <span className="text-xs text-slate-400">{editTags.length}/10</span>
+                </div>
+                
+                {/* Current Tags */}
+                <div className="flex flex-wrap gap-1 mb-2">
+                  {editTags.map(tag => (
+                    <Chip
+                      key={tag}
+                      size="sm"
+                      variant="flat"
+                      onClose={() => removeTag(tag)}
+                      className="text-xs"
+                    >
+                      {tag}
+                    </Chip>
+                  ))}
+                  {editTags.length === 0 && (
+                    <span className="text-xs text-slate-400 italic">No tags yet</span>
+                  )}
+                </div>
+                
+                {/* Add Tag Input */}
+                <div className="flex gap-1">
+                  <Input
+                    size="sm"
+                    placeholder="Add tag..."
+                    value={newTag}
+                    onChange={(e) => setNewTag(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter') {
+                        e.preventDefault()
+                        addTag()
+                      }
+                    }}
+                    className="flex-1"
+                  />
+                  <Button
+                    size="sm"
+                    isIconOnly
+                    variant="flat"
+                    onPress={addTag}
+                    isDisabled={!newTag.trim()}
+                  >
+                    <Plus className="w-3 h-3" />
+                  </Button>
+                </div>
+                <p className="text-xs text-slate-400 mt-1">
+                  Press Enter or click + to add
+                </p>
+              </div>
+              
+              {/* Save Button */}
+              <Button
+                color="primary"
+                size="sm"
+                className="w-full"
+                onPress={saveDocumentMeta}
+                isLoading={savingMeta}
+                isDisabled={savingMeta || (
+                  editCategory === (document?.category || 'all') &&
+                  JSON.stringify(editTags.sort()) === JSON.stringify((document?.tags || []).sort())
+                )}
+              >
+                {savingMeta ? 'Saving...' : 'Save Changes'}
+              </Button>
+            </div>
+          </div>
+        </div>
+
         {/* Layout with optional TOC sidebar */}
         <div className="flex gap-8">
           {/* Table of Contents - Desktop Sidebar */}
@@ -859,6 +1025,127 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
               </div>
             </div>
           )}
+
+          {/* Category & Tag Editing Sidebar */}
+          <aside className="hidden lg:block w-64 flex-shrink-0">
+            <div className="sticky top-8 max-h-[calc(100vh-6rem)] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-slate-600 scrollbar-track-transparent">
+              <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-4">
+                <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-4 flex items-center gap-2">
+                  <Folder className="w-4 h-4" />
+                  Document Properties
+                </h4>
+                
+                <div className="space-y-4">
+                  {/* Category */}
+                  <div>
+                    <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">
+                      Category
+                    </label>
+                    <Select
+                      size="sm"
+                      selectedKeys={[editCategory]}
+                      onChange={(e) => setEditCategory(e.target.value)}
+                      className="w-full"
+                    >
+                      {categoryOptions.map(cat => (
+                        <SelectItem key={cat.key}>{cat.label}</SelectItem>
+                      ))}
+                    </Select>
+                  </div>
+                  
+                  {/* Tags */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-xs font-medium text-slate-500 dark:text-slate-400">
+                        Tags
+                      </label>
+                      <span className="text-xs text-slate-400">{editTags.length}/10</span>
+                    </div>
+                    
+                    {/* Current Tags */}
+                    <div className="flex flex-wrap gap-1 mb-2">
+                      {editTags.map(tag => (
+                        <Chip
+                          key={tag}
+                          size="sm"
+                          variant="flat"
+                          onClose={() => removeTag(tag)}
+                          className="text-xs"
+                        >
+                          {tag}
+                        </Chip>
+                      ))}
+                      {editTags.length === 0 && (
+                        <span className="text-xs text-slate-400 italic">No tags yet</span>
+                      )}
+                    </div>
+                    
+                    {/* Add Tag Input */}
+                    <div className="flex gap-1">
+                      <Input
+                        size="sm"
+                        placeholder="Add tag..."
+                        value={newTag}
+                        onChange={(e) => setNewTag(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault()
+                            addTag()
+                          }
+                        }}
+                        className="flex-1"
+                      />
+                      <Button
+                        size="sm"
+                        isIconOnly
+                        variant="flat"
+                        onPress={addTag}
+                        isDisabled={!newTag.trim()}
+                      >
+                        <Plus className="w-3 h-3" />
+                      </Button>
+                    </div>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Press Enter or click + to add
+                    </p>
+                  </div>
+                  
+                  {/* Save Button */}
+                  <Button
+                    color="primary"
+                    size="sm"
+                    className="w-full"
+                    onPress={saveDocumentMeta}
+                    isLoading={savingMeta}
+                    isDisabled={savingMeta || (
+                      editCategory === (document?.category || 'all') &&
+                      JSON.stringify(editTags.sort()) === JSON.stringify((document?.tags || []).sort())
+                    )}
+                  >
+                    {savingMeta ? 'Saving...' : 'Save Changes'}
+                  </Button>
+                  
+                  {/* Current Values (read-only) */}
+                  <div className="pt-4 border-t border-slate-100 dark:border-slate-700">
+                    <div className="text-xs text-slate-500 dark:text-slate-400 space-y-1">
+                      <div className="flex justify-between">
+                        <span>Current Category:</span>
+                        <span className="font-medium text-slate-700 dark:text-slate-300">
+                          {categoryOptions.find(c => c.key === (document?.category || 'all'))?.label || 'Uncategorized'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Tags Count:</span>
+                        <span className="font-medium text-slate-700 dark:text-slate-300">
+                          {(document?.tags || []).length}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </aside>
 
           {/* Main Content */}
           <article className="flex-1 min-w-0">
