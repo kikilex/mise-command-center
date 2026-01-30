@@ -140,6 +140,7 @@ function ProjectsPageContent() {
   
   const { selectedBusinessId, selectedBusiness } = useBusiness()
   const supabase = createClient()
+  const router = useRouter()
 
   // Load view preference
   useEffect(() => {
@@ -538,7 +539,7 @@ function ProjectsPageContent() {
             key={project.id} 
             className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:shadow-md transition-shadow cursor-pointer"
             isPressable
-            onPress={() => handleEdit(project)}
+            onPress={() => router.push(`/projects/${project.id}`)}
           >
             <CardBody className="p-4">
               <div className="flex items-start justify-between mb-3">
@@ -626,6 +627,7 @@ function ProjectsPageContent() {
               <TableRow
                 key={project.id}
                 className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/50"
+                onClick={() => router.push(`/projects/${project.id}`)}
               >
                 <TableCell>
                   <div className="flex items-center gap-2">
@@ -674,6 +676,14 @@ function ProjectsPageContent() {
                 </TableCell>
                 <TableCell onClick={(e) => e.stopPropagation()}>
                   <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="flat"
+                      isIconOnly
+                      onPress={() => router.push(`/projects/${project.id}`)}
+                    >
+                      <Eye className="w-4 h-4" />
+                    </Button>
                     <Button
                       size="sm"
                       variant="flat"
