@@ -1,11 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo, Suspense } from 'react'
+import { useRouter } from 'next/navigation'
 import { 
   Button, 
   Card, 
   CardBody,
-  CardHeader,
   Chip,
   Input,
   Modal,
@@ -20,13 +20,41 @@ import {
   Progress,
   Tabs,
   Tab,
+  Table,
+  TableHeader,
+  TableColumn,
+  TableBody,
+  TableRow,
+  TableCell,
+  SortDescriptor,
+  Spinner,
 } from "@heroui/react"
 import { createClient } from '@/lib/supabase/client'
 import Navbar from '@/components/Navbar'
 import { useBusiness } from '@/lib/business-context'
 import { showErrorToast, showSuccessToast, getErrorMessage } from '@/lib/errors'
 import { ErrorFallback } from '@/components/ErrorBoundary'
-import { Target, Rocket, Megaphone, Folder, Calendar, Plus } from '@/lib/icons'
+import { 
+  Target, Rocket, Megaphone, Folder, Calendar, Plus,
+  LayoutGrid, List, Eye, Pencil, Trash2
+} from 'lucide-react'
+
+// Main export with Suspense wrapper
+export default function ProjectsPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center">
+        <Spinner size="lg" />
+      </div>
+    }>
+      <ProjectsPageContent />
+    </Suspense>
+  )
+}
+
+type ViewMode = 'board' | 'list'
+
+const VIEW_STORAGE_KEY = 'mise-projects-view'
 
 interface FieldDefinition {
   name: string
@@ -86,7 +114,7 @@ function getTemplateIcon(templateName?: string | null) {
   return templateIconMap[templateName.toLowerCase()] || Folder
 }
 
-export default function ProjectsPage() {
+function ProjectsPageContent() {
   const [projects, setProjects] = useState<Project[]>([])
   const [templates, setTemplates] = useState<ProjectTemplate[]>([])
   const [user, setUser] = useState<UserData | null>(null)
@@ -94,6 +122,11 @@ export default function ProjectsPage() {
   const [loadError, setLoadError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [viewMode, setViewMode] = useState<ViewMode>('list')
+  const [sortDescriptor, setSortDescriptor] = useState<SortDescriptor>({
+    column: 'created_at',
+    direction: 'descending',
+  })
   const { isOpen, onOpen, onClose } = useDisclosure()
   const [editingProject, setEditingProject] = useState<Project | null>(null)
   const [selectedTemplate, setSelectedTemplate] = useState<ProjectTemplate | null>(null)
@@ -105,8 +138,21 @@ export default function ProjectsPage() {
     custom_fields: {} as Record<string, any>,
   })
   
-  const { selectedBusinessId, selectedBusiness, businesses } = useBusiness()
+  const { selectedBusinessId, selectedBusiness } = useBusiness()
   const supabase = createClient()
+
+  // Load view preference
+  useEffect(() => {
+    const saved = localStorage.getItem(VIEW_STORAGE_KEY)
+    if (saved === 'board' || saved === 'list') {
+      setViewMode(saved)
+    }
+  }, [])
+
+  function handleViewChange(mode: ViewMode) {
+    setViewMode(mode)
+    localStorage.setItem(VIEW_STORAGE_KEY, mode)
+  }
 
   useEffect(() => {
     loadUser()
@@ -418,9 +464,9 @@ export default function ProjectsPage() {
               type="checkbox"
               checked={!!value}
               onChange={(e) => handleCustomFieldChange(field.name, e.target.checked)}
-              className="w-4 h-4 rounded border-slate-300"
+              className="w-4 h-4 rounded border-slate-300 dark:border-slate-600"
             />
-            <span className="text-sm text-slate-700">{field.label}</span>
+            <span className="text-sm text-slate-700 dark:text-slate-300">{field.label}</span>
           </label>
         )
       
@@ -447,57 +493,259 @@ export default function ProjectsPage() {
     ? projects 
     : projects.filter(p => p.status === statusFilter)
 
+  // Sort projects for list view
+  const sortedProjects = useMemo(() => {
+    if (!sortDescriptor.column) return filteredProjects
+    
+    return [...filteredProjects].sort((a, b) => {
+      let first: any
+      let second: any
+      
+      switch (sortDescriptor.column) {
+        case 'name':
+          first = a.name.toLowerCase()
+          second = b.name.toLowerCase()
+          break
+        case 'status':
+          first = a.status
+          second = b.status
+          break
+        case 'created_at':
+          first = new Date(a.created_at).getTime()
+          second = new Date(b.created_at).getTime()
+          break
+        default:
+          return 0
+      }
+      
+      const cmp = first < second ? -1 : first > second ? 1 : 0
+      return sortDescriptor.direction === 'descending' ? -cmp : cmp
+    })
+  }, [filteredProjects, sortDescriptor])
+
   // Get progress for goal-type projects
   const getProgress = (project: Project) => {
     return project.custom_fields?.progress || 0
   }
 
-  return (
-    <div className="min-h-screen bg-background">
-      <Navbar 
-        user={user} 
-        actions={
-          <Button 
-            color="primary" 
-            size="sm" 
-            onPress={handleNew}
-            startContent={<Plus className="w-4 h-4" />}
+  // Render Board View - Cards
+  const renderBoardView = () => (
+    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      {sortedProjects.map(project => {
+        const IconComponent = getTemplateIcon(project.template?.name)
+        return (
+          <Card 
+            key={project.id} 
+            className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:shadow-md transition-shadow cursor-pointer"
+            isPressable
+            onPress={() => handleEdit(project)}
           >
-            New Project
-          </Button>
-        }
-      />
-
-      <main className="p-4 sm:p-6 max-w-7xl mx-auto">
-        {/* Header */}
-        <div className="mb-6">
-          <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-            <div>
-              <div className="flex items-center gap-3 mb-2">
-                <h1 className="text-2xl font-bold text-slate-800">Projects</h1>
-                {selectedBusiness && (
-                  <Chip 
-                    size="sm" 
-                    variant="flat"
-                    style={{ backgroundColor: `${selectedBusiness.color}20`, color: selectedBusiness.color }}
-                  >
-                    {selectedBusiness.name}
-                  </Chip>
-                )}
-                {!selectedBusinessId && (
-                  <Chip size="sm" variant="flat" className="bg-slate-100 text-slate-600">
-                    Personal
+            <CardBody className="p-4">
+              <div className="flex items-start justify-between mb-3">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-lg bg-primary-50 dark:bg-primary-900/20 flex items-center justify-center">
+                    <IconComponent className="w-5 h-5 text-primary-600 dark:text-primary-400" />
+                  </div>
+                  <div>
+                    <h3 className="font-semibold text-slate-800 dark:text-slate-100">{project.name}</h3>
+                    {project.template && (
+                      <span className="text-xs text-slate-500 dark:text-slate-400">{project.template.name}</span>
+                    )}
+                  </div>
+                </div>
+                <Chip 
+                  size="sm" 
+                  color={statusOptions.find(s => s.key === project.status)?.color as any}
+                  variant="flat"
+                >
+                  {statusOptions.find(s => s.key === project.status)?.label}
+                </Chip>
+              </div>
+              
+              {project.description && (
+                <p className="text-sm text-slate-600 dark:text-slate-400 mb-3 line-clamp-2">{project.description}</p>
+              )}
+              
+              {/* Progress bar for goals */}
+              {project.custom_fields?.progress !== undefined && (
+                <div className="mb-3">
+                  <div className="flex justify-between text-xs text-slate-500 dark:text-slate-400 mb-1">
+                    <span>Progress</span>
+                    <span>{getProgress(project)}%</span>
+                  </div>
+                  <Progress 
+                    value={getProgress(project)} 
+                    size="sm"
+                    color={getProgress(project) >= 100 ? 'success' : 'primary'}
+                  />
+                </div>
+              )}
+              
+              {/* Custom fields preview */}
+              <div className="flex flex-wrap gap-2">
+                {project.custom_fields?.target_date && (
+                  <Chip size="sm" variant="flat" className="bg-blue-50 dark:bg-blue-900/20 text-blue-600 dark:text-blue-400">
+                    <Calendar className="w-3 h-3 mr-1" />
+                    {new Date(project.custom_fields.target_date).toLocaleDateString()}
                   </Chip>
                 )}
               </div>
-              <p className="text-slate-500 text-sm">
-                {filteredProjects.length} project{filteredProjects.length !== 1 ? 's' : ''}
-              </p>
-            </div>
+              
+              <div className="text-xs text-slate-400 dark:text-slate-500 mt-3">
+                {new Date(project.created_at).toLocaleDateString()}
+              </div>
+            </CardBody>
+          </Card>
+        )
+      })}
+    </div>
+  )
+
+  // Render List View - Table like Content
+  const renderListView = () => (
+    <Card className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
+      <CardBody className="p-0">
+        <Table
+          aria-label="Projects table"
+          sortDescriptor={sortDescriptor}
+          onSortChange={setSortDescriptor}
+          classNames={{
+            wrapper: "min-h-[400px]",
+          }}
+        >
+          <TableHeader>
+            <TableColumn key="name" allowsSorting>Name</TableColumn>
+            <TableColumn key="status" allowsSorting width={140}>Status</TableColumn>
+            <TableColumn key="template" width={120}>Template</TableColumn>
+            <TableColumn key="description" width={200}>Description</TableColumn>
+            <TableColumn key="created_at" allowsSorting width={120}>Created</TableColumn>
+            <TableColumn key="actions" width={150}>Actions</TableColumn>
+          </TableHeader>
+          <TableBody items={sortedProjects} emptyContent="No projects to display">
+            {(project) => (
+              <TableRow
+                key={project.id}
+                className="cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-700/50"
+              >
+                <TableCell>
+                  <div className="flex items-center gap-2">
+                    {(() => {
+                      const IconComponent = getTemplateIcon(project.template?.name)
+                      return <IconComponent className="w-4 h-4 text-slate-400" />
+                    })()}
+                    <span className="font-medium truncate max-w-[250px]">{project.name}</span>
+                  </div>
+                </TableCell>
+                <TableCell onClick={(e) => e.stopPropagation()}>
+                  <Select
+                    size="sm"
+                    selectedKeys={[project.status]}
+                    className="w-full"
+                    onChange={(e) => handleStatusChange(project.id, e.target.value)}
+                    aria-label="Change status"
+                  >
+                    {statusOptions.map(s => (
+                      <SelectItem key={s.key}>{s.label}</SelectItem>
+                    ))}
+                  </Select>
+                </TableCell>
+                <TableCell>
+                  {project.template?.name ? (
+                    <Chip size="sm" variant="flat" className="capitalize">
+                      {project.template.name}
+                    </Chip>
+                  ) : (
+                    <span className="text-slate-400">-</span>
+                  )}
+                </TableCell>
+                <TableCell>
+                  {project.description ? (
+                    <span className="text-sm text-slate-600 dark:text-slate-400 truncate block max-w-[180px]">
+                      {project.description}
+                    </span>
+                  ) : (
+                    <span className="text-slate-400">-</span>
+                  )}
+                </TableCell>
+                <TableCell>
+                  <span className="text-sm">
+                    {new Date(project.created_at).toLocaleDateString()}
+                  </span>
+                </TableCell>
+                <TableCell onClick={(e) => e.stopPropagation()}>
+                  <div className="flex gap-2">
+                    <Button
+                      size="sm"
+                      variant="flat"
+                      isIconOnly
+                      onPress={() => handleEdit(project)}
+                    >
+                      <Pencil className="w-4 h-4" />
+                    </Button>
+                    <Button
+                      size="sm"
+                      variant="flat"
+                      color="danger"
+                      isIconOnly
+                      onPress={() => handleDelete(project.id)}
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </Button>
+                  </div>
+                </TableCell>
+              </TableRow>
+            )}
+          </TableBody>
+        </Table>
+      </CardBody>
+    </Card>
+  )
+
+  return (
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
+      <Navbar user={user} />
+
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+        {/* View Tabs and Controls - matching Content page layout */}
+        <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center mb-6">
+          {/* Left side: View toggle */}
+          <div className="w-full sm:w-auto overflow-x-auto pb-2 sm:pb-0 -mx-4 px-4 sm:mx-0 sm:px-0">
+            <Tabs
+              selectedKey={viewMode}
+              onSelectionChange={(key) => handleViewChange(key as ViewMode)}
+              color="primary"
+              variant="solid"
+              size="md"
+              classNames={{
+                tabList: "flex-nowrap",
+                tab: "whitespace-nowrap",
+              }}
+            >
+              <Tab key="board" title={
+                <div className="flex items-center gap-2">
+                  <LayoutGrid className="w-4 h-4" />
+                </div>
+              } />
+              <Tab key="list" title={
+                <div className="flex items-center gap-2">
+                  <List className="w-4 h-4" />
+                </div>
+              } />
+            </Tabs>
+          </div>
+
+          <div className="flex items-center gap-2 flex-shrink-0">
+            <Button
+              color="primary"
+              onPress={handleNew}
+              startContent={<Plus className="w-4 h-4" />}
+            >
+              New Project
+            </Button>
           </div>
         </div>
 
-        {/* Status Filter */}
+        {/* Status Filter Pills */}
         <div className="flex gap-2 flex-wrap mb-6">
           <Button 
             size="sm" 
@@ -527,15 +775,17 @@ export default function ProjectsPage() {
           </div>
         )}
 
-        {/* Projects Grid */}
+        {/* Content */}
         {loading ? (
-          <div className="text-center py-12 text-slate-500">Loading projects...</div>
+          <div className="flex justify-center py-12">
+            <Spinner size="lg" />
+          </div>
         ) : filteredProjects.length === 0 ? (
-          <Card className="bg-white">
+          <Card className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
             <CardBody className="text-center py-12">
-              <Folder className="w-12 h-12 mx-auto mb-4 text-slate-300" />
-              <h3 className="text-lg font-semibold text-slate-800 mb-2">No Projects Yet</h3>
-              <p className="text-slate-500 mb-4">
+              <Folder className="w-12 h-12 mx-auto mb-4 text-slate-300 dark:text-slate-600" />
+              <h3 className="text-lg font-semibold text-slate-800 dark:text-slate-100 mb-2">No Projects Yet</h3>
+              <p className="text-slate-500 dark:text-slate-400 mb-4">
                 Create your first project to start organizing your work.
               </p>
               <Button color="primary" onPress={handleNew} startContent={<Plus className="w-4 h-4" />}>
@@ -544,81 +794,7 @@ export default function ProjectsPage() {
             </CardBody>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-            {filteredProjects.map(project => {
-              const IconComponent = getTemplateIcon(project.template?.name)
-              return (
-                <Card 
-                  key={project.id} 
-                  className="bg-white hover:shadow-md transition-shadow cursor-pointer"
-                  isPressable
-                  onPress={() => handleEdit(project)}
-                >
-                  <CardBody className="p-4">
-                    <div className="flex items-start justify-between mb-3">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-primary-50 flex items-center justify-center">
-                          <IconComponent className="w-5 h-5 text-primary-600" />
-                        </div>
-                        <div>
-                          <h3 className="font-semibold text-slate-800">{project.name}</h3>
-                          {project.template && (
-                            <span className="text-xs text-slate-500">{project.template.name}</span>
-                          )}
-                        </div>
-                      </div>
-                      <Chip 
-                        size="sm" 
-                        color={statusOptions.find(s => s.key === project.status)?.color as any}
-                        variant="flat"
-                      >
-                        {statusOptions.find(s => s.key === project.status)?.label}
-                      </Chip>
-                    </div>
-                    
-                    {project.description && (
-                      <p className="text-sm text-slate-600 mb-3 line-clamp-2">{project.description}</p>
-                    )}
-                    
-                    {/* Progress bar for goals */}
-                    {project.custom_fields?.progress !== undefined && (
-                      <div className="mb-3">
-                        <div className="flex justify-between text-xs text-slate-500 mb-1">
-                          <span>Progress</span>
-                          <span>{getProgress(project)}%</span>
-                        </div>
-                        <Progress 
-                          value={getProgress(project)} 
-                          size="sm"
-                          color={getProgress(project) >= 100 ? 'success' : 'primary'}
-                        />
-                      </div>
-                    )}
-                    
-                    {/* Custom fields preview */}
-                    <div className="flex flex-wrap gap-2">
-                      {project.custom_fields?.target_date && (
-                        <Chip size="sm" variant="flat" className="bg-blue-50 text-blue-600">
-                          <Calendar className="w-3 h-3 mr-1" />
-                          {new Date(project.custom_fields.target_date).toLocaleDateString()}
-                        </Chip>
-                      )}
-                      {project.custom_fields?.status && (
-                        <Chip size="sm" variant="flat" className="bg-violet-50 text-violet-600">
-                          {project.custom_fields.status}
-                        </Chip>
-                      )}
-                      {project.custom_fields?.priority && (
-                        <Chip size="sm" variant="flat" className="bg-orange-50 text-orange-600">
-                          {project.custom_fields.priority}
-                        </Chip>
-                      )}
-                    </div>
-                  </CardBody>
-                </Card>
-              )
-            })}
-          </div>
+          viewMode === 'board' ? renderBoardView() : renderListView()
         )}
       </main>
 
@@ -640,7 +816,7 @@ export default function ProjectsPage() {
               {/* Template Picker (only for new projects) */}
               {!editingProject && (
                 <div>
-                  <label className="text-sm font-medium text-slate-700 mb-2 block">
+                  <label className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-2 block">
                     Project Type
                   </label>
                   <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -652,13 +828,13 @@ export default function ProjectsPage() {
                           isPressable
                           className={`cursor-pointer transition-all ${
                             formData.template_id === template.id 
-                              ? 'ring-2 ring-primary bg-primary-50' 
-                              : 'hover:bg-slate-50'
+                              ? 'ring-2 ring-primary bg-primary-50 dark:bg-primary-900/20' 
+                              : 'hover:bg-slate-50 dark:hover:bg-slate-700'
                           }`}
                           onPress={() => handleTemplateChange(template.id)}
                         >
                           <CardBody className="p-3 text-center">
-                            <IconComponent className="w-6 h-6 mx-auto mb-1 text-slate-600" />
+                            <IconComponent className="w-6 h-6 mx-auto mb-1 text-slate-600 dark:text-slate-400" />
                             <div className="text-sm font-medium">{template.name}</div>
                           </CardBody>
                         </Card>
@@ -697,7 +873,7 @@ export default function ProjectsPage() {
               {/* Dynamic Fields from Template */}
               {selectedTemplate && selectedTemplate.fields.length > 0 && (
                 <div className="border-t pt-4 mt-2">
-                  <h4 className="text-sm font-medium text-slate-700 mb-3">
+                  <h4 className="text-sm font-medium text-slate-700 dark:text-slate-300 mb-3">
                     {selectedTemplate.name} Fields
                   </h4>
                   <div className="flex flex-col gap-4">
