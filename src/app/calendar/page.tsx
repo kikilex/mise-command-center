@@ -63,7 +63,9 @@ interface UserData {
 
 // Calendar colors
 const calendarColors: Record<string, { bg: string; text: string; border: string; darkBg: string; darkText: string }> = {
-  'Family': { bg: 'bg-green-100', text: 'text-green-700', border: 'border-green-200', darkBg: 'dark:bg-green-900/30', darkText: 'dark:text-green-300' },
+  'Mise Family': { bg: 'bg-green-100', text: 'text-green-700', border: 'border-green-200', darkBg: 'dark:bg-green-900/30', darkText: 'dark:text-green-300' },
+  'Alex\'s Work': { bg: 'bg-blue-100', text: 'text-blue-700', border: 'border-blue-200', darkBg: 'dark:bg-blue-900/30', darkText: 'dark:text-blue-300' },
+  'Ax': { bg: 'bg-purple-100', text: 'text-purple-700', border: 'border-purple-200', darkBg: 'dark:bg-purple-900/30', darkText: 'dark:text-purple-300' },
   'Work': { bg: 'bg-orange-100', text: 'text-orange-700', border: 'border-orange-200', darkBg: 'dark:bg-orange-900/30', darkText: 'dark:text-orange-300' },
   'Personal': { bg: 'bg-blue-100', text: 'text-blue-700', border: 'border-blue-200', darkBg: 'dark:bg-blue-900/30', darkText: 'dark:text-blue-300' },
   'US Holidays': { bg: 'bg-red-100', text: 'text-red-700', border: 'border-red-200', darkBg: 'dark:bg-red-900/30', darkText: 'dark:text-red-300' },
@@ -72,7 +74,7 @@ const calendarColors: Record<string, { bg: string; text: string; border: string;
 
 const defaultCalendarColor = { bg: 'bg-slate-100', text: 'text-slate-700', border: 'border-slate-200', darkBg: 'dark:bg-slate-800', darkText: 'dark:text-slate-300' }
 
-const CALENDARS = ['Family', 'Work', 'Personal']
+const CALENDARS = ['Mise Family', 'Alex\'s Work', 'Ax']
 
 export default function CalendarPage() {
   const [tasks, setTasks] = useState<Task[]>([])
@@ -99,7 +101,7 @@ export default function CalendarPage() {
     end_time: '',
     all_day: false,
     location: '',
-    calendar_name: 'Personal',
+    calendar_name: 'Mise Family',
   })
   const [saving, setSaving] = useState(false)
   
@@ -290,7 +292,7 @@ export default function CalendarPage() {
       end_time: '',
       all_day: false,
       location: '',
-      calendar_name: 'Personal',
+      calendar_name: 'Mise Family',
     })
   }
 
