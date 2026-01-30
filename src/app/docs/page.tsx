@@ -311,19 +311,6 @@ function DocsPageContent() {
     })
   }, [documents, searchQuery, statusFilter, categoryTab, selectedTags, showArchived, showHidden, parseSearchQuery])
 
-  // Count by category for tabs
-  const categoryCounts = useMemo(() => {
-    const counts: Record<string, number> = { all: 0 }
-    documents.forEach(doc => {
-      if (!doc.archived && doc.visibility !== 'hidden') {
-        counts.all++
-        const cat = doc.category || 'all'
-        counts[cat] = (counts[cat] || 0) + 1
-      }
-    })
-    return counts
-  }, [documents])
-
   // Get content preview (first 150 chars, strip markdown)
   const getPreview = (content: string) => {
     const stripped = content
@@ -407,7 +394,6 @@ function DocsPageContent() {
           <div className="flex items-center gap-3">
             <FileText className="w-8 h-8 text-violet-600 dark:text-violet-400" />
             <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Documents</h1>
-            <Chip size="sm" variant="flat">{filteredDocuments.length}</Chip>
           </div>
           <Button
             color="primary"
@@ -434,16 +420,7 @@ function DocsPageContent() {
               {categoryOptions.map(cat => (
                 <Tab 
                   key={cat.key} 
-                  title={
-                    <div className="flex items-center gap-2">
-                      <span>{cat.label}</span>
-                      {categoryCounts[cat.key] !== undefined && (
-                        <Chip size="sm" variant="flat" className="text-xs">
-                          {categoryCounts[cat.key] || 0}
-                        </Chip>
-                      )}
-                    </div>
-                  }
+                  title={cat.label}
                 />
               ))}
             </Tabs>
