@@ -8,7 +8,7 @@ import remarkGfm from 'remark-gfm'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import { useTheme } from 'next-themes'
-import { ArrowLeft, Edit, FileText, List, ExternalLink, Share2, Check, RotateCcw, MessageSquare, Send, AlertCircle, Trash2, CheckCircle2, Clock, ChevronDown, ChevronRight, ArrowUp, ArrowDown, ChevronsDownUp, ChevronsUpDown, Folder, Tag as TagIcon, X, Plus } from 'lucide-react'
+import { ArrowLeft, Edit, FileText, List, ExternalLink, Share2, Check, RotateCcw, MessageSquare, Send, AlertCircle, Trash2, CheckCircle2, Clock, ChevronDown, ChevronRight, ArrowUp, ArrowDown, ChevronsDownUp, ChevronsUpDown, Folder, Tag as TagIcon, X, Plus, Settings } from 'lucide-react'
 import {
   Button,
   Chip,
@@ -24,6 +24,9 @@ import {
   Select,
   SelectItem,
   useDisclosure,
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
 } from '@heroui/react'
 import { createClient } from '@/lib/supabase/client'
 import Navbar from '@/components/Navbar'
@@ -134,6 +137,9 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
   const [editTags, setEditTags] = useState<string[]>([])
   const [newTag, setNewTag] = useState('')
   const [savingMeta, setSavingMeta] = useState(false)
+  
+  // Document properties popover state
+  const [propertiesOpen, setPropertiesOpen] = useState(false)
   
   // Theme for syntax highlighting
   const { resolvedTheme } = useTheme()
@@ -673,6 +679,134 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
             >
               {copied ? 'Copied!' : 'Share'}
             </Button>
+            <Popover isOpen={propertiesOpen} onOpenChange={setPropertiesOpen} placement="bottom-end">
+              <PopoverTrigger>
+                <Button
+                  variant="flat"
+                  startContent={<Settings className="w-4 h-4" />}
+                >
+                  Properties
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="w-72 p-4">
+                <div className="space-y-4">
+                  <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-2">
+                    <Folder className="w-4 h-4" />
+                    Document Properties
+                  </h4>
+                  
+                  {/* Category */}
+                  <div>
+                    <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">
+                      Category
+                    </label>
+                    <Select
+                      size="sm"
+                      selectedKeys={[editCategory]}
+                      onChange={(e) => setEditCategory(e.target.value)}
+                      className="w-full"
+                    >
+                      {categoryOptions.map(cat => (
+                        <SelectItem key={cat.key}>{cat.label}</SelectItem>
+                      ))}
+                    </Select>
+                  </div>
+                  
+                  {/* Tags */}
+                  <div>
+                    <div className="flex items-center justify-between mb-1">
+                      <label className="block text-xs font-medium text-slate-500 dark:text-slate-400">
+                        Tags
+                      </label>
+                      <span className="text-xs text-slate-400">{editTags.length}/10</span>
+                    </div>
+                    
+                    {/* Current Tags */}
+                    <div className="flex flex-wrap gap-1 mb-2">
+                      {editTags.map(tag => (
+                        <Chip
+                          key={tag}
+                          size="sm"
+                          variant="flat"
+                          onClose={() => removeTag(tag)}
+                          className="text-xs"
+                        >
+                          {tag}
+                        </Chip>
+                      ))}
+                      {editTags.length === 0 && (
+                        <span className="text-xs text-slate-400 italic">No tags yet</span>
+                      )}
+                    </div>
+                    
+                    {/* Add Tag Input */}
+                    <div className="flex gap-1">
+                      <Input
+                        size="sm"
+                        placeholder="Add tag..."
+                        value={newTag}
+                        onChange={(e) => setNewTag(e.target.value)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault()
+                            addTag()
+                          }
+                        }}
+                        className="flex-1"
+                      />
+                      <Button
+                        size="sm"
+                        isIconOnly
+                        variant="flat"
+                        onPress={addTag}
+                        isDisabled={!newTag.trim()}
+                      >
+                        <Plus className="w-3 h-3" />
+                      </Button>
+                    </div>
+                    <p className="text-xs text-slate-400 mt-1">
+                      Press Enter or click + to add
+                    </p>
+                  </div>
+                  
+                  {/* Save Button */}
+                  <Button
+                    color="primary"
+                    size="sm"
+                    className="w-full"
+                    onPress={() => {
+                      saveDocumentMeta()
+                      setPropertiesOpen(false)
+                    }}
+                    isLoading={savingMeta}
+                    isDisabled={savingMeta || (
+                      editCategory === (document?.category || 'all') &&
+                      JSON.stringify(editTags.sort()) === JSON.stringify((document?.tags || []).sort())
+                    )}
+                  >
+                    {savingMeta ? 'Saving...' : 'Save Changes'}
+                  </Button>
+                  
+                  {/* Current Values (read-only) */}
+                  <div className="pt-4 border-t border-slate-100 dark:border-slate-700">
+                    <div className="text-xs text-slate-500 dark:text-slate-400 space-y-1">
+                      <div className="flex justify-between">
+                        <span>Current Category:</span>
+                        <span className="font-medium text-slate-700 dark:text-slate-300">
+                          {categoryOptions.find(c => c.key === (document?.category || 'all'))?.label || 'Uncategorized'}
+                        </span>
+                      </div>
+                      <div className="flex justify-between">
+                        <span>Tags Count:</span>
+                        <span className="font-medium text-slate-700 dark:text-slate-300">
+                          {(document?.tags || []).length}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </PopoverContent>
+            </Popover>
             <Link href={`/docs/${id}/edit`}>
               <Button color="primary" startContent={<Edit className="w-4 h-4" />}>
                 Edit
@@ -741,107 +875,6 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
         </div>
 
         <Divider className="mb-8" />
-
-        {/* Mobile Category & Tag Editor (shown on small screens) */}
-        <div className="lg:hidden mb-6">
-          <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-4">
-            <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-4 flex items-center gap-2">
-              <Folder className="w-4 h-4" />
-              Document Properties
-            </h4>
-            
-            <div className="space-y-4">
-              {/* Category */}
-              <div>
-                <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">
-                  Category
-                </label>
-                <Select
-                  size="sm"
-                  selectedKeys={[editCategory]}
-                  onChange={(e) => setEditCategory(e.target.value)}
-                  className="w-full"
-                >
-                  {categoryOptions.map(cat => (
-                    <SelectItem key={cat.key}>{cat.label}</SelectItem>
-                  ))}
-                </Select>
-              </div>
-              
-              {/* Tags */}
-              <div>
-                <div className="flex items-center justify-between mb-1">
-                  <label className="block text-xs font-medium text-slate-500 dark:text-slate-400">
-                    Tags
-                  </label>
-                  <span className="text-xs text-slate-400">{editTags.length}/10</span>
-                </div>
-                
-                {/* Current Tags */}
-                <div className="flex flex-wrap gap-1 mb-2">
-                  {editTags.map(tag => (
-                    <Chip
-                      key={tag}
-                      size="sm"
-                      variant="flat"
-                      onClose={() => removeTag(tag)}
-                      className="text-xs"
-                    >
-                      {tag}
-                    </Chip>
-                  ))}
-                  {editTags.length === 0 && (
-                    <span className="text-xs text-slate-400 italic">No tags yet</span>
-                  )}
-                </div>
-                
-                {/* Add Tag Input */}
-                <div className="flex gap-1">
-                  <Input
-                    size="sm"
-                    placeholder="Add tag..."
-                    value={newTag}
-                    onChange={(e) => setNewTag(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault()
-                        addTag()
-                      }
-                    }}
-                    className="flex-1"
-                  />
-                  <Button
-                    size="sm"
-                    isIconOnly
-                    variant="flat"
-                    onPress={addTag}
-                    isDisabled={!newTag.trim()}
-                  >
-                    <Plus className="w-3 h-3" />
-                  </Button>
-                </div>
-                <p className="text-xs text-slate-400 mt-1">
-                  Press Enter or click + to add
-                </p>
-              </div>
-              
-              {/* Save Button */}
-              <Button
-                color="primary"
-                size="sm"
-                className="w-full"
-                onPress={saveDocumentMeta}
-                isLoading={savingMeta}
-                isDisabled={savingMeta || (
-                  editCategory === (document?.category || 'all') &&
-                  JSON.stringify(editTags.sort()) === JSON.stringify((document?.tags || []).sort())
-                )}
-              >
-                {savingMeta ? 'Saving...' : 'Save Changes'}
-              </Button>
-            </div>
-          </div>
-        </div>
 
         {/* Layout with optional TOC sidebar */}
         <div className="flex gap-8">
@@ -1023,127 +1056,6 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
               </div>
             </div>
           )}
-
-          {/* Category & Tag Editing Sidebar */}
-          <aside className="hidden lg:block w-64 flex-shrink-0">
-            <div className="sticky top-8 max-h-[calc(100vh-6rem)] overflow-y-auto pr-2 scrollbar-thin scrollbar-thumb-slate-300 dark:scrollbar-thumb-slate-600 scrollbar-track-transparent">
-              <div className="bg-white dark:bg-slate-800 rounded-lg border border-slate-200 dark:border-slate-700 p-4">
-                <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-4 flex items-center gap-2">
-                  <Folder className="w-4 h-4" />
-                  Document Properties
-                </h4>
-                
-                <div className="space-y-4">
-                  {/* Category */}
-                  <div>
-                    <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">
-                      Category
-                    </label>
-                    <Select
-                      size="sm"
-                      selectedKeys={[editCategory]}
-                      onChange={(e) => setEditCategory(e.target.value)}
-                      className="w-full"
-                    >
-                      {categoryOptions.map(cat => (
-                        <SelectItem key={cat.key}>{cat.label}</SelectItem>
-                      ))}
-                    </Select>
-                  </div>
-                  
-                  {/* Tags */}
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="block text-xs font-medium text-slate-500 dark:text-slate-400">
-                        Tags
-                      </label>
-                      <span className="text-xs text-slate-400">{editTags.length}/10</span>
-                    </div>
-                    
-                    {/* Current Tags */}
-                    <div className="flex flex-wrap gap-1 mb-2">
-                      {editTags.map(tag => (
-                        <Chip
-                          key={tag}
-                          size="sm"
-                          variant="flat"
-                          onClose={() => removeTag(tag)}
-                          className="text-xs"
-                        >
-                          {tag}
-                        </Chip>
-                      ))}
-                      {editTags.length === 0 && (
-                        <span className="text-xs text-slate-400 italic">No tags yet</span>
-                      )}
-                    </div>
-                    
-                    {/* Add Tag Input */}
-                    <div className="flex gap-1">
-                      <Input
-                        size="sm"
-                        placeholder="Add tag..."
-                        value={newTag}
-                        onChange={(e) => setNewTag(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault()
-                            addTag()
-                          }
-                        }}
-                        className="flex-1"
-                      />
-                      <Button
-                        size="sm"
-                        isIconOnly
-                        variant="flat"
-                        onPress={addTag}
-                        isDisabled={!newTag.trim()}
-                      >
-                        <Plus className="w-3 h-3" />
-                      </Button>
-                    </div>
-                    <p className="text-xs text-slate-400 mt-1">
-                      Press Enter or click + to add
-                    </p>
-                  </div>
-                  
-                  {/* Save Button */}
-                  <Button
-                    color="primary"
-                    size="sm"
-                    className="w-full"
-                    onPress={saveDocumentMeta}
-                    isLoading={savingMeta}
-                    isDisabled={savingMeta || (
-                      editCategory === (document?.category || 'all') &&
-                      JSON.stringify(editTags.sort()) === JSON.stringify((document?.tags || []).sort())
-                    )}
-                  >
-                    {savingMeta ? 'Saving...' : 'Save Changes'}
-                  </Button>
-                  
-                  {/* Current Values (read-only) */}
-                  <div className="pt-4 border-t border-slate-100 dark:border-slate-700">
-                    <div className="text-xs text-slate-500 dark:text-slate-400 space-y-1">
-                      <div className="flex justify-between">
-                        <span>Current Category:</span>
-                        <span className="font-medium text-slate-700 dark:text-slate-300">
-                          {categoryOptions.find(c => c.key === (document?.category || 'all'))?.label || 'Uncategorized'}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Tags Count:</span>
-                        <span className="font-medium text-slate-700 dark:text-slate-300">
-                          {(document?.tags || []).length}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </div>
-          </aside>
 
           {/* Main Content */}
           <article className="flex-1 min-w-0">
