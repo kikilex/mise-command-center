@@ -48,7 +48,6 @@ import {
   Video,
   LayoutGrid,
   List,
-  Mic,
   Search,
   Settings,
   Archive,
@@ -678,8 +677,6 @@ function ContentPageContent() {
 
   // Content card component - simplified like Tasks
   const ContentCard = ({ item }: { item: ContentItem }) => {
-    const voice = item.voice || item.custom_fields?.voice
-
     return (
       <Card
         className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 shadow-sm hover:shadow-md transition-shadow cursor-pointer w-full overflow-hidden"
@@ -704,12 +701,6 @@ function ContentPageContent() {
                 {item.template?.name && (
                   <Chip size="sm" variant="flat" className="text-xs capitalize">
                     {item.template.name}
-                  </Chip>
-                )}
-                {voice && (
-                  <Chip size="sm" variant="flat" className="text-xs">
-                    <Mic className="w-3 h-3 mr-1" />
-                    {voice}
                   </Chip>
                 )}
               </div>
