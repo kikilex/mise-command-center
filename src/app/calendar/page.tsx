@@ -18,7 +18,7 @@ import {
   Select,
   SelectItem,
 } from "@heroui/react"
-import { RefreshCw, Plus, Calendar, MapPin, Clock, AlertCircle } from 'lucide-react'
+import { Plus, Calendar, MapPin, Clock, AlertCircle } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import Navbar from '@/components/Navbar'
 import { showErrorToast, getErrorMessage } from '@/lib/errors'
@@ -81,7 +81,6 @@ export default function CalendarPage() {
   const [user, setUser] = useState<UserData | null>(null)
   const [currentDate, setCurrentDate] = useState(new Date())
   const [loading, setLoading] = useState(true)
-  const [syncing, setSyncing] = useState(false)
   const [loadError, setLoadError] = useState<string | null>(null)
   
   // Filter state
@@ -187,35 +186,6 @@ export default function CalendarPage() {
       showErrorToast(error, 'Failed to load calendar data')
     } finally {
       setLoading(false)
-    }
-  }
-
-  // Sync with Apple Calendar
-  async function handleSync() {
-    setSyncing(true)
-    try {
-      const response = await fetch('/api/calendar/sync', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ calendars: ['Home', 'Work'] }),
-      })
-      
-      const data = await response.json()
-      
-      if (data.error) {
-        throw new Error(data.error)
-      }
-      
-      const { results } = data
-      toast.success(`Synced! ${results.pulled} pulled, ${results.pushed} pushed, ${results.updated} updated`)
-      
-      // Refresh events
-      await fetchCalendarEvents(currentDate)
-    } catch (error) {
-      console.error('Sync failed:', error)
-      showErrorToast(error, 'Sync failed')
-    } finally {
-      setSyncing(false)
     }
   }
 
@@ -456,14 +426,6 @@ export default function CalendarPage() {
                 Calendar
               </h1>
               <div className="flex gap-2">
-                <Button
-                  variant="flat"
-                  startContent={<RefreshCw className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`} />}
-                  onPress={handleSync}
-                  isLoading={syncing}
-                >
-                  Sync Now
-                </Button>
                 <Button
                   color="primary"
                   startContent={<Plus className="w-4 h-4" />}
