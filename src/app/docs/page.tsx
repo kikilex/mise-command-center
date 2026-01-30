@@ -407,7 +407,7 @@ function DocsPageContent() {
           <div className="flex items-center gap-3">
             <FileText className="w-8 h-8 text-violet-600 dark:text-violet-400" />
             <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Documents</h1>
-            <Chip size="sm" variant="flat">{documents.length}</Chip>
+            <Chip size="sm" variant="flat">{filteredDocuments.length}</Chip>
           </div>
           <Button
             color="primary"

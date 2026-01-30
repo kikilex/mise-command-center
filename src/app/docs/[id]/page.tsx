@@ -524,6 +524,13 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
       .map(section => section.parent.id)
   }, [groupedTOC])
 
+  // Collapse all sections by default when content loads
+  useEffect(() => {
+    if (collapsibleSectionIds.length > 0) {
+      setCollapsedSections(new Set(collapsibleSectionIds))
+    }
+  }, [collapsibleSectionIds])
+
   // Check if all collapsible sections are collapsed
   const allCollapsed = useMemo(() => {
     if (collapsibleSectionIds.length === 0) return false
@@ -688,15 +695,6 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
             <div className="flex items-center gap-3">
               <Clock className="w-5 h-5 text-blue-600 dark:text-blue-400 flex-shrink-0" />
               <p className="font-medium text-blue-800 dark:text-blue-200 flex-1">Awaiting Approval</p>
-              <Button
-                color="success"
-                size="sm"
-                startContent={approving ? null : <CheckCircle2 className="w-4 h-4" />}
-                onPress={handleApprove}
-                isLoading={approving}
-              >
-                Approve
-              </Button>
             </div>
           </div>
         )}
