@@ -55,9 +55,18 @@ CREATE TABLE IF NOT EXISTS business_members (
 );
 
 -- Add foreign key for businesses.owner_id after users table exists
-ALTER TABLE businesses 
-  ADD CONSTRAINT fk_businesses_owner 
-  FOREIGN KEY (owner_id) REFERENCES users(id);
+DO $$ 
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM information_schema.table_constraints 
+    WHERE table_name = 'businesses' 
+    AND constraint_name = 'fk_businesses_owner'
+  ) THEN
+    ALTER TABLE businesses 
+    ADD CONSTRAINT fk_businesses_owner 
+    FOREIGN KEY (owner_id) REFERENCES users(id);
+  END IF;
+END $$;
 
 -- ============================================
 -- PROJECTS

@@ -17,6 +17,7 @@ import {
 import { SunIcon, MoonIcon, ComputerDesktopIcon, PencilIcon, TrashIcon, PlusIcon } from '@heroicons/react/24/outline'
 import { createClient } from '@/lib/supabase/client'
 import Navbar from '@/components/Navbar'
+import SettingsNav from '@/components/SettingsNav'
 import { showErrorToast, showSuccessToast } from '@/lib/errors'
 import { useBusiness, Business } from '@/lib/business-context'
 import { useMenuSettings, PERSONAL_MENU_OPTIONS, BUSINESS_MENU_OPTIONS, DEFAULT_MENU_CONFIG, MenuConfig } from '@/lib/menu-settings'
@@ -295,9 +296,22 @@ export default function SettingsPage() {
     return (
       <div className="min-h-screen bg-background">
         <Navbar user={null} />
-        <main className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
-          <div className="flex justify-center py-12">
-            <Spinner size="lg" />
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+          <div className="flex flex-col lg:flex-row gap-8">
+            {/* Settings Sidebar */}
+            <div className="lg:w-64 flex-shrink-0">
+              <div className="sticky top-24">
+                <h1 className="text-2xl font-bold text-foreground mb-6">Settings</h1>
+                <SettingsNav />
+              </div>
+            </div>
+
+            {/* Settings Content */}
+            <div className="flex-1">
+              <div className="flex justify-center py-12">
+                <Spinner size="lg" />
+              </div>
+            </div>
           </div>
         </main>
       </div>
@@ -308,8 +322,19 @@ export default function SettingsPage() {
     <div className="min-h-screen bg-background">
       <Navbar user={user} />
 
-      <main className="max-w-4xl mx-auto px-4 sm:px-6 py-8">
-        <h1 className="text-2xl font-bold text-foreground mb-6">Settings</h1>
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+        <div className="flex flex-col lg:flex-row gap-8">
+          {/* Settings Sidebar */}
+          <div className="lg:w-64 flex-shrink-0">
+            <div className="sticky top-24">
+              <h1 className="text-2xl font-bold text-foreground mb-6">Settings</h1>
+              <SettingsNav />
+            </div>
+          </div>
+
+          {/* Settings Content */}
+          <div className="flex-1">
+            <h2 className="text-xl font-semibold text-foreground mb-6">General Settings</h2>
 
         {/* Theme Settings Card */}
         <Card className="mb-6">
@@ -661,6 +686,8 @@ export default function SettingsPage() {
             </div>
           </CardBody>
         </Card>
+          </div>
+        </div>
       </main>
 
       {/* Business Modals */}
