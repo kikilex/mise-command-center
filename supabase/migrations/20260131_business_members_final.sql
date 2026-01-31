@@ -59,28 +59,25 @@ DROP POLICY IF EXISTS "Only owners/admins can update members" ON business_member
 DROP POLICY IF EXISTS "Only owners/admins can delete members, owners cannot be removed" ON business_members;
 
 -- Policy 1: Users can see memberships for businesses they belong to
+-- Note: Cannot self-reference business_members (causes infinite recursion)
+-- Instead check: own membership, or business owner, or system admin
 CREATE POLICY "Users can view business members for their businesses"
 ON business_members
 FOR SELECT
 USING (
-  EXISTS (
-    SELECT 1 FROM business_members bm2
-    WHERE bm2.business_id = business_members.business_id
-    AND bm2.user_id = auth.uid()
-  )
+  user_id = auth.uid()
+  OR business_id IN (SELECT id FROM businesses WHERE owner_id = auth.uid())
+  OR EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role IN ('admin', 'ai'))
 );
 
 -- Policy 2: Only owners/admins can insert new memberships
+-- Note: Check via businesses.owner_id to avoid recursion
 CREATE POLICY "Only owners/admins can insert members"
 ON business_members
 FOR INSERT
 WITH CHECK (
-  EXISTS (
-    SELECT 1 FROM business_members bm2
-    WHERE bm2.business_id = business_members.business_id
-    AND bm2.user_id = auth.uid()
-    AND bm2.role IN ('owner', 'admin')
-  )
+  business_id IN (SELECT id FROM businesses WHERE owner_id = auth.uid())
+  OR EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role IN ('admin', 'ai'))
 );
 
 -- Policy 3: Only owners/admins can update memberships
@@ -88,41 +85,20 @@ CREATE POLICY "Only owners/admins can update members"
 ON business_members
 FOR UPDATE
 USING (
-  EXISTS (
-    SELECT 1 FROM business_members bm2
-    WHERE bm2.business_id = business_members.business_id
-    AND bm2.user_id = auth.uid()
-    AND bm2.role IN ('owner', 'admin')
-  )
-)
-WITH CHECK (
-  EXISTS (
-    SELECT 1 FROM business_members bm2
-    WHERE bm2.business_id = business_members.business_id
-    AND bm2.user_id = auth.uid()
-    AND bm2.role IN ('owner', 'admin')
-  )
+  business_id IN (SELECT id FROM businesses WHERE owner_id = auth.uid())
+  OR EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role IN ('admin', 'ai'))
 );
 
--- Policy 4: Only owners/admins can delete memberships, but owners cannot be removed (except by themselves)
-CREATE POLICY "Only owners/admins can delete members, owners cannot be removed"
+-- Policy 4: Only owners can delete memberships, owners cannot be removed by others
+CREATE POLICY "Only owners/admins can delete members"
 ON business_members
 FOR DELETE
 USING (
-  -- Check if the deleter is an owner/admin
-  EXISTS (
-    SELECT 1 FROM business_members bm2
-    WHERE bm2.business_id = business_members.business_id
-    AND bm2.user_id = auth.uid()
-    AND bm2.role IN ('owner', 'admin')
+  (
+    business_id IN (SELECT id FROM businesses WHERE owner_id = auth.uid())
+    AND (role != 'owner' OR user_id = auth.uid())
   )
-  -- Additional check: owners cannot be removed by others
-  AND (
-    -- If the member being deleted is an owner, they can only be deleted by themselves
-    (business_members.role = 'owner' AND business_members.user_id = auth.uid())
-    -- If not an owner, anyone (owner/admin) can delete
-    OR business_members.role != 'owner'
-  )
+  OR EXISTS (SELECT 1 FROM users WHERE id = auth.uid() AND role = 'admin')
 );
 
 -- Migration: Auto-add existing business owners as members if not already members
