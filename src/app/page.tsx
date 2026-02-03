@@ -39,6 +39,7 @@ import {
   Pencil,
   Check,
   X,
+  Clock,
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
@@ -92,6 +93,14 @@ interface AIAgent {
   slug: string
   is_active: boolean
   role: string
+  last_action?: string
+  last_action_at?: string
+}
+
+interface WorkLogEntry {
+  agent_name: string
+  action: string
+  created_at: string
 }
 
 const priorityOptions = [
@@ -150,7 +159,7 @@ export default function Home() {
         role: profile?.role || 'member'
       });
 
-      const [spacesRes, tasksRes, completedRes, inboxRes, messagesRes, agentsRes] = await Promise.all([
+      const [spacesRes, tasksRes, completedRes, inboxRes, messagesRes, agentsRes, workLogRes] = await Promise.all([
         supabase.from('spaces').select('id, name, color'),
         supabase.from('tasks')
           .select('*')
@@ -172,15 +181,27 @@ export default function Home() {
           .eq('item_type', 'message')
           .order('created_at', { ascending: false })
           .limit(30),
-        supabase.from('ai_agents').select('*').order('created_at', { ascending: true })
+        supabase.from('ai_agents').select('*').order('created_at', { ascending: true }),
+        supabase.from('ai_work_log').select('agent_name,action,created_at').order('created_at', { ascending: false }).limit(10)
       ]);
+
+      // Merge latest work log action into agents
+      const workLogs: WorkLogEntry[] = workLogRes.data || [];
+      const agentsWithActions = (agentsRes.data || []).map((agent: AIAgent) => {
+        const latestLog = workLogs.find(w => w.agent_name?.toLowerCase() === agent.slug?.toLowerCase() || w.agent_name?.toLowerCase() === agent.name?.toLowerCase());
+        return {
+          ...agent,
+          last_action: latestLog?.action,
+          last_action_at: latestLog?.created_at,
+        };
+      });
 
       setSpaces(spacesRes.data || []);
       setTodaysTasks(tasksRes.data || []);
       setCompletedTasks(completedRes.data || []);
       setInboxItems(inboxRes.data || []);
       setMessages(messagesRes.data || []);
-      setAgents(agentsRes.data || []);
+      setAgents(agentsWithActions);
 
     } catch (error) {
       console.error('Dashboard load error:', error);
@@ -358,6 +379,17 @@ export default function Home() {
       setSubmitting(false);
     }
   }
+
+  const timeAgo = (dateStr: string) => {
+    if (!dateStr) return '';
+    const diff = Date.now() - new Date(dateStr).getTime();
+    const mins = Math.floor(diff / 60000);
+    if (mins < 1) return 'just now';
+    if (mins < 60) return `${mins}m ago`;
+    const hrs = Math.floor(mins / 60);
+    if (hrs < 24) return `${hrs}h ago`;
+    return `${Math.floor(hrs / 24)}d ago`;
+  };
 
   const getPriorityColor = (priority: string) => {
     switch (priority) {
@@ -707,35 +739,57 @@ export default function Home() {
               </CardBody>
             </Card>
 
-            <div className="space-y-4">
-              <h2 className="text-sm font-black uppercase tracking-widest text-slate-400 px-1 flex items-center gap-2">
-                <Bot className="w-4 h-4" /> Agent Status
-              </h2>
-              {agents.map((agent) => (
-                <Card 
-                  key={agent.id} 
-                  isPressable 
-                  onPress={() => router.push('/ai')}
-                  className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden"
-                >
-                  <div className={`h-1 w-full ${agent.is_active ? 'bg-emerald-500' : 'bg-slate-400'}`} />
-                  <CardBody className="p-4">
-                    <div className="flex items-center justify-between">
+            <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+              <CardHeader className="bg-slate-50 dark:bg-slate-800/50 px-4 py-3 border-b border-slate-200 dark:border-slate-700">
+                <div className="flex items-center justify-between w-full">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
+                      <Bot className="w-4 h-4 text-white" />
+                    </div>
+                    <span className="font-semibold text-slate-800 dark:text-slate-100">Agents</span>
+                  </div>
+                  <Button size="sm" variant="light" radius="full" onPress={() => router.push('/ai')}>
+                    View All
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardBody className="p-0 divide-y divide-slate-100 dark:divide-slate-800">
+                {agents.map((agent) => (
+                  <div 
+                    key={agent.id} 
+                    onClick={() => router.push('/ai')}
+                    className="p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors"
+                  >
+                    <div className="flex items-center justify-between mb-2">
                       <div className="flex items-center gap-3">
-                        <Avatar name={agent.name} size="sm" className="bg-gradient-to-br from-violet-500 to-purple-600 text-white font-black" />
+                        <div className="relative">
+                          <Avatar name={agent.name} size="sm" className="bg-gradient-to-br from-violet-500 to-purple-600 text-white font-black" />
+                          <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white dark:border-slate-900 ${agent.is_active ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+                        </div>
                         <div>
-                          <p className="font-bold text-slate-800 dark:text-slate-100 leading-none mb-1">{agent.name}</p>
-                          <p className="text-[10px] uppercase font-bold text-slate-400 tracking-tight">{agent.role.replace(/_/g, ' ')}</p>
+                          <p className="font-semibold text-sm text-slate-800 dark:text-slate-100">{agent.name}</p>
+                          <p className="text-[10px] text-slate-400 capitalize">{agent.role.replace(/_/g, ' ')}</p>
                         </div>
                       </div>
-                      <Chip size="sm" variant="dot" color={agent.is_active ? 'success' : 'default'} className="h-6">
+                      <Chip size="sm" variant="flat" color={agent.is_active ? 'success' : 'default'} className="h-5 text-[10px]">
                         {agent.is_active ? 'Online' : 'Offline'}
                       </Chip>
                     </div>
-                  </CardBody>
-                </Card>
-              ))}
-            </div>
+                    {agent.last_action && (
+                      <div className="ml-11 mt-1">
+                        <div className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+                          <Activity className="w-3 h-3 text-slate-400 flex-shrink-0" />
+                          <span className="line-clamp-1">{agent.last_action}</span>
+                        </div>
+                        {agent.last_action_at && (
+                          <p className="text-[10px] text-slate-400 ml-4.5 mt-0.5">{timeAgo(agent.last_action_at)}</p>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </CardBody>
+            </Card>
           </div>
         </div>
       </main>

@@ -13,7 +13,7 @@ import {
 } from "@heroui/react"
 import { createClient } from '@/lib/supabase/client'
 import { MessageCircle, X, Send, ArrowLeft, Bot, User, Briefcase } from 'lucide-react'
-import { motion, AnimatePresence } from 'framer-motion'
+import { showErrorToast } from '@/lib/errors'
 
 interface ChatMessage {
   id: string
@@ -157,13 +157,9 @@ export default function ChatWidget() {
 
   return (
     <div className="fixed bottom-6 right-6 z-[100] flex flex-col items-end gap-4">
-      <AnimatePresence>
         {isOpen && (
-          <motion.div
-            initial={{ opacity: 0, y: 20, scale: 0.95 }}
-            animate={{ opacity: 1, y: 0, scale: 1 }}
-            exit={{ opacity: 0, y: 20, scale: 0.95 }}
-            className="w-[350px] h-[500px] bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col overflow-hidden mb-2"
+          <div
+            className="w-[350px] h-[450px] bg-white dark:bg-slate-900 rounded-3xl shadow-2xl border border-slate-200 dark:border-slate-800 flex flex-col overflow-hidden mb-2 animate-in fade-in slide-in-from-bottom-4 duration-200"
           >
             {/* Header */}
             <div className="bg-slate-50 dark:bg-slate-800/50 p-4 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
@@ -242,24 +238,21 @@ export default function ChatWidget() {
                 </ScrollShadow>
               )}
             </div>
-          </motion.div>
+          </div>
         )}
-      </AnimatePresence>
 
       {/* Floating Button */}
-      <motion.button
-        whileHover={{ scale: 1.05 }}
-        whileTap={{ scale: 0.95 }}
+      <button
         onClick={() => setIsOpen(!isOpen)}
-        className="w-16 h-16 bg-violet-600 rounded-full shadow-2xl flex items-center justify-center text-white relative group border-4 border-white dark:border-slate-800"
+        className="w-14 h-14 bg-violet-600 hover:bg-violet-700 active:scale-95 rounded-full shadow-2xl flex items-center justify-center text-white relative transition-all border-4 border-white dark:border-slate-800"
       >
-        <MessageCircle className={`w-8 h-8 transition-transform duration-500 ${isOpen ? 'rotate-90' : ''}`} />
+        <MessageCircle className={`w-7 h-7 transition-transform duration-300 ${isOpen ? 'rotate-90' : ''}`} />
         {unreadTotal > 0 && (
-          <div className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-black w-6 h-6 rounded-full flex items-center justify-center border-2 border-white dark:border-slate-800">
+          <div className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center border-2 border-white dark:border-slate-800">
             {unreadTotal}
           </div>
         )}
-      </motion.button>
+      </button>
     </div>
   )
 }
