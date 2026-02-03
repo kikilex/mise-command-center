@@ -58,6 +58,7 @@ import {
   Unlock,
   User,
   LogOut,
+  Briefcase,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -159,6 +160,7 @@ export {
   Unlock,
   User,
   LogOut,
+  Briefcase,
 }
 
 export type { LucideIcon }

@@ -31,7 +31,7 @@ import { showErrorToast, showSuccessToast } from '@/lib/errors'
 import { 
   Check, Trash2, Calendar, FolderOpen, Send, Bot, ArrowRight, 
   Inbox as InboxIcon, MessageCircle, Plus, X, ChevronDown, ChevronRight,
-  User, Users, ArrowLeft, MoreVertical, Archive
+  User, Users, ArrowLeft, MoreVertical, Archive, Briefcase as BriefcaseIcon
 } from 'lucide-react'
 
 interface InboxItem {
