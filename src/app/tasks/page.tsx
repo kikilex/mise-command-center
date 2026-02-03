@@ -122,6 +122,7 @@ function TasksPageContent() {
   const [users, setUsers] = useState<UserData[]>([])
   const [agents, setAgents] = useState<AIAgent[]>([])
   const [projects, setProjects] = useState<Project[]>([])
+  const [spaces, setSpaces] = useState<any[]>([])
   const [user, setUser] = useState<UserData | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
@@ -169,14 +170,11 @@ function TasksPageContent() {
 
   async function loadDropdownData() {
     try {
-      const { data: usersData } = await supabase
-        .from('users')
-        .select('id, name, email, avatar_url')
-      
-      const { data: agentsData } = await supabase
-        .from('ai_agents')
-        .select('id, name, slug, role')
-        .eq('is_active', true)
+      const [usersRes, agentsRes, spacesRes] = await Promise.all([
+        supabase.from('users').select('id, name, email, avatar_url'),
+        supabase.from('ai_agents').select('id, name, slug, role').eq('is_active', true),
+        supabase.from('spaces').select('id, name, color, icon').is('archived_at', null).order('name')
+      ])
       
       let projectQuery = supabase
         .from('projects')
@@ -188,8 +186,9 @@ function TasksPageContent() {
       
       const { data: projectsData } = await projectQuery
 
-      setUsers(usersData || [])
-      setAgents(agentsData || [])
+      setUsers(usersRes.data || [])
+      setAgents(agentsRes.data || [])
+      setSpaces(spacesRes.data || [])
       setProjects(projectsData || [])
     } catch (error) {
       console.error('Error loading dropdown data:', error)
