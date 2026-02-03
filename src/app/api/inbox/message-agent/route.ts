@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server'
 
-const AGENT_WEBHOOKS: Record<string, string> = {
-  ax: 'http://localhost:18789/hooks?token=ax-tony-secret-2026',
-  tony: 'http://localhost:19789/hooks?token=tony-ax-secret-2026'
+const AGENT_CONFIG: Record<string, { url: string; token: string }> = {
+  ax: { url: 'http://localhost:18789/hooks/agent', token: 'ax-tony-secret-2026' },
+  tony: { url: 'http://localhost:19789/hooks/agent', token: 'tony-ax-secret-2026' }
 }
 
 export async function POST(request: Request) {
@@ -13,21 +13,25 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing agent or message' }, { status: 400 })
     }
 
-    const webhookUrl = AGENT_WEBHOOKS[agent.toLowerCase()]
+    const config = AGENT_CONFIG[agent.toLowerCase()]
     
-    if (!webhookUrl) {
+    if (!config) {
       return NextResponse.json({ error: 'Agent webhook not configured' }, { status: 404 })
     }
 
     // Try to notify the agent via webhook
     try {
-      const response = await fetch(webhookUrl, {
+      const response = await fetch(config.url, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: { 
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${config.token}`
+        },
         body: JSON.stringify({
           message: `[Inbox Message from ${sender}] ${message}`,
-          name: sender,
-          source: 'inbox'
+          name: 'Inbox',
+          deliver: true,
+          channel: 'telegram'
         })
       })
 
