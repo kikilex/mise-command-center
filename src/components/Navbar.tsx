@@ -35,6 +35,7 @@ export default function Navbar({ user, actions, onOpenTask }: NavbarProps) {
       href: item.href,
       label: item.label,
       icon: item.icon,
+      iconOnly: (item as any).iconOnly || false,
     }))
   }, [getActiveNavItems])
 
@@ -87,14 +88,15 @@ export default function Navbar({ user, actions, onOpenTask }: NavbarProps) {
               <Link 
                 key={item.key}
                 href={item.href} 
-                className={`px-3 py-2 text-sm font-medium rounded-lg transition-colors whitespace-nowrap min-h-[36px] flex items-center gap-2 ${
+                className={`${item.iconOnly ? 'px-2' : 'px-3'} py-2 text-sm font-medium rounded-lg transition-colors whitespace-nowrap min-h-[36px] flex items-center gap-2 ${
                   isActive(item.href)
                     ? 'bg-background shadow-sm text-foreground'
                     : 'text-default-600 hover:bg-background/50'
                 }`}
+                title={item.iconOnly ? 'Home' : item.label}
               >
                 {renderIcon(item.icon, "w-4 h-4")}
-                <span className="hidden xl:inline">{item.label}</span>
+                {!item.iconOnly && <span className="hidden xl:inline">{item.label}</span>}
               </Link>
             ))}
           </nav>

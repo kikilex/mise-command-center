@@ -9,20 +9,21 @@ export interface MenuConfig {
 }
 
 export const DEFAULT_MENU_CONFIG: MenuConfig = {
-  personal: ['dashboard', 'spaces', 'tasks', 'docs', 'calendar'],
+  personal: ['dashboard', 'spaces', 'tasks', 'docs', 'calendar', 'ai'],
   business: ['dashboard', 'spaces', 'tasks', 'content', 'docs', 'calendar', 'ai'],
 }
 
 export const PERSONAL_MENU_OPTIONS = [
-  { key: 'dashboard', label: 'Home', icon: 'dashboard', href: '/' },
+  { key: 'dashboard', label: '', icon: 'dashboard', href: '/', iconOnly: true },
   { key: 'spaces', label: 'Spaces', icon: 'spaces', href: '/spaces' },
   { key: 'tasks', label: 'Tasks', icon: 'tasks', href: '/tasks' },
   { key: 'docs', label: 'Docs', icon: 'docs', href: '/docs' },
   { key: 'calendar', label: 'Calendar', icon: 'calendar', href: '/calendar' },
+  { key: 'ai', label: 'AI', icon: 'ai', href: '/ai' },
 ]
 
 export const BUSINESS_MENU_OPTIONS = [
-  { key: 'dashboard', label: 'Home', icon: 'dashboard', href: '/' },
+  { key: 'dashboard', label: '', icon: 'dashboard', href: '/', iconOnly: true },
   { key: 'spaces', label: 'Spaces', icon: 'spaces', href: '/spaces' },
   { key: 'tasks', label: 'Tasks', icon: 'tasks', href: '/tasks' },
   { key: 'content', label: 'Content', icon: 'content', href: '/content' },

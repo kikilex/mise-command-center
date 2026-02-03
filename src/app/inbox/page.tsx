@@ -866,36 +866,7 @@ export default function InboxPage() {
           </Card>
         )}
 
-        {/* Quick Capture for Thoughts */}
-        <Card className="mb-6 shadow-sm">
-          <CardBody className="p-3">
-            <div className="flex gap-2">
-              <Input
-                ref={thoughtInputRef}
-                placeholder="Quick thought... (no recipient = goes to inbox)"
-                value={newThought}
-                onChange={(e) => setNewThought(e.target.value)}
-                onKeyDown={handleKeyDown}
-                disabled={submitting}
-                classNames={{
-                  input: "text-base",
-                  inputWrapper: "shadow-none bg-default-100",
-                }}
-                startContent={<InboxIcon className="w-4 h-4 text-default-400" />}
-              />
-              <Button
-                isIconOnly
-                color="default"
-                variant="flat"
-                onPress={handleAddThought}
-                isLoading={submitting}
-                isDisabled={!newThought.trim()}
-              >
-                <Plus className="w-4 h-4" />
-              </Button>
-            </div>
-          </CardBody>
-        </Card>
+        {/* Brain dump moved to Dashboard */}
 
         {/* Inbox Zero State */}
         {totalItems === 0 && !selectedThread && (

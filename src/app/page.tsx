@@ -70,8 +70,20 @@ interface InboxItem {
   id: string
   content: string
   item_type: 'thought' | 'message'
+  from_agent: string | null
+  to_recipient: string | null
+  thread_id: string | null
+  subject: string | null
+  tags: string[] | null
   status: 'pending' | 'processing' | 'processed'
   created_at: string
+}
+
+interface MessageThread {
+  recipient: string
+  lastMessage: InboxItem
+  messageCount: number
+  threadId: string | null
 }
 
 interface AIAgent {
@@ -159,7 +171,7 @@ export default function Home() {
           .select('*')
           .eq('item_type', 'message')
           .order('created_at', { ascending: false })
-          .limit(5),
+          .limit(30),
         supabase.from('ai_agents').select('*').order('created_at', { ascending: true })
       ]);
 
@@ -194,6 +206,74 @@ export default function Home() {
       showErrorToast(error, 'Failed to update task');
     }
   }
+
+  async function revertTask(taskId: string) {
+    try {
+      const task = completedTasks.find(t => t.id === taskId);
+      const { error } = await supabase
+        .from('tasks')
+        .update({ status: 'todo', updated_at: new Date().toISOString() })
+        .eq('id', taskId);
+      if (error) throw error;
+      setCompletedTasks(prev => prev.filter(t => t.id !== taskId));
+      if (task) setTodaysTasks(prev => [{ ...task, status: 'todo' }, ...prev]);
+      showSuccessToast('Task reopened');
+    } catch (error) {
+      showErrorToast(error, 'Failed to revert task');
+    }
+  }
+
+  async function handleAddTag(itemId: string, tag: string) {
+    if (!tag.trim()) return;
+    const item = inboxItems.find(i => i.id === itemId);
+    const currentTags = item?.tags || [];
+    if (currentTags.includes(tag.trim())) return;
+    const newTags = [...currentTags, tag.trim()];
+    try {
+      const { error } = await supabase
+        .from('inbox')
+        .update({ tags: newTags })
+        .eq('id', itemId);
+      if (error) throw error;
+      setInboxItems(prev => prev.map(i => i.id === itemId ? { ...i, tags: newTags } : i));
+    } catch (error) {
+      showErrorToast(error, 'Failed to add tag');
+    }
+  }
+
+  async function handleRemoveTag(itemId: string, tag: string) {
+    const item = inboxItems.find(i => i.id === itemId);
+    const newTags = (item?.tags || []).filter(t => t !== tag);
+    try {
+      const { error } = await supabase
+        .from('inbox')
+        .update({ tags: newTags })
+        .eq('id', itemId);
+      if (error) throw error;
+      setInboxItems(prev => prev.map(i => i.id === itemId ? { ...i, tags: newTags } : i));
+    } catch (error) {
+      showErrorToast(error, 'Failed to remove tag');
+    }
+  }
+
+  // Group messages into threads
+  const messageThreads = useMemo<MessageThread[]>(() => {
+    const threadMap = new Map<string, { messages: InboxItem[], recipient: string }>();
+    messages.forEach(msg => {
+      const key = msg.thread_id || msg.to_recipient || msg.from_agent || 'unknown';
+      const recipient = msg.to_recipient || msg.from_agent || 'unknown';
+      if (!threadMap.has(key)) {
+        threadMap.set(key, { messages: [], recipient });
+      }
+      threadMap.get(key)!.messages.push(msg);
+    });
+    return Array.from(threadMap.entries()).map(([key, val]) => ({
+      recipient: val.recipient,
+      lastMessage: val.messages[0],
+      messageCount: val.messages.length,
+      threadId: val.messages[0].thread_id,
+    })).slice(0, 5);
+  }, [messages]);
 
   async function handleDeleteDump(id: string) {
     try {
@@ -382,16 +462,25 @@ export default function Home() {
                           </div>
                         ) : (
                           <div 
-                            className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors"
+                            className="flex items-start gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors"
                             onClick={() => { setViewingDump(item); onViewOpen(); }}
                           >
-                            <div className="w-1.5 h-1.5 rounded-full bg-violet-400 flex-shrink-0" />
-                            <p className="flex-1 text-sm text-slate-700 dark:text-slate-300 truncate">{item.content}</p>
+                            <div className="w-1.5 h-1.5 rounded-full bg-violet-400 flex-shrink-0 mt-2" />
+                            <div className="flex-1 min-w-0">
+                              <p className="text-sm text-slate-700 dark:text-slate-300 line-clamp-2 break-words">{item.content}</p>
+                              {item.tags && item.tags.length > 0 && (
+                                <div className="flex flex-wrap gap-1 mt-1">
+                                  {item.tags.map(tag => (
+                                    <Chip key={tag} size="sm" variant="flat" color="secondary" className="h-5 text-[10px]">{tag}</Chip>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
                             <div className="hidden group-hover:flex items-center gap-1 flex-shrink-0">
                               <Button 
                                 isIconOnly size="sm" variant="light" 
                                 className="w-7 h-7 min-w-7"
-                                onPress={(e) => { handleEditDump(item); }}
+                                onPress={() => handleEditDump(item)}
                                 onClick={(e) => e.stopPropagation()}
                               >
                                 <Pencil className="w-3.5 h-3.5 text-slate-400" />
@@ -405,7 +494,7 @@ export default function Home() {
                                 <Trash2 className="w-3.5 h-3.5" />
                               </Button>
                             </div>
-                            <span className="text-[10px] text-slate-400 flex-shrink-0 group-hover:hidden">
+                            <span className="text-[10px] text-slate-400 flex-shrink-0 group-hover:hidden mt-1">
                               {new Date(item.created_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
                             </span>
                           </div>
@@ -425,8 +514,41 @@ export default function Home() {
                   Thought
                 </ModalHeader>
                 <ModalBody className="pb-6">
-                  <p className="text-slate-700 dark:text-slate-300 whitespace-pre-wrap">{viewingDump?.content}</p>
-                  <p className="text-xs text-slate-400 mt-4">
+                  <p className="text-slate-700 dark:text-slate-300 whitespace-pre-wrap break-words">{viewingDump?.content}</p>
+                  
+                  {/* Tags */}
+                  <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+                    <p className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Tags</p>
+                    <div className="flex flex-wrap gap-1.5 mb-2">
+                      {(viewingDump?.tags || []).map(tag => (
+                        <Chip 
+                          key={tag} 
+                          size="sm" 
+                          variant="flat" 
+                          color="secondary" 
+                          onClose={() => viewingDump && handleRemoveTag(viewingDump.id, tag)}
+                        >
+                          {tag}
+                        </Chip>
+                      ))}
+                      {(!viewingDump?.tags || viewingDump.tags.length === 0) && (
+                        <span className="text-xs text-slate-400">No tags yet</span>
+                      )}
+                    </div>
+                    <Input
+                      size="sm"
+                      placeholder="Add a tag and press Enter..."
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && viewingDump) {
+                          handleAddTag(viewingDump.id, (e.target as HTMLInputElement).value);
+                          (e.target as HTMLInputElement).value = '';
+                        }
+                      }}
+                      classNames={{ inputWrapper: "bg-slate-50 dark:bg-slate-800 border-none shadow-none h-9" }}
+                    />
+                  </div>
+
+                  <p className="text-xs text-slate-400 mt-3">
                     {viewingDump && new Date(viewingDump.created_at).toLocaleString()}
                   </p>
                 </ModalBody>
@@ -497,9 +619,15 @@ export default function Home() {
                         <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2 px-1">Completed</p>
                         <div className="space-y-1">
                           {completedTasks.slice(0, 3).map(task => (
-                            <div key={task.id} className="flex items-center gap-3 px-3 py-2 rounded-lg">
-                              <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" />
-                              <span className="text-sm text-slate-400 line-through truncate">{task.title}</span>
+                            <div 
+                              key={task.id} 
+                              className="group/done flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer transition-colors"
+                              onClick={() => revertTask(task.id)}
+                              title="Click to reopen"
+                            >
+                              <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0 group-hover/done:text-orange-400 transition-colors" />
+                              <span className="text-sm text-slate-400 line-through truncate group-hover/done:text-slate-600 dark:group-hover/done:text-slate-300 transition-colors">{task.title}</span>
+                              <span className="text-[10px] text-transparent group-hover/done:text-orange-400 ml-auto transition-colors">undo</span>
                             </div>
                           ))}
                         </div>
@@ -512,7 +640,7 @@ export default function Home() {
           </div>
 
           <div className="w-full lg:w-96 space-y-8">
-            {/* Messages - iOS Style */}
+            {/* Messages - Thread List (iOS Style) */}
             <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
               <CardHeader className="bg-slate-50 dark:bg-slate-800/50 px-4 py-3 border-b border-slate-200 dark:border-slate-700">
                 <div className="flex items-center justify-between w-full">
@@ -528,39 +656,49 @@ export default function Home() {
                 </div>
               </CardHeader>
               <CardBody className="p-0">
-                {messages.length === 0 ? (
+                {messageThreads.length === 0 ? (
                   <div className="text-center py-12 px-4">
                     <div className="w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mx-auto mb-3">
                       <MessageCircle className="w-8 h-8 text-slate-400" />
                     </div>
-                    <p className="text-sm text-slate-500">No messages yet</p>
+                    <p className="text-sm text-slate-500">No conversations yet</p>
                   </div>
                 ) : (
                   <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                    {messages.map((msg) => {
-                      const isFromAgent = msg.from_agent
+                    {messageThreads.map((thread, idx) => {
+                      const isAI = ['ax', 'tony'].includes(thread.recipient.toLowerCase())
                       return (
                         <div 
-                          key={msg.id} 
-                          onClick={() => router.push('/inbox')}
-                          className="flex items-start gap-3 p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors"
+                          key={idx} 
+                          onClick={() => router.push(`/inbox?thread=${thread.recipient}`)}
+                          className="flex items-center gap-3 p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors"
                         >
-                          <Avatar 
-                            size="sm" 
-                            name={isFromAgent ? msg.from_agent : 'You'}
-                            className={isFromAgent ? 'bg-gradient-to-br from-violet-500 to-purple-600' : 'bg-gradient-to-br from-blue-500 to-blue-600'}
-                          />
+                          <div className="relative">
+                            <Avatar 
+                              size="sm" 
+                              name={thread.recipient}
+                              className={isAI ? 'bg-gradient-to-br from-violet-500 to-purple-600' : 'bg-gradient-to-br from-blue-500 to-blue-600'}
+                            />
+                            {isAI && (
+                              <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-white dark:bg-slate-900 flex items-center justify-center">
+                                <Bot className="w-3 h-3 text-violet-500" />
+                              </div>
+                            )}
+                          </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between gap-2">
                               <span className="font-semibold text-sm text-slate-800 dark:text-slate-100 capitalize">
-                                {isFromAgent ? msg.from_agent : 'You'}
+                                {thread.recipient}
                               </span>
                               <span className="text-xs text-slate-400 flex-shrink-0">
-                                {new Date(msg.created_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                                {new Date(thread.lastMessage.created_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
                               </span>
                             </div>
-                            <p className="text-sm text-slate-600 dark:text-slate-400 line-clamp-2 mt-0.5">{msg.content}</p>
+                            <p className="text-sm text-slate-500 dark:text-slate-400 line-clamp-1 mt-0.5">{thread.lastMessage.content}</p>
                           </div>
+                          {thread.messageCount > 1 && (
+                            <Chip size="sm" variant="flat" className="h-5 min-w-5 text-[10px]">{thread.messageCount}</Chip>
+                          )}
                         </div>
                       )
                     })}
