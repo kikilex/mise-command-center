@@ -811,6 +811,7 @@ export default function InboxPage() {
                   minRows={3}
                   maxRows={8}
                   classNames={{
+                    input: "text-base",
                     inputWrapper: "shadow-none bg-default-100",
                   }}
                 />
@@ -889,14 +890,51 @@ export default function InboxPage() {
               >
                 <ArrowLeft className="w-5 h-5" />
               </Button>
-              <div className="w-10 h-10 rounded-full bg-default-100 flex items-center justify-center">
-                {getRecipientInfo(selectedThread.recipient)?.type === 'ai' 
-                  ? <Bot className="w-5 h-5 text-violet-500" /> 
-                  : <User className="w-5 h-5 text-pink-500" />}
-              </div>
+              
+              {/* All participants - main recipient + anyone CC'd */}
+              {(() => {
+                // Collect all unique participants from thread messages
+                const allParticipants = new Set<string>([selectedThread.recipient])
+                selectedThread.messages.forEach(msg => {
+                  if (msg.cc_recipients) {
+                    msg.cc_recipients.forEach(cc => allParticipants.add(cc))
+                  }
+                })
+                const participants = Array.from(allParticipants)
+                
+                return (
+                  <div className="flex items-center gap-1">
+                    {participants.map((pid, idx) => {
+                      const pInfo = getRecipientInfo(pid)
+                      return (
+                        <div 
+                          key={pid}
+                          className={`w-10 h-10 rounded-full bg-default-100 flex items-center justify-center ${idx > 0 ? '-ml-3' : ''} border-2 border-white dark:border-slate-800`}
+                          title={pInfo.name}
+                        >
+                          {pInfo?.type === 'ai' 
+                            ? <Bot className="w-5 h-5 text-violet-500" /> 
+                            : <User className="w-5 h-5 text-pink-500" />}
+                        </div>
+                      )
+                    })}
+                  </div>
+                )
+              })()}
+              
               <div className="flex-1">
                 <h2 className="font-semibold text-foreground">
-                  {getRecipientInfo(selectedThread.recipient).name}
+                  {(() => {
+                    const allParticipants = new Set<string>([selectedThread.recipient])
+                    selectedThread.messages.forEach(msg => {
+                      if (msg.cc_recipients) {
+                        msg.cc_recipients.forEach(cc => allParticipants.add(cc))
+                      }
+                    })
+                    return Array.from(allParticipants)
+                      .map(pid => getRecipientInfo(pid).name)
+                      .join(', ')
+                  })()}
                 </h2>
                 {selectedThread.subject && (
                   <p className="text-xs text-default-500">{selectedThread.subject}</p>
@@ -997,6 +1035,7 @@ export default function InboxPage() {
                   maxRows={4}
                   className="flex-1"
                   classNames={{
+                    input: "text-base",
                     inputWrapper: "shadow-none bg-default-100",
                   }}
                 />
