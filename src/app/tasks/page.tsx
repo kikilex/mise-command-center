@@ -343,7 +343,7 @@ function TasksPageContent() {
       assignee_id: '',
       ai_agent: '',
       project_id: '',
-      space_id: (localSpaceId !== 'all' ? localSpaceId : selectedSpaceId) || '',
+      space_id: (localSpaceId !== 'all' ? localSpaceId : '') || '',
     })
     onOpen()
   }

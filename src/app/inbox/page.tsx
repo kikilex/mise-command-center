@@ -94,8 +94,11 @@ export default function InboxPage() {
   const [composeMessage, setComposeMessage] = useState('')
   const [showCCField, setShowCCField] = useState(false)
   
+  const [spaces, setSpaces] = useState<any[]>([])
+  
   const { isOpen: isScheduleOpen, onOpen: onScheduleOpen, onClose: onScheduleClose } = useDisclosure()
   const { isOpen: isProjectOpen, onOpen: onProjectOpen, onClose: onProjectClose } = useDisclosure()
+  const { isOpen: isLinkSpaceOpen, onOpen: onLinkSpaceOpen, onClose: onLinkSpaceClose } = useDisclosure()
   
   const thoughtInputRef = useRef<HTMLInputElement>(null)
   const messageInputRef = useRef<HTMLTextAreaElement>(null)
@@ -190,9 +193,11 @@ export default function InboxPage() {
         if (error) throw error
         setItems(inboxData || [])
 
-        // Load projects
+        // Load projects and spaces
         const { data: projectsData } = await supabase.from('projects').select('id, name')
+        const { data: spacesData } = await supabase.from('spaces').select('id, name')
         setProjects(projectsData || [])
+        setSpaces(spacesData || [])
       } catch (error) {
         console.error('Error loading inbox:', error)
         showErrorToast('Failed to load inbox')
@@ -479,6 +484,32 @@ export default function InboxPage() {
     } catch (error) {
       console.error('Error moving to project:', error)
       showErrorToast('Failed to move to project')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleLinkToSpace = async () => {
+    if (!selectedItem || !selectedSpace || !user) return
+    setSubmitting(true)
+    try {
+      const { error } = await supabase
+        .from('inbox')
+        .update({ space_id: selectedSpace })
+        .eq('id', selectedItem.id)
+
+      if (error) throw error
+
+      const spaceName = spaces.find(s => s.id === selectedSpace)?.name || 'Space'
+      
+      // Update local state
+      setItems(items.map(i => i.id === selectedItem.id ? { ...i, space_id: selectedSpace } : i))
+      
+      showSuccessToast(`Linked to ${spaceName}`)
+      onLinkSpaceClose()
+    } catch (error) {
+      console.error('Error linking to space:', error)
+      showErrorToast('Failed to link to space')
     } finally {
       setSubmitting(false)
     }
@@ -955,6 +986,16 @@ export default function InboxPage() {
                 </DropdownTrigger>
                 <DropdownMenu aria-label="Thread actions">
                   <DropdownItem
+                    key="link-space"
+                    startContent={<BriefcaseIcon className="w-4 h-4" />}
+                    onPress={() => {
+                      setSelectedItem(selectedThread.lastMessage)
+                      onLinkSpaceOpen()
+                    }}
+                  >
+                    Link to Space
+                  </DropdownItem>
+                  <DropdownItem
                     key="archive"
                     startContent={<Archive className="w-4 h-4" />}
                     onPress={() => {
@@ -1124,6 +1165,16 @@ export default function InboxPage() {
                               </Button>
                             </DropdownTrigger>
                             <DropdownMenu aria-label="Thread actions">
+                              <DropdownItem
+                                key="link-space"
+                                startContent={<BriefcaseIcon className="w-4 h-4" />}
+                                onPress={() => {
+                                  setSelectedItem(thread.lastMessage)
+                                  onLinkSpaceOpen()
+                                }}
+                              >
+                                Link to Space
+                              </DropdownItem>
                               <DropdownItem
                                 key="archive"
                                 startContent={<Archive className="w-4 h-4" />}
@@ -1299,6 +1350,38 @@ export default function InboxPage() {
               isDisabled={!selectedProject}
             >
               Move to Project
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+      {/* Link to Space Modal */}
+      <Modal isOpen={isLinkSpaceOpen} onClose={onLinkSpaceClose}>
+        <ModalContent>
+          <ModalHeader>Link to Space</ModalHeader>
+          <ModalBody>
+            <div className="flex flex-col gap-4">
+              <p className="text-sm text-default-500 italic">"{selectedItem?.content}"</p>
+              <Select
+                label="Select Space"
+                placeholder="Choose a space"
+                selectedKeys={selectedSpace ? [selectedSpace] : []}
+                onChange={(e) => setSelectedSpace(e.target.value)}
+              >
+                {spaces.map(s => (
+                  <SelectItem key={s.id}>{s.name}</SelectItem>
+                ))}
+              </Select>
+            </div>
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="flat" onPress={onLinkSpaceClose}>Cancel</Button>
+            <Button 
+              color="primary" 
+              onPress={handleLinkToSpace}
+              isLoading={submitting}
+              isDisabled={!selectedSpace}
+            >
+              Link to Space
             </Button>
           </ModalFooter>
         </ModalContent>
