@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef, useMemo } from 'react'
+import { useSearchParams } from 'next/navigation'
 import { 
   Button, 
   Card, 
@@ -33,6 +34,7 @@ import {
   Inbox as InboxIcon, MessageCircle, Plus, X, ChevronDown, ChevronRight,
   User, Users, ArrowLeft, MoreVertical, Archive, Briefcase as BriefcaseIcon
 } from 'lucide-react'
+import { Suspense } from 'react'
 
 interface InboxItem {
   id: string
@@ -72,6 +74,18 @@ const RECIPIENTS = [
 ]
 
 export default function InboxPage() {
+  return (
+    <Suspense fallback={
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center">
+        <Spinner size="lg" />
+      </div>
+    }>
+      <InboxPageContent />
+    </Suspense>
+  )
+}
+
+function InboxPageContent() {
   const [items, setItems] = useState<InboxItem[]>([])
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState<UserData | null>(null)
