@@ -944,8 +944,8 @@ export default function InboxPage() {
                     <CardBody className="p-4 min-h-[100px]">
                       {/* Thread Header */}
                       <div className="flex items-start justify-between gap-4">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-full bg-default-100 flex items-center justify-center">
+                        <div className="flex items-center gap-3 flex-1 min-w-0">
+                          <div className="w-10 h-10 rounded-full bg-default-100 flex items-center justify-center flex-shrink-0">
                             {recipient?.type === 'ai' ? <Bot className="w-5 h-5 text-violet-500" /> : <User className="w-5 h-5 text-pink-500" />}
                           </div>
                           <div className="flex-1 min-w-0">
@@ -972,15 +972,15 @@ export default function InboxPage() {
                         </div>
 
                         {/* Thread Actions */}
-                        <div className="flex items-center gap-1 flex-shrink-0">
+                        <div 
+                          className="flex items-center gap-1 flex-shrink-0"
+                          onClick={(e) => e.stopPropagation()}
+                        >
                           <Button
                             size="sm"
                             variant="light"
                             isIconOnly
-                            onPress={(e) => {
-                              e.stopPropagation()
-                              handleArchiveThread(thread)
-                            }}
+                            onPress={() => handleArchiveThread(thread)}
                             className="text-default-400 hover:text-success"
                           >
                             <Check className="w-4 h-4" />
@@ -989,10 +989,7 @@ export default function InboxPage() {
                             size="sm"
                             variant="light"
                             isIconOnly
-                            onPress={(e) => {
-                              e.stopPropagation()
-                              handleDelete(thread.lastMessage)
-                            }}
+                            onPress={() => handleDelete(thread.lastMessage)}
                             className="text-default-400 hover:text-danger"
                           >
                             <Trash2 className="w-4 h-4" />
