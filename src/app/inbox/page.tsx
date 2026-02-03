@@ -950,7 +950,7 @@ export default function InboxPage() {
               <h2 className="font-semibold text-default-700">Message Threads</h2>
               <Chip size="sm" variant="flat">{threads.length}</Chip>
             </div>
-            <div className="space-y-3">
+            <div className="flex flex-col gap-3">
               {threads.map((thread) => {
                 const recipient = getRecipientInfo(thread.recipient)
                 const hasMultiple = thread.messages.length > 1
@@ -958,13 +958,14 @@ export default function InboxPage() {
                 return (
                   <Card 
                     key={thread.id} 
-                    className="shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+                    className="shadow-sm hover:shadow-md transition-shadow cursor-pointer w-full"
+                    fullWidth
                     isPressable
                     onPress={() => openThreadChat(thread)}
                   >
                     <CardBody className="p-4 min-h-[100px]">
                       {/* Thread Header */}
-                      <div className="flex items-start justify-between gap-4">
+                      <div className="flex items-start justify-between gap-4 w-full">
                         <div className="flex items-center gap-3 flex-1 min-w-0">
                           <div className="w-10 h-10 rounded-full bg-default-100 flex items-center justify-center flex-shrink-0">
                             {recipient?.type === 'ai' ? <Bot className="w-5 h-5 text-violet-500" /> : <User className="w-5 h-5 text-pink-500" />}
