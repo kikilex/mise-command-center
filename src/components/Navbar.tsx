@@ -5,9 +5,9 @@ import Link from 'next/link'
 import { Button, Avatar } from "@heroui/react"
 import { usePathname } from 'next/navigation'
 import UserMenu from './UserMenu'
-import BusinessSelector from './BusinessSelector'
+import SpaceSelector from './SpaceSelector'
 import NotificationBell from './NotificationBell'
-import { useBusiness } from '@/lib/business-context'
+import { useSpace } from '@/lib/space-context'
 import { useMenuSettings } from '@/lib/menu-settings'
 import { navIcons, Menu, X } from '@/lib/icons'
 
@@ -28,21 +28,21 @@ interface NavbarProps {
 export default function Navbar({ user, actions, onOpenTask }: NavbarProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const pathname = usePathname()
-  const { selectedBusiness } = useBusiness()
+  const { selectedSpace } = useSpace()
   const { getActiveNavItems, loading: menuLoading } = useMenuSettings()
 
-  // Determine if we're in business mode (a business is selected)
-  const isBusinessMode = selectedBusiness !== null
+  // Determine if we're in a space (always true in new architecture but checking for consistency)
+  const isSpaceContext = selectedSpace !== null
 
   // Get nav items based on current mode from user settings
   const navItems = useMemo(() => {
-    return getActiveNavItems(isBusinessMode).map(item => ({
+    return getActiveNavItems(isSpaceContext).map(item => ({
       key: item.key,
       href: item.href,
       label: item.label,
       icon: item.icon,
     }))
-  }, [getActiveNavItems, isBusinessMode])
+  }, [getActiveNavItems, isSpaceContext])
 
   const isActive = (href: string) => {
     if (href === '/') {
@@ -86,9 +86,9 @@ export default function Navbar({ user, actions, onOpenTask }: NavbarProps) {
               <span className="font-semibold text-foreground text-lg hidden sm:block">Mise</span>
             </Link>
             
-            {/* Business Selector - show on desktop */}
+            {/* Space Selector - show on desktop */}
             <div className="hidden md:block ml-2">
-              <BusinessSelector />
+              <SpaceSelector />
             </div>
           </div>
 
@@ -136,10 +136,10 @@ export default function Navbar({ user, actions, onOpenTask }: NavbarProps) {
       {/* Mobile menu dropdown */}
       {isMenuOpen && (
         <div className="lg:hidden bg-background border-t border-divider py-4 px-4 shadow-lg">
-          {/* Mobile Business Selector */}
+          {/* Mobile Space Selector */}
           <div className="mb-4 pb-4 border-b border-divider">
-            <p className="text-xs text-default-500 mb-2 px-1">Current Context</p>
-            <BusinessSelector />
+            <p className="text-xs text-default-500 mb-2 px-1">Current Space</p>
+            <SpaceSelector />
           </div>
           
           <div className="flex flex-col gap-1">

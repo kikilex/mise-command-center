@@ -34,7 +34,7 @@ import {
   Checkbox,
 } from "@heroui/react"
 import { createClient } from '@/lib/supabase/client'
-import { useBusiness } from '@/lib/business-context'
+import { useSpace } from '@/lib/space-context'
 import Navbar from '@/components/Navbar'
 import { showErrorToast, showSuccessToast, getErrorMessage } from '@/lib/errors'
 import { ErrorFallback } from '@/components/ErrorBoundary'
@@ -62,6 +62,7 @@ interface Task {
   assignee_id: string | null
   project_id: string | null
   business_id: string | null
+  space_id: string | null
   due_date: string | null
   tags: string[]
   ai_flag: boolean
@@ -141,10 +142,11 @@ function TasksPageContent() {
     assignee_id: '',
     ai_agent: '',
     project_id: '',
+    space_id: '',
   })
   
   const supabase = createClient()
-  const { selectedBusinessId } = useBusiness()
+  const { selectedSpaceId, spaces } = useSpace()
   const searchParams = useSearchParams()
   const router = useRouter()
 
@@ -164,7 +166,7 @@ function TasksPageContent() {
   useEffect(() => {
     loadTasks()
     loadDropdownData()
-  }, [selectedBusinessId])
+  }, [selectedSpaceId])
 
   async function loadDropdownData() {
     try {
@@ -179,12 +181,10 @@ function TasksPageContent() {
       
       let projectQuery = supabase
         .from('projects')
-        .select('id, name, business_id')
+        .select('id, name, space_id')
       
-      if (selectedBusinessId) {
-        projectQuery = projectQuery.eq('business_id', selectedBusinessId)
-      } else {
-        projectQuery = projectQuery.is('business_id', null)
+      if (selectedSpaceId) {
+        projectQuery = projectQuery.eq('space_id', selectedSpaceId)
       }
       
       const { data: projectsData } = await projectQuery
@@ -248,10 +248,8 @@ function TasksPageContent() {
         .from('tasks')
         .select('*')
       
-      if (selectedBusinessId) {
-        query = query.eq('business_id', selectedBusinessId)
-      } else {
-        query = query.is('business_id', null)
+      if (selectedSpaceId) {
+        query = query.eq('space_id', selectedSpaceId)
       }
       
       const { data, error } = await query.order('created_at', { ascending: false })
@@ -295,6 +293,7 @@ function TasksPageContent() {
             assignee_id: formData.assignee_id || null,
             ai_agent: formData.ai_agent || null,
             project_id: formData.project_id || null,
+            space_id: formData.space_id || selectedSpaceId,
           })
           .eq('id', editingTask.id)
         
@@ -314,7 +313,7 @@ function TasksPageContent() {
             ai_flag: formData.ai_flag,
             created_by: user.id,
             due_date: formData.due_date || null,
-            business_id: selectedBusinessId,
+            space_id: formData.space_id || selectedSpaceId,
             assignee_id: formData.assignee_id || null,
             ai_agent: formData.ai_agent || null,
             project_id: formData.project_id || null,
@@ -364,6 +363,7 @@ function TasksPageContent() {
       assignee_id: '',
       ai_agent: '',
       project_id: '',
+      space_id: selectedSpaceId || '',
     })
     onClose()
   }
@@ -380,6 +380,7 @@ function TasksPageContent() {
       assignee_id: '',
       ai_agent: '',
       project_id: '',
+      space_id: selectedSpaceId || '',
     })
     onOpen()
   }
@@ -713,6 +714,23 @@ function TasksPageContent() {
                 {projects.map(p => (
                   <SelectItem key={p.id} textValue={p.name}>
                     {p.name}
+                  </SelectItem>
+                ))}
+              </Select>
+
+              <Select
+                label="Space"
+                placeholder="Select space"
+                selectedKeys={formData.space_id ? [formData.space_id] : []}
+                onChange={(e) => setFormData({ ...formData, space_id: e.target.value })}
+                isRequired
+              >
+                {spaces.map(s => (
+                  <SelectItem key={s.id} textValue={s.name}>
+                    <div className="flex items-center gap-2">
+                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: s.color || '#3b82f6' }} />
+                      <span>{s.name}</span>
+                    </div>
                   </SelectItem>
                 ))}
               </Select>

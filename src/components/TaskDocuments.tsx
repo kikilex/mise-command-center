@@ -28,7 +28,7 @@ interface Document {
 interface TaskDocumentsProps {
   taskId: string
   taskTitle: string
-  businessId: string | null
+  spaceId: string | null
   userId: string | null
 }
 
@@ -52,7 +52,7 @@ const getStatusLabel = (status: string) => {
   }
 }
 
-export default function TaskDocuments({ taskId, taskTitle, businessId, userId }: TaskDocumentsProps) {
+export default function TaskDocuments({ taskId, taskTitle, spaceId, userId }: TaskDocumentsProps) {
   const [documents, setDocuments] = useState<Document[]>([])
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
@@ -130,7 +130,7 @@ export default function TaskDocuments({ taskId, taskTitle, businessId, userId }:
           content: `# ${taskTitle}\n\n## Overview\n\nDescribe the deliverable here...\n\n## Details\n\n- Point 1\n- Point 2\n- Point 3\n`,
           status: 'draft',
           task_id: taskId,
-          business_id: businessId,
+          space_id: spaceId,
           created_by: userId,
         })
         .select()

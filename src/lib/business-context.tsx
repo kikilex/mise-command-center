@@ -1,8 +1,18 @@
 'use client'
 
-import { createContext, useContext, useState, useEffect, ReactNode } from 'react'
-import { createClient } from '@/lib/supabase/client'
+/**
+ * COMPATIBILITY LAYER
+ * 
+ * This file provides backward compatibility for code still using the old
+ * business context. It maps to the new space context under the hood.
+ * 
+ * TODO: Migrate all usages to useSpace() and delete this file.
+ */
 
+import { createContext, useContext, ReactNode } from 'react'
+import { useSpace, Space, SpaceProvider } from './space-context'
+
+// Map Space to Business interface for compatibility
 export interface Business {
   id: string
   name: string
@@ -17,7 +27,7 @@ export interface Business {
 interface BusinessContextType {
   businesses: Business[]
   selectedBusiness: Business | null
-  selectedBusinessId: string | null // null means "Personal"
+  selectedBusinessId: string | null
   setSelectedBusinessId: (id: string | null) => void
   loading: boolean
   error: string | null
@@ -26,100 +36,40 @@ interface BusinessContextType {
 
 const BusinessContext = createContext<BusinessContextType | undefined>(undefined)
 
-const STORAGE_KEY = 'mise-selected-business-id'
-
-// Read initial value from localStorage synchronously to prevent flash
-function getInitialBusinessId(): string | null {
-  if (typeof window === 'undefined') return null
-  const saved = localStorage.getItem(STORAGE_KEY)
-  if (saved === 'personal' || saved === null) return null
-  return saved // Will be validated against businesses list later
+function spaceToBusinessCompat(space: Space): Business {
+  return {
+    id: space.id,
+    name: space.name,
+    slug: space.name.toLowerCase().replace(/\s+/g, '-'),
+    description: space.description,
+    logo_url: null,
+    color: space.color || '#3b82f6',
+    owner_id: space.created_by,
+    created_at: space.created_at,
+  }
 }
 
 export function BusinessProvider({ children }: { children: ReactNode }) {
-  const [businesses, setBusinesses] = useState<Business[]>([])
-  const [selectedBusinessId, setSelectedBusinessIdState] = useState<string | null>(getInitialBusinessId)
-  const [loading, setLoading] = useState(true)
-  const [error, setError] = useState<string | null>(null)
-  const [initialized, setInitialized] = useState(false)
-  
-  const supabase = createClient()
-
-  // Load businesses on mount
-  useEffect(() => {
-    loadBusinesses()
-  }, [])
-
-  // Validate saved selection after businesses are loaded
-  useEffect(() => {
-    if (!initialized && !loading && businesses.length >= 0) {
-      const currentId = selectedBusinessId
-      // If we have a saved business ID, validate it exists
-      if (currentId && currentId !== 'personal' && !businesses.find(b => b.id === currentId)) {
-        // Invalid business ID - reset to Personal
-        setSelectedBusinessIdState(null)
-        localStorage.setItem(STORAGE_KEY, 'personal')
-      }
-      setInitialized(true)
-    }
-  }, [businesses, loading, initialized, selectedBusinessId])
-
-  async function loadBusinesses() {
-    setLoading(true)
-    setError(null)
-    
-    try {
-      const { data, error: fetchError } = await supabase
-        .from('businesses')
-        .select('*')
-        .order('name')
-      
-      if (fetchError) {
-        throw fetchError
-      }
-      
-      setBusinesses(data || [])
-    } catch (err) {
-      console.error('Failed to load businesses:', err)
-      setError(err instanceof Error ? err.message : 'Failed to load businesses')
-    } finally {
-      setLoading(false)
-    }
-  }
-
-  function setSelectedBusinessId(id: string | null) {
-    setSelectedBusinessIdState(id)
-    if (id) {
-      localStorage.setItem(STORAGE_KEY, id)
-    } else {
-      // Explicitly save "personal" so we know user chose Personal mode
-      localStorage.setItem(STORAGE_KEY, 'personal')
-    }
-  }
-
-  const selectedBusiness = businesses.find(b => b.id === selectedBusinessId) || null
-
-  return (
-    <BusinessContext.Provider
-      value={{
-        businesses,
-        selectedBusiness,
-        selectedBusinessId,
-        setSelectedBusinessId,
-        loading,
-        error,
-        refreshBusinesses: loadBusinesses,
-      }}
-    >
-      {children}
-    </BusinessContext.Provider>
-  )
+  // Just wrap with SpaceProvider - the actual logic is in useSpace
+  return <SpaceProvider>{children}</SpaceProvider>
 }
 
-export function useBusiness() {
-  const context = useContext(BusinessContext)
-  if (context === undefined) {
-    throw new Error('useBusiness must be used within a BusinessProvider')
+export function useBusiness(): BusinessContextType {
+  const spaceContext = useSpace()
+  
+  // Map spaces to businesses for compatibility
+  const businesses = spaceContext.spaces.map(spaceToBusinessCompat)
+  const selectedBusiness = spaceContext.selectedSpace 
+    ? spaceToBusinessCompat(spaceContext.selectedSpace) 
+    : null
+
+  return {
+    businesses,
+    selectedBusiness,
+    selectedBusinessId: spaceContext.selectedSpaceId,
+    setSelectedBusinessId: spaceContext.setSelectedSpaceId,
+    loading: spaceContext.loading,
+    error: spaceContext.error,
+    refreshBusinesses: spaceContext.refreshSpaces,
   }
-  return context
 }

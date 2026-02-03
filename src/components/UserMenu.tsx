@@ -123,7 +123,7 @@ export default function UserMenu({ user }: UserMenuProps) {
       </DropdownTrigger>
       <DropdownMenu aria-label="User menu">
         <DropdownSection showDivider>
-          <DropdownItem key="profile" className="h-14 gap-2" textValue="profile">
+          <DropdownItem key="profile" className="h-14 gap-2" textValue="profile" href="/profile">
             <p className="font-semibold">{user.name || 'User'}</p>
             <p className="text-sm text-default-500">{user.email}</p>
           </DropdownItem>

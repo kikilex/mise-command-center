@@ -32,6 +32,7 @@ interface Task {
   assignee_id: string | null
   project_id: string | null
   business_id: string | null
+  space_id: string | null
   due_date: string | null
   tags: string[]
   ai_flag: boolean
@@ -127,6 +128,7 @@ export default function TaskDetailModal({
     assignee_id: '',
     ai_agent: '',
     project_id: '',
+    space_id: '',
   })
   const [files, setFiles] = useState<TaskFile[]>([])
   const [users, setUsers] = useState<UserData[]>([])
@@ -156,13 +158,14 @@ export default function TaskDetailModal({
         assignee_id: task.assignee_id || '',
         ai_agent: task.ai_agent || '',
         project_id: task.project_id || '',
+        space_id: task.space_id || '',
       })
       loadFiles(task.id)
-      loadDropdownData(task.business_id)
+      loadDropdownData(task.space_id)
     }
   }, [task, isOpen])
 
-  async function loadDropdownData(businessId: string | null) {
+  async function loadDropdownData(spaceId: string | null) {
     setLoadingData(true)
     try {
       // Fetch Users
@@ -179,12 +182,10 @@ export default function TaskDetailModal({
       // Fetch Projects
       let projectQuery = supabase
         .from('projects')
-        .select('id, name, business_id')
+        .select('id, name, space_id')
       
-      if (businessId) {
-        projectQuery = projectQuery.eq('business_id', businessId)
-      } else {
-        projectQuery = projectQuery.is('business_id', null)
+      if (spaceId) {
+        projectQuery = projectQuery.eq('space_id', spaceId)
       }
       
       const { data: projectsData } = await projectQuery
@@ -235,6 +236,7 @@ export default function TaskDetailModal({
           assignee_id: formData.assignee_id || null,
           ai_agent: formData.ai_agent || null,
           project_id: formData.project_id || null,
+          space_id: formData.space_id || null,
         })
         .eq('id', task.id)
 
@@ -602,7 +604,7 @@ export default function TaskDetailModal({
               <TaskDocuments
                 taskId={task.id}
                 taskTitle={task.title}
-                businessId={null}
+                spaceId={task.space_id}
                 userId={userId || null}
               />
             )}

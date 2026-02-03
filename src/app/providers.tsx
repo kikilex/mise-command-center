@@ -3,7 +3,7 @@
 import { HeroUIProvider } from '@heroui/react'
 import { ThemeProvider as NextThemesProvider } from 'next-themes'
 import { useRouter } from 'next/navigation'
-import { BusinessProvider } from '@/lib/business-context'
+import { SpaceProvider } from '@/lib/space-context'
 import { MenuSettingsProvider } from '@/lib/menu-settings'
 
 export function Providers({ children }: { children: React.ReactNode }) {
@@ -17,11 +17,11 @@ export function Providers({ children }: { children: React.ReactNode }) {
       storageKey="mise-theme"
     >
       <HeroUIProvider navigate={router.push}>
-        <BusinessProvider>
+        <SpaceProvider>
           <MenuSettingsProvider>
             {children}
           </MenuSettingsProvider>
-        </BusinessProvider>
+        </SpaceProvider>
       </HeroUIProvider>
     </NextThemesProvider>
   )
