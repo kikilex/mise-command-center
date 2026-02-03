@@ -9,8 +9,8 @@ export interface MenuConfig {
 }
 
 export const DEFAULT_MENU_CONFIG: MenuConfig = {
-  personal: ['inbox', 'dashboard', 'spaces', 'tasks', 'projects', 'calendar', 'notes', 'docs', 'family'],
-  business: ['inbox', 'dashboard', 'spaces', 'tasks', 'projects', 'content', 'docs', 'calendar', 'ai'],
+  personal: ['inbox', 'dashboard', 'spaces', 'tasks', 'projects', 'calendar', 'notes', 'docs', 'family', 'agent-chat'],
+  business: ['inbox', 'dashboard', 'spaces', 'tasks', 'projects', 'content', 'docs', 'calendar', 'ai', 'agent-chat'],
 }
 
 export const PERSONAL_MENU_OPTIONS = [
@@ -23,6 +23,7 @@ export const PERSONAL_MENU_OPTIONS = [
   { key: 'notes', label: 'Notes', icon: 'notes', href: '/notes' },
   { key: 'docs', label: 'Documents', icon: 'docs', href: '/docs' },
   { key: 'family', label: 'Family', icon: 'family', href: '/family' },
+  { key: 'agent-chat', label: 'Agent Chat', icon: 'bot', href: '/agent-chat' },
 ]
 
 export const BUSINESS_MENU_OPTIONS = [
@@ -35,6 +36,7 @@ export const BUSINESS_MENU_OPTIONS = [
   { key: 'docs', label: 'Documents', icon: 'docs', href: '/docs' },
   { key: 'calendar', label: 'Calendar', icon: 'calendar', href: '/calendar' },
   { key: 'ai', label: 'AI Workspace', icon: 'ai', href: '/ai' },
+  { key: 'agent-chat', label: 'Agent Chat', icon: 'bot', href: '/agent-chat' },
 ]
 
 interface MenuSettingsContextType {

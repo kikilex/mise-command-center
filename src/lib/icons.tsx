@@ -74,6 +74,7 @@ export const navIcons: Record<string, LucideIcon> = {
   docs: FileText,
   family: Users,
   ai: Bot,
+  bot: Bot,
   settings: Settings,
 }
 
