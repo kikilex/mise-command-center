@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import {
   Modal,
   ModalContent,
@@ -10,9 +10,12 @@ import {
   Button,
   Input,
   Textarea,
+  Select,
+  SelectItem,
 } from '@heroui/react'
 import { createClient } from '@/lib/supabase/client'
 import { showErrorToast, showSuccessToast } from '@/lib/errors'
+import IconPicker from './IconPicker'
 
 interface AddSpaceModalProps {
   isOpen: boolean
