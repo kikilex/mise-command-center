@@ -2,6 +2,7 @@
 
 import {
   Home,
+  Inbox,
   CheckSquare,
   FolderKanban,
   Calendar,
@@ -61,6 +62,7 @@ import {
 
 // Icon mapping for nav items
 export const navIcons: Record<string, LucideIcon> = {
+  inbox: Inbox,
   dashboard: Home,
   tasks: CheckSquare,
   projects: FolderKanban,
@@ -98,6 +100,7 @@ export const statusIcons: Record<string, LucideIcon> = {
 // Export individual icons for direct use
 export {
   Home,
+  Inbox,
   CheckSquare,
   FolderKanban,
   Calendar,

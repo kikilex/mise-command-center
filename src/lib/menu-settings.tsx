@@ -9,11 +9,12 @@ export interface MenuConfig {
 }
 
 export const DEFAULT_MENU_CONFIG: MenuConfig = {
-  personal: ['dashboard', 'tasks', 'projects', 'calendar', 'notes', 'docs', 'family'],
-  business: ['dashboard', 'tasks', 'projects', 'content', 'docs', 'calendar', 'ai'],
+  personal: ['inbox', 'dashboard', 'tasks', 'projects', 'calendar', 'notes', 'docs', 'family'],
+  business: ['inbox', 'dashboard', 'tasks', 'projects', 'content', 'docs', 'calendar', 'ai'],
 }
 
 export const PERSONAL_MENU_OPTIONS = [
+  { key: 'inbox', label: 'Inbox', icon: 'inbox', href: '/inbox' },
   { key: 'dashboard', label: 'Dashboard', icon: 'dashboard', href: '/' },
   { key: 'tasks', label: 'Tasks', icon: 'tasks', href: '/tasks' },
   { key: 'projects', label: 'Projects', icon: 'projects', href: '/projects' },
@@ -24,6 +25,7 @@ export const PERSONAL_MENU_OPTIONS = [
 ]
 
 export const BUSINESS_MENU_OPTIONS = [
+  { key: 'inbox', label: 'Inbox', icon: 'inbox', href: '/inbox' },
   { key: 'dashboard', label: 'Dashboard', icon: 'dashboard', href: '/' },
   { key: 'tasks', label: 'Tasks', icon: 'tasks', href: '/tasks' },
   { key: 'projects', label: 'Projects', icon: 'projects', href: '/projects' },
