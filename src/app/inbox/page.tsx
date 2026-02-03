@@ -61,9 +61,9 @@ interface UserData {
 
 // Recipients configuration
 const RECIPIENTS = [
-  { id: 'ax', name: 'Ax', type: 'ai', avatar: '🤖', color: 'violet' },
-  { id: 'tony', name: 'Tony', type: 'ai', avatar: '🤖', color: 'blue' },
-  { id: 'mom', name: 'Mom', type: 'family', avatar: '👩', color: 'pink' },
+  { id: 'ax', name: 'Ax', type: 'ai', icon: 'bot', color: 'violet' },
+  { id: 'tony', name: 'Tony', type: 'ai', icon: 'bot', color: 'blue' },
+  { id: 'mom', name: 'Mom', type: 'family', icon: 'user', color: 'pink' },
 ]
 
 export default function InboxPage() {
@@ -564,7 +564,7 @@ export default function InboxPage() {
                     {RECIPIENTS.map(r => (
                       <SelectItem key={r.id} textValue={r.name}>
                         <div className="flex items-center gap-2">
-                          <span>{r.avatar}</span>
+                          {r.type === 'ai' ? <Bot className="w-4 h-4 text-violet-500" /> : <User className="w-4 h-4 text-pink-500" />}
                           <span>{r.name}</span>
                           <Chip size="sm" variant="flat" color={r.type === 'ai' ? 'secondary' : 'default'}>
                             {r.type === 'ai' ? 'AI' : 'Family'}
@@ -603,7 +603,7 @@ export default function InboxPage() {
                       {RECIPIENTS.filter(r => r.id !== composeTo).map(r => (
                         <SelectItem key={r.id} textValue={r.name}>
                           <div className="flex items-center gap-2">
-                            <span>{r.avatar}</span>
+                            {r.type === 'ai' ? <Bot className="w-4 h-4 text-violet-500" /> : <User className="w-4 h-4 text-pink-500" />}
                             <span>{r.name}</span>
                           </div>
                         </SelectItem>
@@ -746,8 +746,8 @@ export default function InboxPage() {
                               )}
                             </div>
                           )}
-                          <div className="w-8 h-8 rounded-full bg-default-100 flex items-center justify-center text-lg">
-                            {recipient.avatar}
+                          <div className="w-8 h-8 rounded-full bg-default-100 flex items-center justify-center">
+                            {recipient?.type === 'ai' ? <Bot className="w-4 h-4 text-violet-500" /> : <User className="w-4 h-4 text-pink-500" />}
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1">
