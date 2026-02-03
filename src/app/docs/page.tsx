@@ -186,10 +186,9 @@ function DocsPageContent() {
         `)
         .order('updated_at', { ascending: false })
       
+      // Query by space_id (new architecture) - fall back to business_id for compatibility
       if (selectedBusinessId) {
-        query = query.eq('business_id', selectedBusinessId)
-      } else {
-        query = query.is('business_id', null)
+        query = query.or(`space_id.eq.${selectedBusinessId},business_id.eq.${selectedBusinessId}`)
       }
       
       const { data, error } = await query
@@ -226,7 +225,8 @@ function DocsPageContent() {
           content: '# New Document\n\nStart writing here...',
           status: 'draft',
           created_by: user.id,
-          business_id: selectedBusinessId,
+          space_id: selectedBusinessId,
+          business_id: selectedBusinessId, // Keep for compatibility
           category: categoryTab !== 'all' ? categoryTab : 'all',
           tags: [],
           visibility: 'normal',
