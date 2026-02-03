@@ -417,18 +417,18 @@ function TasksPageContent() {
     return priorityOptions.find(p => p.key === priority)?.color || 'bg-slate-400'
   }
 
-  // Focus tasks: todo/in_progress, sorted by priority, limited
+  // Focus tasks: YOUR tasks only (no AI agent tasks), todo/in_progress, sorted by priority
   const focusTasks = useMemo(() => {
     return tasks
-      .filter(t => t.status === 'todo' || t.status === 'in_progress')
+      .filter(t => (t.status === 'todo' || t.status === 'in_progress') && !t.ai_agent)
       .sort((a, b) => (priorityOrder[a.priority] || 99) - (priorityOrder[b.priority] || 99))
       .slice(0, MAX_FOCUS_TASKS)
   }, [tasks])
 
-  // All non-done tasks for expanded view
+  // All non-done tasks for expanded view (still excludes AI tasks by default)
   const allActiveTasks = useMemo(() => {
     return tasks
-      .filter(t => t.status !== 'done')
+      .filter(t => t.status !== 'done' && !t.ai_agent)
       .sort((a, b) => (priorityOrder[a.priority] || 99) - (priorityOrder[b.priority] || 99))
   }, [tasks])
 
