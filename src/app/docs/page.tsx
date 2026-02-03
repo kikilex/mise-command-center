@@ -44,6 +44,7 @@ interface Document {
   content: string
   task_id: string | null
   business_id: string | null
+  space_id: string | null
   created_by: string | null
   created_at: string
   updated_at: string
@@ -53,6 +54,7 @@ interface Document {
   tags: string[]
   visibility: 'normal' | 'hidden'
   archived: boolean
+  doc_type: 'document' | 'note'
   tasks?: { title: string } | null
 }
 
@@ -128,6 +130,7 @@ function DocsPageContent() {
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
   const [categoryTab, setCategoryTab] = useState('all')
+  const [docTypeTab, setDocTypeTab] = useState<'document' | 'note'>('document')
   const [selectedTags, setSelectedTags] = useState<string[]>([])
   const [showArchived, setShowArchived] = useState(false)
   const [showHidden, setShowHidden] = useState(false)
@@ -199,6 +202,7 @@ function DocsPageContent() {
         category: doc.category || 'all',
         visibility: doc.visibility || 'normal',
         archived: doc.archived || false,
+        doc_type: doc.doc_type || 'document',
       }))
       setDocuments(docs)
     } catch (error) {
@@ -229,6 +233,7 @@ function DocsPageContent() {
           tags: [],
           visibility: 'normal',
           archived: false,
+          doc_type: 'document',
         })
         .select()
         .single()
@@ -238,6 +243,39 @@ function DocsPageContent() {
     } catch (error) {
       console.error('Create document error:', error)
       showErrorToast(error, 'Failed to create document')
+    }
+  }
+
+  async function handleCreateNote() {
+    if (!user) {
+      showErrorToast(null, 'Please sign in to create notes')
+      return
+    }
+
+    try {
+      const { data, error } = await supabase
+        .from('documents')
+        .insert({
+          title: 'New Note',
+          content: 'Quick note content...',
+          status: 'approved', // Notes are automatically "approved"
+          created_by: user.id,
+          space_id: selectedBusinessId,
+          business_id: selectedBusinessId,
+          category: 'all',
+          tags: ['note'],
+          visibility: 'normal',
+          archived: false,
+          doc_type: 'note',
+        })
+        .select()
+        .single()
+
+      if (error) throw error
+      router.push(`/docs/${data.id}/edit`)
+    } catch (error) {
+      console.error('Create note error:', error)
+      showErrorToast(error, 'Failed to create note')
     }
   }
 
@@ -280,8 +318,11 @@ function DocsPageContent() {
         if (doc.visibility === 'hidden') return false
       }
       
+      // Doc type filter (document vs note)
+      if (doc.doc_type !== docTypeTab) return false
+
       // Category filter (tab)
-      if (categoryTab !== 'all') {
+      if (docTypeTab === 'document' && categoryTab !== 'all') {
         if (doc.category !== categoryTab) return false
       }
       
@@ -307,7 +348,7 @@ function DocsPageContent() {
       
       return true
     })
-  }, [documents, searchQuery, statusFilter, categoryTab, selectedTags, showArchived, showHidden, parseSearchQuery])
+  }, [documents, searchQuery, statusFilter, categoryTab, docTypeTab, selectedTags, showArchived, showHidden, parseSearchQuery])
 
   // Get content preview (first 150 chars, strip markdown)
   const getPreview = (content: string) => {
@@ -391,38 +432,64 @@ function DocsPageContent() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div className="flex items-center gap-3">
             <FileText className="w-8 h-8 text-violet-600 dark:text-violet-400" />
-            <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Documents</h1>
+            <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Intel</h1>
           </div>
-          <Button
-            color="primary"
-            onPress={handleCreateDocument}
-            startContent={<Plus className="w-4 h-4" />}
-          >
-            New Document
-          </Button>
+          <div className="flex gap-2">
+            <Button
+              color="primary"
+              onPress={handleCreateDocument}
+              startContent={<Plus className="w-4 h-4" />}
+            >
+              New Document
+            </Button>
+            <Button
+              color="secondary"
+              variant="flat"
+              onPress={handleCreateNote}
+              startContent={<Pencil className="w-4 h-4" />}
+            >
+              New Note
+            </Button>
+          </div>
         </div>
 
-        {/* Category Tabs */}
-        <div className="mb-4 overflow-x-auto">
-          <div className="flex items-center gap-2">
-            <Tabs 
-              selectedKey={categoryTab} 
-              onSelectionChange={(key) => setCategoryTab(key as string)}
-              color="primary"
-              variant="underlined"
-              classNames={{
-                tabList: "gap-4",
-                tab: "px-0 h-10",
-              }}
-            >
-              {categoryOptions.map(cat => (
-                <Tab 
-                  key={cat.key} 
-                  title={cat.label}
-                />
-              ))}
-            </Tabs>
-            <Popover placement="bottom-end">
+        {/* Primary Tabs: Documents vs Notes */}
+        <div className="mb-6">
+          <Tabs 
+            selectedKey={docTypeTab} 
+            onSelectionChange={(key) => setDocTypeTab(key as 'document' | 'note')}
+            color="primary"
+            variant="solid"
+            size="lg"
+            className="w-full sm:w-auto"
+          >
+            <Tab key="document" title="Documents" />
+            <Tab key="note" title="Notes" />
+          </Tabs>
+        </div>
+
+        {/* Category Tabs (Only for Documents) */}
+        {docTypeTab === 'document' && (
+          <div className="mb-4 overflow-x-auto">
+            <div className="flex items-center gap-2">
+              <Tabs 
+                selectedKey={categoryTab} 
+                onSelectionChange={(key) => setCategoryTab(key as string)}
+                color="primary"
+                variant="underlined"
+                classNames={{
+                  tabList: "gap-4",
+                  tab: "px-0 h-10",
+                }}
+              >
+                {categoryOptions.map(cat => (
+                  <Tab 
+                    key={cat.key} 
+                    title={cat.label}
+                  />
+                ))}
+              </Tabs>
+              <Popover placement="bottom-end">
               <PopoverTrigger>
                 <Button
                   size="sm"

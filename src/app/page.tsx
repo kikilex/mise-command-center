@@ -4,6 +4,7 @@ import {
   Button, 
   Card, 
   CardBody,
+  CardHeader,
   Chip,
   Skeleton,
   Modal,
@@ -16,12 +17,28 @@ import {
   Select,
   SelectItem,
   useDisclosure,
+  Avatar,
+  Divider,
+  ScrollShadow,
 } from "@heroui/react";
-import { useState, useEffect, useMemo } from "react";
+import { useState, useEffect, useMemo, useRef } from "react";
 import { createClient } from '@/lib/supabase/client'
 import Navbar from '@/components/Navbar'
 import { showErrorToast, showSuccessToast } from '@/lib/errors'
 import { ErrorFallback } from '@/components/ErrorBoundary'
+import { 
+  Brain, 
+  Send, 
+  Zap, 
+  Clock, 
+  CheckCircle2, 
+  Plus, 
+  Activity,
+  Bot,
+  User,
+  ArrowRight,
+  MessageCircle,
+} from 'lucide-react'
 
 interface UserData {
   id: string
@@ -31,7 +48,7 @@ interface UserData {
   role?: string
 }
 
-interface Business {
+interface Space {
   id: string
   name: string
   color: string
@@ -43,9 +60,24 @@ interface Task {
   description: string | null
   status: string
   priority: string
-  business_id: string | null
+  space_id: string | null
   due_date: string | null
-  business?: Business | null
+}
+
+interface InboxItem {
+  id: string
+  content: string
+  item_type: 'thought' | 'message'
+  status: 'pending' | 'processing' | 'processed'
+  created_at: string
+}
+
+interface AIAgent {
+  id: string
+  name: string
+  slug: string
+  is_active: boolean
+  role: string
 }
 
 type FilterType = 'all' | 'personal' | 'business'
@@ -60,11 +92,12 @@ const priorityOptions = [
 export default function Home() {
   const [user, setUser] = useState<UserData | null>(null);
   const [todaysTasks, setTodaysTasks] = useState<Task[]>([]);
-  const [businesses, setBusinesses] = useState<Business[]>([]);
+  const [spaces, setSpaces] = useState<Space[]>([]);
+  const [inboxItems, setInboxItems] = useState<InboxItem[]>([]);
+  const [agents, setAgents] = useState<AIAgent[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
-  const [filter, setFilter] = useState<FilterType>('all');
-  const [selectedBusiness, setSelectedBusiness] = useState<string | null>(null);
+  const [brainDump, setBrainDump] = useState('');
   const [submitting, setSubmitting] = useState(false);
   
   const { isOpen, onOpen, onClose } = useDisclosure();
@@ -72,7 +105,7 @@ export default function Home() {
     title: '',
     description: '',
     priority: 'medium',
-    business_id: '',
+    space_id: '',
   });
   
   const supabase = createClient();
@@ -90,85 +123,41 @@ export default function Home() {
     try {
       // Get user
       const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
+      if (authError || !authUser) throw new Error('Not authenticated');
       
-      if (authError) {
-        console.error('Auth error:', authError);
-      }
-      
-      if (authUser) {
-        try {
-          const { data: profile } = await supabase
-            .from('users')
-            .select('*')
-            .eq('id', authUser.id)
-            .single();
-          
-          setUser({
-            id: authUser.id,
-            email: authUser.email || '',
-            name: profile?.name || authUser.user_metadata?.name || authUser.email?.split('@')[0],
-            avatar_url: profile?.avatar_url,
-            role: profile?.role || 'member'
-          });
-        } catch (err) {
-          console.error('Failed to fetch profile:', err);
-          setUser({
-            id: authUser.id,
-            email: authUser.email || '',
-            name: authUser.user_metadata?.name || authUser.email?.split('@')[0],
-          });
-        }
-      }
+      const { data: profile } = await supabase.from('users').select('*').eq('id', authUser.id).single();
+      setUser({
+        id: authUser.id,
+        email: authUser.email || '',
+        name: profile?.name || authUser.email?.split('@')[0],
+        avatar_url: profile?.avatar_url,
+        role: profile?.role || 'member'
+      });
 
-      // Load businesses
-      const { data: businessData, error: businessError } = await supabase
-        .from('businesses')
-        .select('id, name, color');
-      
-      if (businessError) {
-        console.error('Businesses fetch error:', businessError);
-      } else {
-        setBusinesses(businessData || []);
-      }
+      // Load spaces, tasks, inbox, agents
+      const [spacesRes, tasksRes, inboxRes, agentsRes] = await Promise.all([
+        supabase.from('spaces').select('id, name, color'),
+        supabase.from('tasks')
+          .select('*')
+          .neq('status', 'done')
+          .order('priority', { ascending: false }),
+        supabase.from('inbox')
+          .select('*')
+          .eq('item_type', 'thought')
+          .eq('status', 'pending')
+          .order('created_at', { ascending: false })
+          .limit(10),
+        supabase.from('ai_agents').select('*').order('created_at', { ascending: true })
+      ]);
 
-      // Load today's tasks (due today and not done)
-      const todayStr = getTodayString();
-      const { data: tasksData, error: tasksError } = await supabase
-        .from('tasks')
-        .select(`
-          id,
-          title,
-          description,
-          status,
-          priority,
-          business_id,
-          due_date,
-          businesses (
-            id,
-            name,
-            color
-          )
-        `)
-        .gte('due_date', `${todayStr}T00:00:00`)
-        .lt('due_date', `${todayStr}T23:59:59.999`)
-        .neq('status', 'done')
-        .order('priority', { ascending: true });
+      setSpaces(spacesRes.data || []);
+      setTodaysTasks(tasksRes.data || []);
+      setInboxItems(inboxRes.data || []);
+      setAgents(agentsRes.data || []);
 
-      if (tasksError) {
-        console.error('Tasks fetch error:', tasksError);
-        showErrorToast(tasksError, 'Failed to load tasks');
-      } else {
-        // Transform the data to match our interface
-        const transformedTasks = (tasksData || []).map(task => ({
-          ...task,
-          business: task.businesses as unknown as Business | null
-        }));
-        setTodaysTasks(transformedTasks);
-      }
     } catch (error) {
       console.error('Dashboard load error:', error);
       setLoadError('Failed to load dashboard data');
-      showErrorToast(error, 'Failed to load dashboard');
     } finally {
       setLoading(false);
     }
@@ -178,22 +167,60 @@ export default function Home() {
     loadData();
   }, []);
 
-  // Filter tasks based on selected filter
-  const filteredTasks = useMemo(() => {
-    let filtered = todaysTasks;
-
-    if (filter === 'personal') {
-      filtered = filtered.filter(t => !t.business_id);
-    } else if (filter === 'business') {
-      if (selectedBusiness) {
-        filtered = filtered.filter(t => t.business_id === selectedBusiness);
-      } else {
-        filtered = filtered.filter(t => t.business_id !== null);
-      }
+  // Brain Dump Logic
+  async function handleBrainDump() {
+    if (!brainDump.trim() || !user) return;
+    setSubmitting(true);
+    try {
+      const { data, error } = await supabase
+        .from('inbox')
+        .insert({
+          user_id: user.id,
+          content: brainDump.trim(),
+          item_type: 'thought',
+          status: 'pending'
+        })
+        .select()
+        .single();
+      if (error) throw error;
+      setInboxItems([data, ...inboxItems]);
+      setBrainDump('');
+      showSuccessToast('Thought captured');
+    } catch (error) {
+      showErrorToast(error, 'Failed to capture thought');
+    } finally {
+      setSubmitting(false);
     }
+  }
 
-    return filtered;
-  }, [todaysTasks, filter, selectedBusiness]);
+  async function handleOrganize() {
+    if (inboxItems.length === 0 || !user) return;
+    setSubmitting(true);
+    try {
+      // 1. Create organize request message for Ax
+      const content = `Please organize my brain dump:\n${inboxItems.map(i => `- ${i.content}`).join('\n')}`;
+      
+      const { error: msgError } = await supabase.from('inbox').insert({
+        user_id: user.id,
+        content,
+        item_type: 'message',
+        to_recipient: 'ax',
+        status: 'pending'
+      });
+      if (msgError) throw msgError;
+
+      // 2. Mark items as processing
+      const ids = inboxItems.map(i => i.id);
+      await supabase.from('inbox').update({ status: 'processing' }).in('id', ids);
+
+      setInboxItems([]);
+      showSuccessToast('Ax is organizing your thoughts');
+    } catch (error) {
+      showErrorToast(error, 'Failed to start organization');
+    } finally {
+      setSubmitting(false);
+    }
+  }
 
   // Toggle task completion
   async function toggleTaskDone(taskId: string) {
@@ -314,180 +341,203 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
+    <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
       <Navbar user={user} />
 
-      <main className="max-w-2xl mx-auto px-4 py-6">
-        {/* Header */}
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
-            Today
-          </h1>
-          <p className="text-slate-500 dark:text-slate-400 text-sm">
-            {new Date().toLocaleDateString('en-US', { 
-              weekday: 'long', 
-              month: 'long', 
-              day: 'numeric' 
-            })}
-          </p>
-        </div>
-
-        {/* Task List */}
-        {loading ? (
-          <div className="space-y-3">
-            {[1, 2, 3].map((i) => (
-              <Card key={i} className="bg-white dark:bg-slate-800 shadow-sm">
-                <CardBody className="p-4">
+      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
+        <div className="flex flex-col lg:flex-row gap-8">
+          {/* LEFT COLUMN: Brain Dump + What's Next */}
+          <div className="flex-1 space-y-8">
+            {/* 🧠 Brain Dump System */}
+            <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+              <CardHeader className="bg-slate-50 dark:bg-slate-800/50 px-6 py-4 border-b border-slate-200 dark:border-slate-800">
+                <div className="flex items-center justify-between w-full">
                   <div className="flex items-center gap-3">
-                    <Skeleton className="w-6 h-6 rounded" />
-                    <div className="flex-1">
-                      <Skeleton className="w-3/4 h-5 rounded mb-2" />
-                      <Skeleton className="w-24 h-5 rounded" />
+                    <div className="w-10 h-10 rounded-xl bg-violet-600 flex items-center justify-center">
+                      <Brain className="w-6 h-6 text-white" />
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100">Brain Dump</h2>
+                      <p className="text-xs text-slate-500">{inboxItems.length} pending thoughts</p>
                     </div>
                   </div>
-                </CardBody>
-              </Card>
-            ))}
-          </div>
-        ) : (
-          <>
-            {/* Task Cards */}
-            <div className="space-y-2 mb-6">
-              {filteredTasks.length === 0 ? (
-                <Card className="bg-white dark:bg-slate-800 shadow-sm">
-                  <CardBody className="p-8 text-center">
-                    <div className="text-4xl mb-3">✨</div>
-                    <p className="text-slate-600 dark:text-slate-400 font-medium">
-                      {filter === 'all' 
-                        ? "No tasks due today" 
-                        : filter === 'personal'
-                        ? "No personal tasks due today"
-                        : "No business tasks due today"}
-                    </p>
-                    <p className="text-slate-400 dark:text-slate-500 text-sm mt-1">
-                      Add a task to get started
-                    </p>
-                  </CardBody>
-                </Card>
-              ) : (
-                filteredTasks.map((task) => (
-                  <Card 
-                    key={task.id} 
-                    className="bg-white dark:bg-slate-800 shadow-sm hover:shadow-md transition-shadow"
+                  {inboxItems.length > 0 && (
+                    <Button 
+                      size="sm" 
+                      color="primary" 
+                      variant="flat" 
+                      onPress={handleOrganize}
+                      isLoading={submitting}
+                      endContent={<ArrowRight className="w-4 h-4" />}
+                    >
+                      Ask Ax to Organize
+                    </Button>
+                  )}
+                </div>
+              </CardHeader>
+              <CardBody className="p-6">
+                <div className="flex gap-2 mb-6">
+                  <Input 
+                    placeholder="What's on your mind? Hit enter to capture..."
+                    value={brainDump}
+                    onChange={(e) => setBrainDump(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && handleBrainDump()}
+                    className="flex-1"
+                    classNames={{
+                      inputWrapper: "bg-slate-100 dark:bg-slate-800 border-none h-12"
+                    }}
+                  />
+                  <Button 
+                    isIconOnly 
+                    color="primary" 
+                    className="h-12 w-12"
+                    onPress={handleBrainDump}
+                    isLoading={submitting}
                   >
-                    <CardBody className="p-4">
-                      <div className="flex items-start gap-3">
-                        {/* Checkbox */}
-                        <button
-                          onClick={() => toggleTaskDone(task.id)}
-                          className="mt-0.5 w-6 h-6 rounded-full border-2 border-slate-300 dark:border-slate-600 hover:border-emerald-500 hover:bg-emerald-50 dark:hover:bg-emerald-900/30 transition-colors flex items-center justify-center flex-shrink-0"
-                          aria-label="Complete task"
-                        >
-                          <svg 
-                            className="w-3 h-3 text-transparent hover:text-emerald-500" 
-                            fill="none" 
-                            stroke="currentColor" 
-                            viewBox="0 0 24 24"
-                          >
-                            <path 
-                              strokeLinecap="round" 
-                              strokeLinejoin="round" 
-                              strokeWidth={3} 
-                              d="M5 13l4 4L19 7" 
-                            />
-                          </svg>
-                        </button>
+                    <Plus className="w-6 h-6" />
+                  </Button>
+                </div>
 
-                        {/* Task Content */}
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-start justify-between gap-2 mb-1">
-                            <div className="flex items-center gap-2">
-                              <div className={`w-2 h-2 rounded-full flex-shrink-0 ${getPriorityColor(task.priority)}`} />
-                              <h3 className="font-medium text-slate-900 dark:text-slate-100 truncate">
-                                {task.title}
-                              </h3>
-                            </div>
+                <div className="space-y-3">
+                  <p className="text-xs font-bold uppercase tracking-wider text-slate-400 px-1">Recent thoughts</p>
+                  {inboxItems.length === 0 ? (
+                    <div className="text-center py-8 bg-slate-50 dark:bg-slate-800/30 rounded-2xl border-2 border-dashed border-slate-100 dark:border-slate-800">
+                      <p className="text-sm text-slate-400 italic">No pending thoughts. Capturing is key.</p>
+                    </div>
+                  ) : (
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                      {inboxItems.slice(0, 6).map((item) => (
+                        <div key={item.id} className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
+                          <p className="text-sm text-slate-700 dark:text-slate-300 line-clamp-1 italic">"{item.content}"</p>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </CardBody>
+            </Card>
+
+            {/* ✅ What's Next (High Priority Tasks) */}
+            <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
+              <CardHeader className="px-6 py-5 flex items-center justify-between border-b border-slate-200 dark:border-slate-800">
+                <div className="flex items-center gap-3">
+                  <div className="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center text-white">
+                    <Zap className="w-6 h-6" />
+                  </div>
+                  <div>
+                    <h2 className="text-lg font-bold">What's Next</h2>
+                    <p className="text-xs text-slate-500">Highest priority hits</p>
+                  </div>
+                </div>
+                <Button variant="light" color="primary" onPress={() => router.push('/tasks')}>View All</Button>
+              </CardHeader>
+              <CardBody className="p-4 space-y-2">
+                {loading ? (
+                  [1, 2, 3].map(i => <Skeleton key={i} className="h-16 rounded-xl w-full" />)
+                ) : todaysTasks.length === 0 ? (
+                  <div className="text-center py-12">
+                    <CheckCircle2 className="w-12 h-12 text-emerald-500 mx-auto mb-3" />
+                    <p className="text-slate-500">The hit list is empty. Go find some work.</p>
+                  </div>
+                ) : (
+                  todaysTasks.slice(0, 5).map((task) => (
+                    <div 
+                      key={task.id}
+                      onClick={() => router.push(`/tasks?openTask=${task.id}`)}
+                      className="group flex items-center gap-4 p-4 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer transition-all border border-transparent hover:border-slate-200 dark:hover:border-slate-700"
+                    >
+                      <div className={`w-3 h-3 rounded-full flex-shrink-0 ${getPriorityColor(task.priority)} shadow-lg shadow-current/20`} />
+                      <div className="flex-1 min-w-0">
+                        <p className="font-bold text-slate-800 dark:text-slate-200 truncate">{task.title}</p>
+                        <div className="flex items-center gap-2 mt-1">
+                          <Chip size="sm" variant="flat" color="default" className="h-5 text-[10px] uppercase font-bold tracking-tight">
+                            {spaces.find(s => s.id === task.space_id)?.name || 'General'}
+                          </Chip>
+                        </div>
+                      </div>
+                      <button 
+                        onClick={(e) => { e.stopPropagation(); toggleTaskDone(task.id); }}
+                        className="w-10 h-10 rounded-xl border-2 border-slate-200 dark:border-slate-700 flex items-center justify-center group-hover:border-emerald-500 group-hover:bg-emerald-50 dark:group-hover:bg-emerald-900/20 transition-all"
+                      >
+                        <CheckCircle2 className="w-5 h-5 text-transparent group-hover:text-emerald-500" />
+                      </button>
+                    </div>
+                  ))
+                )}
+              </CardBody>
+            </Card>
+          </div>
+
+          {/* RIGHT COLUMN: Messages + Agent Status */}
+          <div className="w-full lg:w-96 space-y-8">
+            {/* 📥 Messages Widget */}
+            <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
+              <CardHeader className="px-6 pt-5 pb-2">
+                <div className="flex items-center justify-between w-full">
+                  <h2 className="text-sm font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
+                    <MessageCircle className="w-4 h-4" /> Intel
+                  </h2>
+                  <Button size="sm" variant="light" onPress={() => router.push('/inbox')}>Open Inbox</Button>
+                </div>
+              </CardHeader>
+              <CardBody className="px-4 pb-4">
+                <div className="space-y-4">
+                  <p className="text-center py-12 text-slate-400 text-sm italic border-2 border-dashed border-slate-100 dark:border-slate-800 rounded-2xl">
+                    No new intel. Keep it that way.
+                  </p>
+                </div>
+              </CardBody>
+            </Card>
+
+            {/* 🤖 Agent Status Cards */}
+            <div className="space-y-4">
+              <h2 className="text-sm font-black uppercase tracking-widest text-slate-400 px-1 flex items-center gap-2">
+                <Bot className="w-4 h-4" /> Agent Status
+              </h2>
+              <div className="grid grid-cols-1 gap-4">
+                {agents.map((agent) => (
+                  <Card 
+                    key={agent.id} 
+                    isPressable 
+                    onPress={() => router.push('/ai')}
+                    className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden"
+                  >
+                    <div className={`h-1 w-full ${agent.is_active ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+                    <CardBody className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <Avatar 
+                            name={agent.name} 
+                            size="sm" 
+                            className="bg-gradient-to-br from-violet-500 to-purple-600 text-white font-black" 
+                          />
+                          <div>
+                            <p className="font-bold text-slate-800 dark:text-slate-100 leading-none mb-1">{agent.name}</p>
+                            <p className="text-[10px] uppercase font-bold text-slate-400 tracking-tight">{agent.role.replace(/_/g, ' ')}</p>
                           </div>
-                          <div className="flex items-center gap-2 flex-wrap">
-                            {getContextBadge(task)}
-                          </div>
+                        </div>
+                        <div className="text-right">
+                          <Chip 
+                            size="sm" 
+                            variant="dot" 
+                            color={agent.is_active ? 'success' : 'default'}
+                            className="h-6"
+                          >
+                            {agent.is_active ? 'Online' : 'Offline'}
+                          </Chip>
                         </div>
                       </div>
                     </CardBody>
                   </Card>
-                ))
-              )}
+                ))}
+              </div>
             </div>
-
-            {/* Filter Buttons */}
-            <div className="flex gap-2 flex-wrap">
-              <Button
-                size="sm"
-                variant={filter === 'all' ? 'solid' : 'flat'}
-                color={filter === 'all' ? 'primary' : 'default'}
-                onPress={() => {
-                  setFilter('all');
-                  setSelectedBusiness(null);
-                }}
-                className="font-medium"
-              >
-                All ({todaysTasks.length})
-              </Button>
-              <Button
-                size="sm"
-                variant={filter === 'personal' ? 'solid' : 'flat'}
-                color={filter === 'personal' ? 'primary' : 'default'}
-                onPress={() => {
-                  setFilter('personal');
-                  setSelectedBusiness(null);
-                }}
-                className="font-medium"
-              >
-                👤 Personal ({todaysTasks.filter(t => !t.business_id).length})
-              </Button>
-              <Button
-                size="sm"
-                variant={filter === 'business' && !selectedBusiness ? 'solid' : 'flat'}
-                color={filter === 'business' && !selectedBusiness ? 'primary' : 'default'}
-                onPress={() => {
-                  setFilter('business');
-                  setSelectedBusiness(null);
-                }}
-                className="font-medium"
-              >
-                🏢 Business ({todaysTasks.filter(t => t.business_id).length})
-              </Button>
-              
-              {/* Individual business filters */}
-              {filter === 'business' && businesses.length > 1 && (
-                <>
-                  {businesses.map(biz => {
-                    const count = todaysTasks.filter(t => t.business_id === biz.id).length;
-                    return (
-                      <Button
-                        key={biz.id}
-                        size="sm"
-                        variant={selectedBusiness === biz.id ? 'solid' : 'flat'}
-                        style={selectedBusiness === biz.id ? {
-                          backgroundColor: biz.color,
-                          color: 'white',
-                        } : {
-                          borderColor: biz.color,
-                          color: biz.color,
-                        }}
-                        className={selectedBusiness !== biz.id ? 'border' : ''}
-                        onPress={() => setSelectedBusiness(biz.id)}
-                      >
-                        {biz.name} ({count})
-                      </Button>
-                    );
-                  })}
-                </>
-              )}
-            </div>
-          </>
-        )}
+          </div>
+        </div>
       </main>
+    </div>
+  );
+}
 
       {/* Floating Quick Add Button */}
       <div className="fixed bottom-6 right-6 z-50">
