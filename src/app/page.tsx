@@ -93,6 +93,7 @@ export default function Home() {
   const [todaysTasks, setTodaysTasks] = useState<Task[]>([]);
   const [spaces, setSpaces] = useState<Space[]>([]);
   const [inboxItems, setInboxItems] = useState<InboxItem[]>([]);
+  const [messages, setMessages] = useState<InboxItem[]>([]);
   const [agents, setAgents] = useState<AIAgent[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -131,7 +132,7 @@ export default function Home() {
         role: profile?.role || 'member'
       });
 
-      const [spacesRes, tasksRes, inboxRes, agentsRes] = await Promise.all([
+      const [spacesRes, tasksRes, inboxRes, messagesRes, agentsRes] = await Promise.all([
         supabase.from('spaces').select('id, name, color'),
         supabase.from('tasks')
           .select('*')
@@ -143,12 +144,18 @@ export default function Home() {
           .eq('status', 'pending')
           .order('created_at', { ascending: false })
           .limit(10),
+        supabase.from('inbox')
+          .select('*')
+          .eq('item_type', 'message')
+          .order('created_at', { ascending: false })
+          .limit(5),
         supabase.from('ai_agents').select('*').order('created_at', { ascending: true })
       ]);
 
       setSpaces(spacesRes.data || []);
       setTodaysTasks(tasksRes.data || []);
       setInboxItems(inboxRes.data || []);
+      setMessages(messagesRes.data || []);
       setAgents(agentsRes.data || []);
 
     } catch (error) {
@@ -374,9 +381,26 @@ export default function Home() {
                 </div>
               </CardHeader>
               <CardBody className="px-4 pb-4">
-                <p className="text-center py-12 text-slate-400 text-sm italic border-2 border-dashed border-slate-100 dark:border-slate-800 rounded-2xl">
-                  No new intel.
-                </p>
+                <div className="space-y-3">
+                  {messages.length === 0 ? (
+                    <p className="text-center py-12 text-slate-400 text-sm italic border-2 border-dashed border-slate-100 dark:border-slate-800 rounded-2xl">
+                      No new intel. Keep it that way.
+                    </p>
+                  ) : (
+                    messages.map((msg) => (
+                      <div 
+                        key={msg.id} 
+                        onClick={() => router.push('/inbox')}
+                        className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 hover:border-violet-200 dark:hover:border-violet-900 transition-all cursor-pointer"
+                      >
+                        <p className="text-sm text-slate-700 dark:text-slate-300 line-clamp-2">{msg.content}</p>
+                        <p className="text-[10px] text-slate-400 mt-1 uppercase font-bold tracking-tighter">
+                          {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </p>
+                      </div>
+                    ))
+                  )}
+                </div>
               </CardBody>
             </Card>
 
