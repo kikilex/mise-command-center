@@ -10,7 +10,8 @@ import {
   Zap,
   ArrowRight,
   Clock,
-  X
+  X,
+  MessageSquare
 } from 'lucide-react'
 import { 
   Tabs,
@@ -22,11 +23,14 @@ import {
   Button,
   Avatar,
   ScrollShadow,
+  Input,
+  Textarea
 } from "@heroui/react"
 import { createClient } from '@/lib/supabase/client'
 import Navbar from '@/components/Navbar'
-import { showErrorToast } from '@/lib/errors'
+import { showErrorToast, showSuccessToast } from '@/lib/errors'
 import TaskThread from '@/components/TaskThread'
+import AgentChat from '@/components/AgentChat' // Assuming this exists or I'll create it
 
 // Types
 interface AIAgent {
@@ -72,7 +76,7 @@ interface WorkLog {
   created_at: string
 }
 
-type ViewType = 'dashboard' | 'activity' | 'debriefs'
+type ViewType = 'dashboard' | 'activity' | 'chat' | 'debriefs'
 
 export default function AIWorkspacePage() {
   const [agents, setAgents] = useState<AIAgent[]>([])
@@ -576,6 +580,12 @@ export default function AIWorkspacePage() {
                 <span className="hidden sm:inline">Activity</span>
               </span>
             } />
+            <Tab key="chat" title={
+              <span className="flex items-center gap-2">
+                <MessageSquare className="w-4 h-4" />
+                <span className="hidden sm:inline">Agent Chat</span>
+              </span>
+            } />
             <Tab key="debriefs" title={
               <span className="flex items-center gap-2">
                 <FileText className="w-4 h-4" />
@@ -595,6 +605,11 @@ export default function AIWorkspacePage() {
           <>
             {currentView === 'dashboard' && renderDashboard()}
             {currentView === 'activity' && renderActivity()}
+            {currentView === 'chat' && (
+              <div className="h-[calc(100vh-200px)]">
+                <AgentChat />
+              </div>
+            )}
             {currentView === 'debriefs' && renderDebriefs()}
           </>
         )}
