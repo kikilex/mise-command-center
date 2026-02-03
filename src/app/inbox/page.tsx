@@ -20,6 +20,10 @@ import {
   Textarea,
   Divider,
   Avatar,
+  Dropdown,
+  DropdownTrigger,
+  DropdownMenu,
+  DropdownItem,
 } from "@heroui/react"
 import { createClient } from '@/lib/supabase/client'
 import Navbar from '@/components/Navbar'
@@ -27,7 +31,7 @@ import { showErrorToast, showSuccessToast } from '@/lib/errors'
 import { 
   Check, Trash2, Calendar, FolderOpen, Send, Bot, ArrowRight, 
   Inbox as InboxIcon, MessageCircle, Plus, X, ChevronDown, ChevronRight,
-  User, Users, ArrowLeft
+  User, Users, ArrowLeft, MoreVertical, Archive
 } from 'lucide-react'
 
 interface InboxItem {
@@ -530,6 +534,23 @@ export default function InboxPage() {
     }
   }
 
+  const handleDeleteThread = async (thread: Thread) => {
+    try {
+      const ids = thread.messages.map(m => m.id)
+      const { error } = await supabase
+        .from('inbox')
+        .delete()
+        .in('id', ids)
+
+      if (error) throw error
+      setItems(items.filter(i => !ids.includes(i.id)))
+      showSuccessToast('Thread deleted')
+    } catch (error) {
+      console.error('Error deleting thread:', error)
+      showErrorToast('Failed to delete')
+    }
+  }
+
   const toggleThread = (threadId: string) => {
     setExpandedThreads(prev => {
       const next = new Set(prev)
@@ -973,27 +994,39 @@ export default function InboxPage() {
 
                         {/* Thread Actions */}
                         <div 
-                          className="flex items-center gap-1 flex-shrink-0"
+                          className="flex-shrink-0"
                           onClick={(e) => e.stopPropagation()}
                         >
-                          <Button
-                            size="sm"
-                            variant="light"
-                            isIconOnly
-                            onPress={() => handleArchiveThread(thread)}
-                            className="text-default-400 hover:text-success"
-                          >
-                            <Check className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="light"
-                            isIconOnly
-                            onPress={() => handleDelete(thread.lastMessage)}
-                            className="text-default-400 hover:text-danger"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </Button>
+                          <Dropdown>
+                            <DropdownTrigger>
+                              <Button
+                                size="sm"
+                                variant="light"
+                                isIconOnly
+                                className="text-default-400"
+                              >
+                                <MoreVertical className="w-4 h-4" />
+                              </Button>
+                            </DropdownTrigger>
+                            <DropdownMenu aria-label="Thread actions">
+                              <DropdownItem
+                                key="archive"
+                                startContent={<Archive className="w-4 h-4" />}
+                                onPress={() => handleArchiveThread(thread)}
+                              >
+                                Archive
+                              </DropdownItem>
+                              <DropdownItem
+                                key="delete"
+                                startContent={<Trash2 className="w-4 h-4" />}
+                                className="text-danger"
+                                color="danger"
+                                onPress={() => handleDeleteThread(thread)}
+                              >
+                                Delete Thread
+                              </DropdownItem>
+                            </DropdownMenu>
+                          </Dropdown>
                         </div>
                       </div>
                     </CardBody>
