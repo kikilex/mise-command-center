@@ -186,10 +186,8 @@ function DocsPageContent() {
         `)
         .order('updated_at', { ascending: false })
       
-      // Query by space_id (new architecture) - fall back to business_id for compatibility
-      if (selectedBusinessId) {
-        query = query.or(`space_id.eq.${selectedBusinessId},business_id.eq.${selectedBusinessId}`)
-      }
+      // Note: We don't filter by space here - docs page shows ALL user's docs
+      // The space selector is used for creating new docs, not filtering
       
       const { data, error } = await query
 
