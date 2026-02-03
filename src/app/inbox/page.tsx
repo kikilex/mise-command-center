@@ -27,7 +27,7 @@ import { showErrorToast, showSuccessToast } from '@/lib/errors'
 import { 
   Check, Trash2, Calendar, FolderOpen, Send, Bot, ArrowRight, 
   Inbox as InboxIcon, MessageCircle, Plus, X, ChevronDown, ChevronRight,
-  User, Users
+  User, Users, ArrowLeft
 } from 'lucide-react'
 
 interface InboxItem {
@@ -77,6 +77,8 @@ export default function InboxPage() {
   const [scheduleDate, setScheduleDate] = useState('')
   const [selectedProject, setSelectedProject] = useState('')
   const [expandedThreads, setExpandedThreads] = useState<Set<string>>(new Set())
+  const [selectedThread, setSelectedThread] = useState<Thread | null>(null)
+  const [replyMessage, setReplyMessage] = useState('')
   
   // Compose form state
   const [composeOpen, setComposeOpen] = useState(false)
@@ -91,6 +93,8 @@ export default function InboxPage() {
   
   const thoughtInputRef = useRef<HTMLInputElement>(null)
   const messageInputRef = useRef<HTMLTextAreaElement>(null)
+  const replyInputRef = useRef<HTMLTextAreaElement>(null)
+  const chatScrollRef = useRef<HTMLDivElement>(null)
   
   const supabase = createClient()
 
@@ -133,6 +137,23 @@ export default function InboxPage() {
     
     return { threads: threadList, thoughts: thoughtItems }
   }, [items])
+
+  // Keep selected thread in sync with items
+  useEffect(() => {
+    if (selectedThread) {
+      const updatedThread = threads.find(t => t.id === selectedThread.id)
+      if (updatedThread) {
+        setSelectedThread(updatedThread)
+      }
+    }
+  }, [threads, selectedThread?.id])
+
+  // Scroll chat to bottom when messages change or thread opens
+  useEffect(() => {
+    if (selectedThread && chatScrollRef.current) {
+      chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight
+    }
+  }, [selectedThread?.messages.length, selectedThread?.id])
 
   // Load user and inbox items
   useEffect(() => {
@@ -267,6 +288,67 @@ export default function InboxPage() {
       showErrorToast('Failed to send message')
     } finally {
       setSubmitting(false)
+    }
+  }
+
+  // Send reply within a thread
+  const handleSendReply = async () => {
+    if (!selectedThread || !replyMessage.trim() || !user) return
+    
+    setSubmitting(true)
+    try {
+      const recipient = RECIPIENTS.find(r => r.id === selectedThread.recipient)
+      
+      // Save to inbox with the same thread_id
+      const { data, error: dbError } = await supabase
+        .from('inbox')
+        .insert({
+          user_id: user.id,
+          content: replyMessage.trim(),
+          item_type: 'message',
+          to_recipient: selectedThread.recipient,
+          thread_id: selectedThread.id,
+          status: 'pending',
+        })
+        .select()
+        .single()
+
+      if (dbError) throw dbError
+
+      // Try to notify AI agents
+      if (recipient?.type === 'ai') {
+        try {
+          const response = await fetch('/api/inbox/message-agent', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              agent: selectedThread.recipient,
+              message: replyMessage.trim(),
+              sender: user.name || user.email
+            })
+          })
+          if (!response.ok) console.warn('Failed to notify agent')
+        } catch (webhookErr) {
+          console.error('Webhook error:', webhookErr)
+        }
+      }
+
+      // Add to items (this will trigger the effect to update selectedThread)
+      setItems([data, ...items])
+      setReplyMessage('')
+      replyInputRef.current?.focus()
+    } catch (error) {
+      console.error('Error sending reply:', error)
+      showErrorToast('Failed to send reply')
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleReplyKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+      e.preventDefault()
+      handleSendReply()
     }
   }
 
@@ -458,6 +540,16 @@ export default function InboxPage() {
       }
       return next
     })
+  }
+
+  const openThreadChat = (thread: Thread) => {
+    setSelectedThread(thread)
+    setReplyMessage('')
+  }
+
+  const closeThreadChat = () => {
+    setSelectedThread(null)
+    setReplyMessage('')
   }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
@@ -702,7 +794,7 @@ export default function InboxPage() {
         </Card>
 
         {/* Inbox Zero State */}
-        {totalItems === 0 && (
+        {totalItems === 0 && !selectedThread && (
           <div className="text-center py-16">
             <div className="w-20 h-20 rounded-full bg-green-100 dark:bg-green-900/30 flex items-center justify-center mx-auto mb-4">
               <Check className="w-10 h-10 text-green-500" />
@@ -714,8 +806,123 @@ export default function InboxPage() {
           </div>
         )}
 
+        {/* Thread Chat View - Full Screen */}
+        {selectedThread && (
+          <div className="fixed inset-0 bg-slate-50 dark:bg-slate-900 z-50 flex flex-col">
+            {/* Chat Header */}
+            <div className="flex items-center gap-3 px-4 py-3 border-b border-default-200 bg-white dark:bg-slate-800">
+              <Button
+                isIconOnly
+                variant="light"
+                onPress={closeThreadChat}
+                className="text-default-500"
+              >
+                <ArrowLeft className="w-5 h-5" />
+              </Button>
+              <div className="w-10 h-10 rounded-full bg-default-100 flex items-center justify-center">
+                {getRecipientInfo(selectedThread.recipient)?.type === 'ai' 
+                  ? <Bot className="w-5 h-5 text-violet-500" /> 
+                  : <User className="w-5 h-5 text-pink-500" />}
+              </div>
+              <div className="flex-1">
+                <h2 className="font-semibold text-foreground">
+                  {getRecipientInfo(selectedThread.recipient).name}
+                </h2>
+                {selectedThread.subject && (
+                  <p className="text-xs text-default-500">{selectedThread.subject}</p>
+                )}
+              </div>
+              <Button
+                size="sm"
+                variant="flat"
+                color="success"
+                onPress={() => {
+                  handleArchiveThread(selectedThread)
+                  closeThreadChat()
+                }}
+                startContent={<Check className="w-4 h-4" />}
+              >
+                Archive
+              </Button>
+            </div>
+
+            {/* Chat Messages */}
+            <div 
+              ref={chatScrollRef}
+              className="flex-1 overflow-y-auto px-4 py-4 space-y-3"
+            >
+              {selectedThread.messages.map((msg) => {
+                const isFromUser = !msg.from_agent
+                
+                return (
+                  <div 
+                    key={msg.id} 
+                    className={`flex ${isFromUser ? 'justify-end' : 'justify-start'}`}
+                  >
+                    <div className={`max-w-[80%] ${isFromUser ? 'order-2' : 'order-1'}`}>
+                      {/* Sender label */}
+                      <div className={`flex items-center gap-1.5 mb-1 ${isFromUser ? 'justify-end' : 'justify-start'}`}>
+                        {!isFromUser && <Bot className="w-3 h-3 text-violet-500" />}
+                        <span className="text-xs text-default-500">
+                          {isFromUser ? 'You' : msg.from_agent || selectedThread.recipient}
+                        </span>
+                        {isFromUser && <User className="w-3 h-3 text-default-400" />}
+                      </div>
+                      
+                      {/* Message bubble */}
+                      <div 
+                        className={`px-4 py-2.5 rounded-2xl ${
+                          isFromUser 
+                            ? 'bg-violet-500 text-white rounded-br-md' 
+                            : 'bg-default-100 text-foreground rounded-bl-md'
+                        }`}
+                      >
+                        <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
+                      </div>
+                      
+                      {/* Timestamp */}
+                      <p className={`text-xs text-default-400 mt-1 ${isFromUser ? 'text-right' : 'text-left'}`}>
+                        {formatTime(msg.created_at)}
+                      </p>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+
+            {/* Reply Input */}
+            <div className="border-t border-default-200 bg-white dark:bg-slate-800 p-3">
+              <div className="flex items-end gap-2 max-w-3xl mx-auto">
+                <Textarea
+                  ref={replyInputRef}
+                  placeholder="Type a message..."
+                  value={replyMessage}
+                  onChange={(e) => setReplyMessage(e.target.value)}
+                  onKeyDown={handleReplyKeyDown}
+                  minRows={1}
+                  maxRows={4}
+                  className="flex-1"
+                  classNames={{
+                    inputWrapper: "shadow-none bg-default-100",
+                  }}
+                />
+                <Button
+                  isIconOnly
+                  color="primary"
+                  onPress={handleSendReply}
+                  isLoading={submitting}
+                  isDisabled={!replyMessage.trim()}
+                  className="h-10 w-10 min-w-10"
+                >
+                  <Send className="w-4 h-4" />
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+
         {/* Message Threads Section */}
-        {threads.length > 0 && (
+        {threads.length > 0 && !selectedThread && (
           <div className="mb-8">
             <div className="flex items-center gap-2 mb-3">
               <MessageCircle className="w-4 h-4 text-default-500" />
@@ -725,44 +932,38 @@ export default function InboxPage() {
             <div className="space-y-3">
               {threads.map((thread) => {
                 const recipient = getRecipientInfo(thread.recipient)
-                const isExpanded = expandedThreads.has(thread.id)
                 const hasMultiple = thread.messages.length > 1
                 
                 return (
-                  <Card key={thread.id} className="shadow-sm hover:shadow-md transition-shadow">
+                  <Card 
+                    key={thread.id} 
+                    className="shadow-sm hover:shadow-md transition-shadow cursor-pointer"
+                    isPressable
+                    onPress={() => openThreadChat(thread)}
+                  >
                     <CardBody className="p-4">
                       {/* Thread Header */}
-                      <div 
-                        className="flex items-start justify-between gap-4 cursor-pointer"
-                        onClick={() => hasMultiple && toggleThread(thread.id)}
-                      >
+                      <div className="flex items-start justify-between gap-4">
                         <div className="flex items-center gap-3">
-                          {hasMultiple && (
-                            <div className="w-4">
-                              {isExpanded ? (
-                                <ChevronDown className="w-4 h-4 text-default-400" />
-                              ) : (
-                                <ChevronRight className="w-4 h-4 text-default-400" />
-                              )}
-                            </div>
-                          )}
-                          <div className="w-8 h-8 rounded-full bg-default-100 flex items-center justify-center">
-                            {recipient?.type === 'ai' ? <Bot className="w-4 h-4 text-violet-500" /> : <User className="w-4 h-4 text-pink-500" />}
+                          <div className="w-10 h-10 rounded-full bg-default-100 flex items-center justify-center">
+                            {recipient?.type === 'ai' ? <Bot className="w-5 h-5 text-violet-500" /> : <User className="w-5 h-5 text-pink-500" />}
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1">
-                              <span className="font-medium text-sm">To: {recipient.name}</span>
-                              {thread.subject && (
-                                <span className="text-default-500 text-sm">• {thread.subject}</span>
-                              )}
+                              <span className="font-medium">{recipient.name}</span>
                               {hasMultiple && (
                                 <Chip size="sm" variant="flat" color="default">
-                                  {thread.messages.length} messages
+                                  {thread.messages.length}
                                 </Chip>
                               )}
                             </div>
+                            {thread.subject && (
+                              <p className="text-xs text-default-500 mb-1">{thread.subject}</p>
+                            )}
                             <p className="text-foreground text-sm line-clamp-2">
-                              {thread.lastMessage.content}
+                              {thread.lastMessage.from_agent 
+                                ? `${thread.lastMessage.from_agent}: ${thread.lastMessage.content}`
+                                : thread.lastMessage.content}
                             </p>
                             <p className="text-xs text-default-400 mt-1">
                               {formatTime(thread.lastMessage.created_at)}
@@ -798,30 +999,6 @@ export default function InboxPage() {
                           </Button>
                         </div>
                       </div>
-
-                      {/* Expanded Messages */}
-                      {isExpanded && hasMultiple && (
-                        <div className="mt-4 ml-7 pl-4 border-l-2 border-default-200 space-y-3">
-                          {thread.messages.map((msg, idx) => (
-                            <div key={msg.id} className="text-sm">
-                              <div className="flex items-center gap-2 mb-1">
-                                {msg.from_agent ? (
-                                  <Bot className="w-3 h-3 text-violet-500" />
-                                ) : (
-                                  <User className="w-3 h-3 text-default-400" />
-                                )}
-                                <span className="text-default-500 text-xs">
-                                  {msg.from_agent ? `From ${msg.from_agent}` : 'You'}
-                                </span>
-                                <span className="text-default-400 text-xs">
-                                  {formatTime(msg.created_at)}
-                                </span>
-                              </div>
-                              <p className="text-foreground">{msg.content}</p>
-                            </div>
-                          ))}
-                        </div>
-                      )}
                     </CardBody>
                   </Card>
                 )
@@ -831,7 +1008,7 @@ export default function InboxPage() {
         )}
 
         {/* Thoughts Section */}
-        {thoughts.length > 0 && (
+        {thoughts.length > 0 && !selectedThread && (
           <div>
             <div className="flex items-center gap-2 mb-3">
               <InboxIcon className="w-4 h-4 text-default-500" />
