@@ -74,7 +74,7 @@ export default function AgentChatPage() {
         .from('agent_chat')
         .select('*')
         .order('created_at', { ascending: true })
-        .limit(100);
+        .limit(500); // Increased limit, scrollable
 
       if (fetchError) throw fetchError;
       setMessages(data || []);
@@ -237,7 +237,7 @@ export default function AgentChatPage() {
                               </Chip>
                             )}
                             
-                            {msg.context && Object.keys(msg.context).length > 0 && (
+                            {msg.context && Object.keys(msg.context).length > 0 && !('error' in msg.context) && (
                               <Chip size="sm" variant="flat">
                                 {JSON.stringify(msg.context).slice(0, 30)}...
                               </Chip>
