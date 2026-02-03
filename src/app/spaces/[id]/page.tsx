@@ -25,6 +25,7 @@ export default function SpaceDetailPage() {
   const [space, setSpace] = useState<any>(null)
   const [members, setMembers] = useState<any[]>([])
   const [tasks, setTasks] = useState<any[]>([])
+  const [showAllTasks, setShowAllTasks] = useState(false)
   const [loading, setLoading] = useState(true)
   const supabase = createClient()
 
@@ -40,7 +41,12 @@ export default function SpaceDetailPage() {
       const [spaceRes, membersRes, tasksRes] = await Promise.all([
         supabase.from('spaces').select('*').eq('id', id).single(),
         supabase.from('space_members').select('*, users(*)').eq('space_id', id),
-        supabase.from('tasks').select('*, assignee:users(*)').eq('space_id', id).order('created_at', { ascending: false })
+        supabase.from('tasks')
+          .select('*, assignee:users(*)')
+          .eq('space_id', id)
+          .order('status', { ascending: true }) // Put active tasks first
+          .order('priority', { ascending: false }) // High priority first
+          .order('created_at', { ascending: false })
       ])
 
       if (spaceRes.error) throw spaceRes.error
@@ -54,6 +60,8 @@ export default function SpaceDetailPage() {
       setLoading(false)
     }
   }
+
+  const displayedTasks = showAllTasks ? tasks : tasks.slice(0, 5)
 
   if (loading) {
     return (
@@ -108,46 +116,75 @@ export default function SpaceDetailPage() {
         </div>
 
         <Tabs aria-label="Space content" variant="underlined" color="primary">
-          <Tab key="tasks" title={`Tasks (${tasks.length})`}>
-            <div className="mt-4 flex flex-col gap-4">
+          <Tab key="tasks" title="Tasks">
+            <div className="mt-8 flex flex-col gap-6">
               <div className="flex justify-between items-center">
-                <h2 className="text-xl font-semibold">Tasks</h2>
-                <Button color="primary" startContent={<PlusIcon className="w-4 h-4" />} size="sm">
+                <h2 className="text-2xl font-semibold text-foreground/80">What&apos;s Next</h2>
+                <Button 
+                  color="primary" 
+                  variant="flat"
+                  startContent={<PlusIcon className="w-4 h-4" />} 
+                  size="sm"
+                  className="rounded-full px-4"
+                >
                   Add Task
                 </Button>
               </div>
               
               {tasks.length === 0 ? (
-                <Card>
+                <Card className="border-none bg-default-100 shadow-none">
                   <CardBody className="py-12 text-center text-default-400">
-                    No tasks in this space yet.
+                    No tasks in this space yet. Focus on the vision first.
                   </CardBody>
                 </Card>
               ) : (
-                <div className="grid grid-cols-1 gap-3">
-                  {tasks.map(task => (
-                    <Card key={task.id} isPressable>
-                      <CardBody className="flex-row items-center justify-between py-3">
-                        <div className="flex items-center gap-3">
-                          <div className={`w-2 h-2 rounded-full ${
-                            task.priority === 'critical' ? 'bg-danger' : 
-                            task.priority === 'high' ? 'bg-warning' : 'bg-primary'
-                          }`} />
-                          <span className="font-medium">{task.title}</span>
-                        </div>
-                        <div className="flex items-center gap-4">
-                          <Chip size="sm" variant="flat">{task.status}</Chip>
-                          {task.assignee && (
-                            <Avatar 
+                <div className="flex flex-col gap-3">
+                  <div className="grid grid-cols-1 gap-3">
+                    {displayedTasks.map(task => (
+                      <Card key={task.id} isPressable className="border-none shadow-sm hover:shadow-md transition-shadow">
+                        <CardBody className="flex-row items-center justify-between py-4 px-6">
+                          <div className="flex items-center gap-4">
+                            <div className={`w-2.5 h-2.5 rounded-full shadow-sm ${
+                              task.priority === 'critical' ? 'bg-danger' : 
+                              task.priority === 'high' ? 'bg-warning' : 'bg-primary'
+                            }`} />
+                            <span className="font-medium text-foreground/90">{task.title}</span>
+                          </div>
+                          <div className="flex items-center gap-6">
+                            <Chip 
                               size="sm" 
-                              src={task.assignee.avatar_url} 
-                              name={task.assignee.display_name || task.assignee.name} 
-                            />
-                          )}
-                        </div>
-                      </CardBody>
-                    </Card>
-                  ))}
+                              variant="flat" 
+                              className="capitalize bg-default-200/50 text-default-600 border-none"
+                            >
+                              {task.status}
+                            </Chip>
+                            {task.assignee && (
+                              <Avatar 
+                                size="sm" 
+                                src={task.assignee.avatar_url} 
+                                name={task.assignee.display_name || task.assignee.name} 
+                                className="ring-2 ring-white shadow-sm"
+                              />
+                            )}
+                          </div>
+                        </CardBody>
+                      </Card>
+                    ))}
+                  </div>
+                  
+                  {tasks.length > 5 && (
+                    <div className="flex justify-center mt-4">
+                      <Button 
+                        variant="light" 
+                        color="primary" 
+                        size="md"
+                        onClick={() => setShowAllTasks(!showAllTasks)}
+                        className="font-medium"
+                      >
+                        {showAllTasks ? 'Show Focused View' : `View All Tasks (${tasks.length})`}
+                      </Button>
+                    </div>
+                  )}
                 </div>
               )}
             </div>

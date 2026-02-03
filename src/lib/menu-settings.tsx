@@ -9,13 +9,14 @@ export interface MenuConfig {
 }
 
 export const DEFAULT_MENU_CONFIG: MenuConfig = {
-  personal: ['inbox', 'dashboard', 'tasks', 'projects', 'calendar', 'notes', 'docs', 'family'],
-  business: ['inbox', 'dashboard', 'tasks', 'projects', 'content', 'docs', 'calendar', 'ai'],
+  personal: ['inbox', 'dashboard', 'spaces', 'tasks', 'projects', 'calendar', 'notes', 'docs', 'family'],
+  business: ['inbox', 'dashboard', 'spaces', 'tasks', 'projects', 'content', 'docs', 'calendar', 'ai'],
 }
 
 export const PERSONAL_MENU_OPTIONS = [
   { key: 'inbox', label: 'Inbox', icon: 'inbox', href: '/inbox' },
   { key: 'dashboard', label: 'Dashboard', icon: 'dashboard', href: '/' },
+  { key: 'spaces', label: 'Spaces', icon: 'layout', href: '/spaces' },
   { key: 'tasks', label: 'Tasks', icon: 'tasks', href: '/tasks' },
   { key: 'projects', label: 'Projects', icon: 'projects', href: '/projects' },
   { key: 'calendar', label: 'Calendar', icon: 'calendar', href: '/calendar' },
@@ -27,6 +28,7 @@ export const PERSONAL_MENU_OPTIONS = [
 export const BUSINESS_MENU_OPTIONS = [
   { key: 'inbox', label: 'Inbox', icon: 'inbox', href: '/inbox' },
   { key: 'dashboard', label: 'Dashboard', icon: 'dashboard', href: '/' },
+  { key: 'spaces', label: 'Spaces', icon: 'layout', href: '/spaces' },
   { key: 'tasks', label: 'Tasks', icon: 'tasks', href: '/tasks' },
   { key: 'projects', label: 'Projects', icon: 'projects', href: '/projects' },
   { key: 'content', label: 'Content', icon: 'content', href: '/content' },

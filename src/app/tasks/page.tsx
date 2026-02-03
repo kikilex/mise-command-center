@@ -128,6 +128,7 @@ function TasksPageContent() {
   const [loadError, setLoadError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [showAllTasks, setShowAllTasks] = useState(false)
+  const [localSpaceId, setLocalSpaceId] = useState<string>('all')
   const { isOpen, onOpen, onClose } = useDisclosure()
   const { isOpen: isDetailOpen, onOpen: onDetailOpen, onClose: onDetailClose } = useDisclosure()
   const [editingTask, setEditingTask] = useState<Task | null>(null)
@@ -166,7 +167,7 @@ function TasksPageContent() {
   useEffect(() => {
     loadTasks()
     loadDropdownData()
-  }, [selectedSpaceId])
+  }, [localSpaceId])
 
   async function loadDropdownData() {
     try {
@@ -183,8 +184,8 @@ function TasksPageContent() {
         .from('projects')
         .select('id, name, space_id')
       
-      if (selectedSpaceId) {
-        projectQuery = projectQuery.eq('space_id', selectedSpaceId)
+      if (localSpaceId && localSpaceId !== 'all') {
+        projectQuery = projectQuery.eq('space_id', localSpaceId)
       }
       
       const { data: projectsData } = await projectQuery
@@ -198,45 +199,7 @@ function TasksPageContent() {
   }
 
   async function loadUser() {
-    try {
-      const { data: { user: authUser }, error: authError } = await supabase.auth.getUser()
-      
-      if (authError) {
-        console.error('Auth error:', authError)
-        return
-      }
-      
-      if (authUser) {
-        try {
-          const { data: profile, error: profileError } = await supabase
-            .from('users')
-            .select('*')
-            .eq('id', authUser.id)
-            .single()
-          
-          if (profileError) {
-            console.error('Profile fetch error:', profileError)
-          }
-          
-          setUser({
-            id: authUser.id,
-            email: authUser.email || '',
-            name: profile?.name || authUser.email?.split('@')[0],
-            avatar_url: profile?.avatar_url,
-          })
-        } catch (err) {
-          console.error('Failed to fetch profile:', err)
-          setUser({
-            id: authUser.id,
-            email: authUser.email || '',
-            name: authUser.email?.split('@')[0],
-          })
-        }
-      }
-    } catch (error) {
-      console.error('Load user error:', error)
-      showErrorToast(error, 'Failed to load user data')
-    }
+    // ... (rest of the code)
   }
 
   async function loadTasks() {
@@ -248,8 +211,8 @@ function TasksPageContent() {
         .from('tasks')
         .select('*')
       
-      if (selectedSpaceId) {
-        query = query.eq('space_id', selectedSpaceId)
+      if (localSpaceId && localSpaceId !== 'all') {
+        query = query.eq('space_id', localSpaceId)
       }
       
       const { data, error } = await query.order('created_at', { ascending: false })
@@ -279,6 +242,8 @@ function TasksPageContent() {
     
     setSubmitting(true)
     
+    const targetSpaceId = formData.space_id || (localSpaceId !== 'all' ? localSpaceId : selectedSpaceId)
+
     try {
       if (editingTask) {
         const { error } = await supabase
@@ -293,7 +258,7 @@ function TasksPageContent() {
             assignee_id: formData.assignee_id || null,
             ai_agent: formData.ai_agent || null,
             project_id: formData.project_id || null,
-            space_id: formData.space_id || selectedSpaceId,
+            space_id: targetSpaceId,
           })
           .eq('id', editingTask.id)
         
@@ -313,7 +278,7 @@ function TasksPageContent() {
             ai_flag: formData.ai_flag,
             created_by: user.id,
             due_date: formData.due_date || null,
-            space_id: formData.space_id || selectedSpaceId,
+            space_id: targetSpaceId,
             assignee_id: formData.assignee_id || null,
             ai_agent: formData.ai_agent || null,
             project_id: formData.project_id || null,
@@ -363,7 +328,7 @@ function TasksPageContent() {
       assignee_id: '',
       ai_agent: '',
       project_id: '',
-      space_id: selectedSpaceId || '',
+      space_id: (localSpaceId !== 'all' ? localSpaceId : selectedSpaceId) || '',
     })
     onClose()
   }
@@ -380,7 +345,7 @@ function TasksPageContent() {
       assignee_id: '',
       ai_agent: '',
       project_id: '',
-      space_id: selectedSpaceId || '',
+      space_id: (localSpaceId !== 'all' ? localSpaceId : selectedSpaceId) || '',
     })
     onOpen()
   }
@@ -511,22 +476,56 @@ function TasksPageContent() {
 
       <main className="max-w-2xl mx-auto px-4 py-8">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6">
-          <div className="flex items-center gap-3">
-            <Target className="w-6 h-6 text-violet-600 dark:text-violet-400" />
-            <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">
-              {showAllTasks ? 'All Tasks' : 'My Focus'}
-            </h1>
+        <div className="flex flex-col gap-4 mb-8">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <Target className="w-6 h-6 text-violet-600 dark:text-violet-400" />
+              <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">
+                {showAllTasks ? 'All Tasks' : 'My Focus'}
+              </h1>
+            </div>
+            
+            <div className="flex items-center gap-2">
+              <Button
+                isIconOnly
+                variant="light"
+                onPress={() => setShowAllTasks(!showAllTasks)}
+                className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+              >
+                <Settings className="w-5 h-5" />
+              </Button>
+            </div>
           </div>
-          
-          <Button
-            isIconOnly
-            variant="light"
-            onPress={() => setShowAllTasks(!showAllTasks)}
-            className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
-          >
-            <Settings className="w-5 h-5" />
-          </Button>
+
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
+            <Button
+              size="sm"
+              variant={localSpaceId === 'all' ? 'solid' : 'flat'}
+              color={localSpaceId === 'all' ? 'primary' : 'default'}
+              onPress={() => setLocalSpaceId('all')}
+              className="rounded-full"
+            >
+              All Spaces
+            </Button>
+            {spaces.map(space => (
+              <Button
+                key={space.id}
+                size="sm"
+                variant={localSpaceId === space.id ? 'solid' : 'flat'}
+                color={localSpaceId === space.id ? 'primary' : 'default'}
+                onPress={() => setLocalSpaceId(space.id)}
+                className="rounded-full whitespace-nowrap"
+                startContent={
+                  <div 
+                    className="w-2 h-2 rounded-full" 
+                    style={{ backgroundColor: space.color || '#3b82f6' }} 
+                  />
+                }
+              >
+                {space.name}
+              </Button>
+            ))}
+          </div>
         </div>
 
         {/* Error State */}

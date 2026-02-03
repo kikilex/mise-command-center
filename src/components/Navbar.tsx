@@ -5,9 +5,7 @@ import Link from 'next/link'
 import { Button, Avatar } from "@heroui/react"
 import { usePathname } from 'next/navigation'
 import UserMenu from './UserMenu'
-import SpaceSelector from './SpaceSelector'
 import NotificationBell from './NotificationBell'
-import { useSpace } from '@/lib/space-context'
 import { useMenuSettings } from '@/lib/menu-settings'
 import { navIcons, Menu, X } from '@/lib/icons'
 
@@ -28,21 +26,17 @@ interface NavbarProps {
 export default function Navbar({ user, actions, onOpenTask }: NavbarProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
   const pathname = usePathname()
-  const { selectedSpace } = useSpace()
   const { getActiveNavItems, loading: menuLoading } = useMenuSettings()
-
-  // Determine if we're in a space (always true in new architecture but checking for consistency)
-  const isSpaceContext = selectedSpace !== null
 
   // Get nav items based on current mode from user settings
   const navItems = useMemo(() => {
-    return getActiveNavItems(isSpaceContext).map(item => ({
+    return getActiveNavItems(false).map(item => ({
       key: item.key,
       href: item.href,
       label: item.label,
       icon: item.icon,
     }))
-  }, [getActiveNavItems, isSpaceContext])
+  }, [getActiveNavItems])
 
   const isActive = (href: string) => {
     if (href === '/') {
@@ -63,7 +57,7 @@ export default function Navbar({ user, actions, onOpenTask }: NavbarProps) {
     <header className="bg-background/80 backdrop-blur-sm border-b border-divider sticky top-0 z-50">
       <div className="max-w-7xl mx-auto px-4 sm:px-6">
         <div className="flex items-center justify-between h-16">
-          {/* Left: Hamburger (mobile) + Brand + Business Selector */}
+          {/* Left: Hamburger (mobile) + Brand */}
           <div className="flex items-center gap-3">
             {/* Mobile hamburger */}
             <button 
@@ -85,11 +79,6 @@ export default function Navbar({ user, actions, onOpenTask }: NavbarProps) {
               </div>
               <span className="font-semibold text-foreground text-lg hidden sm:block">Mise</span>
             </Link>
-            
-            {/* Space Selector - show on desktop */}
-            <div className="hidden md:block ml-2">
-              <SpaceSelector />
-            </div>
           </div>
 
           {/* Center: Desktop navigation */}
@@ -136,12 +125,6 @@ export default function Navbar({ user, actions, onOpenTask }: NavbarProps) {
       {/* Mobile menu dropdown */}
       {isMenuOpen && (
         <div className="lg:hidden bg-background border-t border-divider py-4 px-4 shadow-lg">
-          {/* Mobile Space Selector */}
-          <div className="mb-4 pb-4 border-b border-divider">
-            <p className="text-xs text-default-500 mb-2 px-1">Current Space</p>
-            <SpaceSelector />
-          </div>
-          
           <div className="flex flex-col gap-1">
             {navItems.map((item) => (
               <Link 
