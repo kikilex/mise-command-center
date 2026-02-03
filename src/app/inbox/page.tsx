@@ -109,7 +109,32 @@ export default function InboxPage() {
 
   // Add new item to inbox
   const handleAddItem = async () => {
-    // ... existing code
+    if (!newItem.trim() || !user) return
+
+    setSubmitting(true)
+    try {
+      const { data, error } = await supabase
+        .from('inbox')
+        .insert({
+          user_id: user.id,
+          content: newItem.trim(),
+          item_type: 'thought',
+          status: 'pending',
+        })
+        .select()
+        .single()
+
+      if (error) throw error
+
+      setItems([data, ...items])
+      setNewItem('')
+      inputRef.current?.focus()
+    } catch (error) {
+      console.error('Error adding item:', error)
+      showErrorToast('Failed to add item')
+    } finally {
+      setSubmitting(false)
+    }
   }
 
   const handleMessageAgent = async () => {
@@ -121,11 +146,10 @@ export default function InboxPage() {
         .from('inbox')
         .insert({
           user_id: user.id,
-          content: messageForm.content.trim(),
+          content: `[To ${messageForm.agent}]: ${messageForm.content.trim()}`,
           item_type: 'message',
           status: 'pending',
-          from_agent: null, // From human
-          metadata: { to_agent: messageForm.agent }
+          from_agent: null
         })
 
       if (dbError) throw dbError
