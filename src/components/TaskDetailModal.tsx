@@ -30,6 +30,8 @@ interface Task {
   status: string
   priority: string
   assignee_id: string | null
+  project_id: string | null
+  business_id: string | null
   due_date: string | null
   tags: string[]
   ai_flag: boolean
@@ -37,6 +39,20 @@ interface Task {
   feedback: string | null
   created_at: string
   updated_at?: string
+}
+
+interface AIAgent {
+  id: string
+  name: string
+  slug: string
+  role: string
+  is_active: boolean
+}
+
+interface Project {
+  id: string
+  name: string
+  business_id: string | null
 }
 
 interface TaskFile {
@@ -108,10 +124,17 @@ export default function TaskDetailModal({
     priority: 'medium',
     due_date: '',
     ai_flag: false,
+    assignee_id: '',
+    ai_agent: '',
+    project_id: '',
   })
   const [files, setFiles] = useState<TaskFile[]>([])
+  const [users, setUsers] = useState<UserData[]>([])
+  const [agents, setAgents] = useState<AIAgent[]>([])
+  const [projects, setProjects] = useState<Project[]>([])
   const [saving, setSaving] = useState(false)
   const [loadingFiles, setLoadingFiles] = useState(false)
+  const [loadingData, setLoadingData] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
   const [viewingFile, setViewingFile] = useState<TaskFile | null>(null)
@@ -120,7 +143,7 @@ export default function TaskDetailModal({
   
   const supabase = createClient()
 
-  // Load task data when modal opens
+  // Load task data and dropdown options when modal opens
   useEffect(() => {
     if (task && isOpen) {
       setFormData({
@@ -130,10 +153,51 @@ export default function TaskDetailModal({
         priority: task.priority || 'medium',
         due_date: task.due_date ? task.due_date.split('T')[0] : '',
         ai_flag: task.ai_flag || false,
+        assignee_id: task.assignee_id || '',
+        ai_agent: task.ai_agent || '',
+        project_id: task.project_id || '',
       })
       loadFiles(task.id)
+      loadDropdownData(task.business_id)
     }
   }, [task, isOpen])
+
+  async function loadDropdownData(businessId: string | null) {
+    setLoadingData(true)
+    try {
+      // Fetch Users
+      const { data: usersData } = await supabase
+        .from('users')
+        .select('id, name, email, avatar_url')
+      
+      // Fetch Active Agents
+      const { data: agentsData } = await supabase
+        .from('ai_agents')
+        .select('id, name, slug, role')
+        .eq('is_active', true)
+      
+      // Fetch Projects
+      let projectQuery = supabase
+        .from('projects')
+        .select('id, name, business_id')
+      
+      if (businessId) {
+        projectQuery = projectQuery.eq('business_id', businessId)
+      } else {
+        projectQuery = projectQuery.is('business_id', null)
+      }
+      
+      const { data: projectsData } = await projectQuery
+
+      setUsers(usersData || [])
+      setAgents(agentsData || [])
+      setProjects(projectsData || [])
+    } catch (error) {
+      console.error('Error loading dropdown data:', error)
+    } finally {
+      setLoadingData(false)
+    }
+  }
 
   async function loadFiles(taskId: string) {
     setLoadingFiles(true)
@@ -168,6 +232,9 @@ export default function TaskDetailModal({
           priority: formData.priority,
           due_date: formData.due_date || null,
           ai_flag: formData.ai_flag,
+          assignee_id: formData.assignee_id || null,
+          ai_agent: formData.ai_agent || null,
+          project_id: formData.project_id || null,
         })
         .eq('id', task.id)
 
@@ -442,6 +509,55 @@ export default function TaskDetailModal({
                   value={formData.due_date}
                   onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
                 />
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <Select
+                  label="Assignee"
+                  placeholder="Select human"
+                  selectedKeys={formData.assignee_id ? [formData.assignee_id] : []}
+                  onChange={(e) => setFormData({ ...formData, assignee_id: e.target.value })}
+                  startContent={<User className="w-4 h-4 text-slate-400" />}
+                >
+                  {users.map(u => (
+                    <SelectItem key={u.id} textValue={u.name || u.email}>
+                      <div className="flex items-center gap-2">
+                        <span>{u.name || u.email}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </Select>
+
+                <Select
+                  label="AI Agent"
+                  placeholder="Select agent"
+                  selectedKeys={formData.ai_agent ? [formData.ai_agent] : []}
+                  onChange={(e) => setFormData({ ...formData, ai_agent: e.target.value })}
+                  startContent={<Bot className="w-4 h-4 text-slate-400" />}
+                >
+                  {agents.map(a => (
+                    <SelectItem key={a.slug} textValue={a.name}>
+                      <div className="flex flex-col">
+                        <span className="font-medium">{a.name}</span>
+                        <span className="text-xs text-slate-400">{a.role}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </Select>
+
+                <Select
+                  label="Project"
+                  placeholder="Select project"
+                  selectedKeys={formData.project_id ? [formData.project_id] : []}
+                  onChange={(e) => setFormData({ ...formData, project_id: e.target.value })}
+                  startContent={<FileText className="w-4 h-4 text-slate-400" />}
+                >
+                  {projects.map(p => (
+                    <SelectItem key={p.id} textValue={p.name}>
+                      {p.name}
+                    </SelectItem>
+                  ))}
+                </Select>
               </div>
               
               <label className="flex items-center gap-2 cursor-pointer">
