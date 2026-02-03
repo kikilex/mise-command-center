@@ -368,36 +368,60 @@ export default function Home() {
           </div>
 
           <div className="w-full lg:w-96 space-y-8">
-            <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
-              <CardHeader className="px-6 pt-5 pb-2">
+            {/* Messages - iOS Style */}
+            <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+              <CardHeader className="bg-slate-50 dark:bg-slate-800/50 px-4 py-3 border-b border-slate-200 dark:border-slate-700">
                 <div className="flex items-center justify-between w-full">
-                  <h2 className="text-sm font-black uppercase tracking-widest text-slate-400 flex items-center gap-2">
-                    <MessageCircle className="w-4 h-4" /> Intel
-                  </h2>
-                  <Button size="sm" variant="light" onPress={() => router.push('/inbox')}>Open Inbox</Button>
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center">
+                      <MessageCircle className="w-4 h-4 text-white" />
+                    </div>
+                    <span className="font-semibold text-slate-800 dark:text-slate-100">Messages</span>
+                  </div>
+                  <Button size="sm" variant="light" radius="full" onPress={() => router.push('/inbox')}>
+                    View All
+                  </Button>
                 </div>
               </CardHeader>
-              <CardBody className="px-4 pb-4">
-                <div className="space-y-3">
-                  {messages.length === 0 ? (
-                    <p className="text-center py-12 text-slate-400 text-sm italic border-2 border-dashed border-slate-100 dark:border-slate-800 rounded-2xl">
-                      No new intel. Keep it that way.
-                    </p>
-                  ) : (
-                    messages.map((msg) => (
-                      <div 
-                        key={msg.id} 
-                        onClick={() => router.push('/inbox')}
-                        className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 hover:border-violet-200 dark:hover:border-violet-900 transition-all cursor-pointer"
-                      >
-                        <p className="text-sm text-slate-700 dark:text-slate-300 line-clamp-2">{msg.content}</p>
-                        <p className="text-[10px] text-slate-400 mt-1 uppercase font-bold tracking-tighter">
-                          {new Date(msg.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                        </p>
-                      </div>
-                    ))
-                  )}
-                </div>
+              <CardBody className="p-0">
+                {messages.length === 0 ? (
+                  <div className="text-center py-12 px-4">
+                    <div className="w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mx-auto mb-3">
+                      <MessageCircle className="w-8 h-8 text-slate-400" />
+                    </div>
+                    <p className="text-sm text-slate-500">No messages yet</p>
+                  </div>
+                ) : (
+                  <div className="divide-y divide-slate-100 dark:divide-slate-800">
+                    {messages.map((msg) => {
+                      const isFromAgent = msg.from_agent
+                      return (
+                        <div 
+                          key={msg.id} 
+                          onClick={() => router.push('/inbox')}
+                          className="flex items-start gap-3 p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors"
+                        >
+                          <Avatar 
+                            size="sm" 
+                            name={isFromAgent ? msg.from_agent : 'You'}
+                            className={isFromAgent ? 'bg-gradient-to-br from-violet-500 to-purple-600' : 'bg-gradient-to-br from-blue-500 to-blue-600'}
+                          />
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="font-semibold text-sm text-slate-800 dark:text-slate-100 capitalize">
+                                {isFromAgent ? msg.from_agent : 'You'}
+                              </span>
+                              <span className="text-xs text-slate-400 flex-shrink-0">
+                                {new Date(msg.created_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                              </span>
+                            </div>
+                            <p className="text-sm text-slate-600 dark:text-slate-400 line-clamp-2 mt-0.5">{msg.content}</p>
+                          </div>
+                        </div>
+                      )
+                    })}
+                  </div>
+                )}
               </CardBody>
             </Card>
 

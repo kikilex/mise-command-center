@@ -276,7 +276,7 @@ function DocsPageContent() {
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 mb-6">
           <div className="flex items-center gap-3">
             <FileText className="w-8 h-8 text-violet-600 dark:text-violet-400" />
-            <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Intel</h1>
+            <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Docs</h1>
           </div>
           <div className="flex gap-2">
             <Button color="primary" onPress={handleCreateDocument} startContent={<Plus className="w-4 h-4" />}>
@@ -313,7 +313,7 @@ function DocsPageContent() {
 
         <div className="flex flex-col sm:flex-row gap-3 mb-6">
           <Input
-            placeholder="Search intel..."
+            placeholder="Search docs..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             startContent={<Search className="w-4 h-4 text-slate-400" />}
@@ -331,7 +331,7 @@ function DocsPageContent() {
         {loading ? (
           <div className="flex items-center justify-center py-20"><Spinner size="lg" /></div>
         ) : filteredDocuments.length === 0 ? (
-          <Card><CardBody className="text-center py-16 opacity-50"><FileText className="w-12 h-12 mx-auto mb-2" /><p>No intel found.</p></CardBody></Card>
+          <Card><CardBody className="text-center py-16 opacity-50"><FileText className="w-12 h-12 mx-auto mb-2" /><p>No docs found.</p></CardBody></Card>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredDocuments.map((doc) => (

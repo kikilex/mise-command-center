@@ -9,28 +9,26 @@ export interface MenuConfig {
 }
 
 export const DEFAULT_MENU_CONFIG: MenuConfig = {
-  personal: ['inbox', 'dashboard', 'spaces', 'tasks', 'calendar', 'docs'],
-  business: ['inbox', 'dashboard', 'spaces', 'tasks', 'content', 'docs', 'calendar', 'ai'],
+  personal: ['dashboard', 'spaces', 'tasks', 'docs', 'calendar'],
+  business: ['dashboard', 'spaces', 'tasks', 'content', 'docs', 'calendar', 'ai'],
 }
 
 export const PERSONAL_MENU_OPTIONS = [
-  { key: 'inbox', label: 'Inbox', icon: 'inbox', href: '/inbox' },
-  { key: 'dashboard', label: 'Dashboard', icon: 'dashboard', href: '/' },
-  { key: 'spaces', label: 'Spaces', icon: 'layout', href: '/spaces' },
+  { key: 'dashboard', label: 'Home', icon: 'dashboard', href: '/' },
+  { key: 'spaces', label: 'Spaces', icon: 'spaces', href: '/spaces' },
   { key: 'tasks', label: 'Tasks', icon: 'tasks', href: '/tasks' },
+  { key: 'docs', label: 'Docs', icon: 'docs', href: '/docs' },
   { key: 'calendar', label: 'Calendar', icon: 'calendar', href: '/calendar' },
-  { key: 'docs', label: 'Intel', icon: 'docs', href: '/docs' },
 ]
 
 export const BUSINESS_MENU_OPTIONS = [
-  { key: 'inbox', label: 'Inbox', icon: 'inbox', href: '/inbox' },
-  { key: 'dashboard', label: 'Dashboard', icon: 'dashboard', href: '/' },
-  { key: 'spaces', label: 'Spaces', icon: 'layout', href: '/spaces' },
+  { key: 'dashboard', label: 'Home', icon: 'dashboard', href: '/' },
+  { key: 'spaces', label: 'Spaces', icon: 'spaces', href: '/spaces' },
   { key: 'tasks', label: 'Tasks', icon: 'tasks', href: '/tasks' },
   { key: 'content', label: 'Content', icon: 'content', href: '/content' },
-  { key: 'docs', label: 'Intel', icon: 'docs', href: '/docs' },
+  { key: 'docs', label: 'Docs', icon: 'docs', href: '/docs' },
   { key: 'calendar', label: 'Calendar', icon: 'calendar', href: '/calendar' },
-  { key: 'ai', label: 'AI Workspace', icon: 'ai', href: '/ai' },
+  { key: 'ai', label: 'AI', icon: 'ai', href: '/ai' },
 ]
 
 interface MenuSettingsContextType {
