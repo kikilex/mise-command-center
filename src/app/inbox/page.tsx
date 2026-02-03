@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useRef, useMemo } from 'react'
-import { useSearchParams } from 'next/navigation'
 import { 
   Button, 
   Card, 
@@ -34,7 +33,6 @@ import {
   Inbox as InboxIcon, MessageCircle, Plus, X, ChevronDown, ChevronRight,
   User, Users, ArrowLeft, MoreVertical, Archive, Briefcase as BriefcaseIcon
 } from 'lucide-react'
-import { Suspense } from 'react'
 
 interface InboxItem {
   id: string
@@ -74,18 +72,6 @@ const RECIPIENTS = [
 ]
 
 export default function InboxPage() {
-  return (
-    <Suspense fallback={
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-900 flex items-center justify-center">
-        <Spinner size="lg" />
-      </div>
-    }>
-      <InboxPageContent />
-    </Suspense>
-  )
-}
-
-function InboxPageContent() {
   const [items, setItems] = useState<InboxItem[]>([])
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState<UserData | null>(null)
@@ -118,29 +104,8 @@ function InboxPageContent() {
   const messageInputRef = useRef<HTMLTextAreaElement>(null)
   const replyInputRef = useRef<HTMLTextAreaElement>(null)
   const chatScrollRef = useRef<HTMLDivElement>(null)
-  const searchParams = useSearchParams()
   
   const supabase = createClient()
-
-  // Handle query params for pre-filling compose or opening threads
-  useEffect(() => {
-    if (!loading) {
-      const spaceId = searchParams.get('space')
-      const threadId = searchParams.get('thread')
-
-      if (spaceId) {
-        setComposeOpen(true)
-        setComposeTo('ax') // Default to Ax for space threads
-        // We'll need a space selection in compose form too, or use metadata
-        setSelectedSpace(spaceId)
-      }
-
-      if (threadId) {
-        const thread = threads.find(t => t.id === threadId || t.messages.some(m => m.thread_id === threadId))
-        if (thread) openThreadChat(thread)
-      }
-    }
-  }, [searchParams, loading, threads])
 
   // Group items into threads
   const { threads, thoughts } = useMemo(() => {
@@ -331,7 +296,6 @@ function InboxPageContent() {
           cc_recipients: composeCC.length > 0 ? composeCC : null,
           subject: composeSubject.trim() || null,
           thread_id: threadId,
-          space_id: selectedSpace || null,
           status: 'pending',
         })
         .select()
@@ -855,37 +819,17 @@ function InboxPageContent() {
                 )}
 
                 {/* Subject Field (Optional) */}
-                <div className="flex flex-col sm:flex-row gap-3">
-                  <div className="flex items-center gap-2 flex-1">
-                    <span className="text-sm text-default-500 w-12">Re:</span>
-                    <Input
-                      placeholder="Subject (optional)"
-                      value={composeSubject}
-                      onChange={(e) => setComposeSubject(e.target.value)}
-                      size="sm"
-                      classNames={{
-                        inputWrapper: "shadow-none bg-default-100",
-                      }}
-                    />
-                  </div>
-                  <div className="flex items-center gap-2 flex-1">
-                    <span className="text-sm text-default-500 w-12">Space:</span>
-                    <Select
-                      placeholder="Select space (optional)"
-                      selectedKeys={selectedSpace ? [selectedSpace] : []}
-                      onChange={(e) => setSelectedSpace(e.target.value)}
-                      size="sm"
-                      classNames={{
-                        trigger: "shadow-none bg-default-100",
-                      }}
-                    >
-                      {spaces.map(s => (
-                        <SelectItem key={s.id} textValue={s.name}>
-                          {s.name}
-                        </SelectItem>
-                      ))}
-                    </Select>
-                  </div>
+                <div className="flex items-center gap-2">
+                  <span className="text-sm text-default-500 w-12">Re:</span>
+                  <Input
+                    placeholder="Subject (optional)"
+                    value={composeSubject}
+                    onChange={(e) => setComposeSubject(e.target.value)}
+                    size="sm"
+                    classNames={{
+                      inputWrapper: "shadow-none bg-default-100",
+                    }}
+                  />
                 </div>
 
                 <Divider />
