@@ -28,14 +28,11 @@ import { showErrorToast, showSuccessToast } from '@/lib/errors'
 import { ErrorFallback } from '@/components/ErrorBoundary'
 import { 
   Brain, 
-  Send, 
   Zap, 
-  Clock, 
   CheckCircle2, 
   Plus, 
   Activity,
   Bot,
-  User,
   ArrowRight,
   MessageCircle,
 } from 'lucide-react'
@@ -121,7 +118,7 @@ export default function Home() {
     
     try {
       const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
-      if (authError || !authUser) return;
+      if (authError || !authUser) throw new Error('Not authenticated');
       
       const { data: profile } = await supabase.from('users').select('*').eq('id', authUser.id).single();
       setUser({

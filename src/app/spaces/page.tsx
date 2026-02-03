@@ -2,10 +2,10 @@
 
 import { useState } from 'react'
 import Link from 'next/link'
-import { 
-  Card, 
-  CardBody, 
-  Button, 
+import {
+  Card,
+  CardBody,
+  Button,
   Spinner,
   Chip,
   Avatar,
@@ -13,6 +13,7 @@ import {
   useDisclosure,
 } from '@heroui/react'
 import { PlusIcon, UserIcon } from '@heroicons/react/24/outline'
+import * as LucideIcons from 'lucide-react'
 import Navbar from '@/components/Navbar'
 import AddSpaceModal from '@/components/AddSpaceModal'
 import { useSpace } from '@/lib/space-context'
@@ -20,6 +21,12 @@ import { useSpace } from '@/lib/space-context'
 export default function SpacesPage() {
   const { spaces, loading, refreshSpaces } = useSpace()
   const { isOpen, onOpen, onClose } = useDisclosure()
+
+  const renderSpaceIcon = (iconName: string, fallback: string) => {
+    const Icon = (LucideIcons as any)[iconName]
+    if (Icon) return <Icon className="w-6 h-6" />
+    return fallback || iconName
+  }
 
   function handleAddSuccess() {
     refreshSpaces()
@@ -37,15 +44,15 @@ export default function SpacesPage() {
   return (
     <div className="min-h-screen bg-default-50">
       <Navbar user={null} />
-      
+
       <main className="max-w-5xl mx-auto py-8 px-4">
         <div className="flex justify-between items-center mb-8">
           <div>
             <h1 className="text-3xl font-bold">Your Spaces</h1>
             <p className="text-default-500 mt-1">Organize your work into spaces</p>
           </div>
-          <Button 
-            color="primary" 
+          <Button
+            color="primary"
             startContent={<PlusIcon className="w-5 h-5" />}
             onPress={onOpen}
           >
@@ -68,28 +75,28 @@ export default function SpacesPage() {
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
             {spaces.map((space) => (
               <Link key={space.id} href={`/spaces/${space.id}`}>
-                <Card 
-                  isPressable 
+                <Card
+                  isPressable
                   className="h-full hover:shadow-lg transition-shadow"
                 >
                   <CardBody className="p-5">
                     <div className="flex items-start justify-between mb-3">
                       <div 
-                        className="w-12 h-12 rounded-xl flex items-center justify-center text-white text-xl font-bold"
+                        className="w-12 h-12 rounded-xl flex items-center justify-center text-white text-xl font-bold shadow-md"
                         style={{ backgroundColor: space.color || '#3b82f6' }}
                       >
-                        {space.icon || space.name.charAt(0)}
+                        {renderSpaceIcon(space.icon, space.name.charAt(0))}
                       </div>
                       {space.is_default && (
                         <Chip size="sm" variant="flat" color="secondary">Personal</Chip>
                       )}
                     </div>
-                    
+
                     <h3 className="text-lg font-semibold mb-1">{space.name}</h3>
                     <p className="text-sm text-default-500 line-clamp-2 mb-4">
                       {space.description || 'No description'}
                     </p>
-                    
+
                     <div className="flex items-center justify-between mt-auto pt-3 border-t border-default-100">
                       <span className="text-xs text-default-400 capitalize">
                         {space.role || 'member'}
@@ -104,9 +111,9 @@ export default function SpacesPage() {
         )}
       </main>
 
-      <AddSpaceModal 
-        isOpen={isOpen} 
-        onClose={onClose} 
+      <AddSpaceModal
+        isOpen={isOpen}
+        onClose={onClose}
         onSuccess={handleAddSuccess}
       />
     </div>

@@ -14,6 +14,7 @@ import {
 import { createClient } from '@/lib/supabase/client'
 import { showErrorToast, showSuccessToast } from '@/lib/errors'
 import { Space } from '@/lib/space-context'
+import IconPicker from './IconPicker'
 
 interface EditSpaceModalProps {
   space: Space | null
@@ -35,13 +36,11 @@ const COLOR_OPTIONS = [
   '#84cc16', // Lime
 ]
 
-const ICON_OPTIONS = ['🏢', '🏠', '🚀', '📚', '🧪', '💼', '🛒', '🎨', '🧠', '🌐']
-
 export default function EditSpaceModal({ space, isOpen, onClose, onSuccess }: EditSpaceModalProps) {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [color, setColor] = useState(COLOR_OPTIONS[0])
-  const [icon, setIcon] = useState(ICON_OPTIONS[0])
+  const [icon, setIcon] = useState('Layout')
   const [saving, setSaving] = useState(false)
   const [deleting, setDeleting] = useState(false)
   
@@ -52,7 +51,7 @@ export default function EditSpaceModal({ space, isOpen, onClose, onSuccess }: Ed
       setName(space.name || '')
       setDescription(space.description || '')
       setColor(space.color || COLOR_OPTIONS[0])
-      setIcon(space.icon || ICON_OPTIONS[0])
+      setIcon(space.icon || 'Layout')
     }
   }, [space, isOpen])
 
@@ -123,18 +122,10 @@ export default function EditSpaceModal({ space, isOpen, onClose, onSuccess }: Ed
         </ModalHeader>
         <ModalBody>
           <div className="space-y-4">
-            <div className="flex gap-2">
-               <div className="w-14">
-                <label className="text-xs font-medium text-default-700 mb-1 block">Icon</label>
-                <div className="relative">
-                  <select 
-                    className="w-full h-10 rounded-xl bg-default-100 border-none appearance-none text-center cursor-pointer text-xl"
-                    value={icon}
-                    onChange={(e) => setIcon(e.target.value)}
-                  >
-                    {ICON_OPTIONS.map(i => <option key={i} value={i}>{i}</option>)}
-                  </select>
-                </div>
+            <div className="flex items-end gap-3">
+               <div className="flex-shrink-0">
+                <label className="text-[10px] font-black uppercase tracking-widest text-slate-400 mb-1 block px-1">Icon</label>
+                <IconPicker value={icon} onChange={setIcon} />
               </div>
               <div className="flex-1">
                 <Input

@@ -13,17 +13,19 @@ import {
   Avatar,
   AvatarGroup,
   Chip,
-  Link as NextUILink
+  Link as NextUILink,
+  useDisclosure
 } from '@heroui/react'
 import { Plus, Settings, ArrowRight, ListTodo, Calendar, Users, FileText, MessageSquare, ChevronRight } from 'lucide-react'
+import * as LucideIcons from 'lucide-react'
 import Link from 'next/link'
 import Navbar from '@/components/Navbar'
 import { useSpace } from '@/lib/space-context'
 import { toast } from 'react-hot-toast'
 import AddTaskModal from '@/components/AddTaskModal'
-import { useDisclosure } from '@heroui/react'
 
 export default function SpaceDetailPage() {
+  // ... rest
   const { id } = useParams()
   const router = useRouter()
   const { spaces } = useSpace()
@@ -133,6 +135,12 @@ export default function SpaceDetailPage() {
     }
   }
 
+  const renderSpaceIcon = (iconName: string, fallback: string) => {
+    const Icon = (LucideIcons as any)[iconName]
+    if (Icon) return <Icon className="w-5 h-5" />
+    return fallback || iconName
+  }
+
   return (
     <div className="min-h-screen bg-default-50">
       <Navbar user={null} /> {/* User will be handled by providers */}
@@ -142,10 +150,10 @@ export default function SpaceDetailPage() {
         <div className="mb-8">
           <div className="flex items-center gap-3 mb-4">
             <div 
-              className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-lg"
+              className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-lg"
               style={{ backgroundColor: space.color || '#3b82f6' }}
             >
-              {space.icon || space.name.charAt(0)}
+              {renderSpaceIcon(space.icon, space.name.charAt(0))}
             </div>
             <div>
               <h1 className="text-2xl font-bold text-foreground">{space.name}</h1>
