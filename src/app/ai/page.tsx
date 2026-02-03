@@ -26,6 +26,7 @@ import {
 import { createClient } from '@/lib/supabase/client'
 import Navbar from '@/components/Navbar'
 import { showErrorToast } from '@/lib/errors'
+import TaskThread from '@/components/TaskThread'
 
 // Types
 interface AIAgent {
@@ -374,6 +375,12 @@ export default function AIWorkspacePage() {
                     <p className="text-red-700 dark:text-red-300">{selectedTask.error}</p>
                   </div>
                 )}
+
+                {/* Thread Section */}
+                <div className="h-[500px]">
+                  <p className="text-xs font-bold uppercase text-slate-500 mb-2">Conversation</p>
+                  <TaskThread agentTaskId={selectedTask.id} className="h-full" />
+                </div>
               </div>
             </ScrollShadow>
           </>

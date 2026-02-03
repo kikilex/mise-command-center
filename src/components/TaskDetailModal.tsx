@@ -21,6 +21,7 @@ import { createClient } from '@/lib/supabase/client'
 import { showErrorToast, showSuccessToast } from '@/lib/errors'
 import FileViewerModal, { isViewableFile } from './FileViewerModal'
 import TaskDocuments from './TaskDocuments'
+import TaskThread from './TaskThread'
 
 interface Task {
   id: string
@@ -109,25 +110,15 @@ export default function TaskDetailModal({
     ai_flag: false,
   })
   const [files, setFiles] = useState<TaskFile[]>([])
-  const [feedbackMessages, setFeedbackMessages] = useState<FeedbackMessage[]>([])
-  const [newMessage, setNewMessage] = useState('')
   const [saving, setSaving] = useState(false)
-  const [sendingMessage, setSendingMessage] = useState(false)
   const [loadingFiles, setLoadingFiles] = useState(false)
-  const [loadingFeedback, setLoadingFeedback] = useState(false)
   const [uploading, setUploading] = useState(false)
   const [isDragging, setIsDragging] = useState(false)
   const [viewingFile, setViewingFile] = useState<TaskFile | null>(null)
   const [viewFileUrl, setViewFileUrl] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
-  const chatEndRef = useRef<HTMLDivElement>(null)
   
   const supabase = createClient()
-
-  // Scroll to bottom of chat
-  const scrollToBottom = useCallback(() => {
-    chatEndRef.current?.scrollIntoView({ behavior: 'smooth' })
-  }, [])
 
   // Load task data when modal opens
   useEffect(() => {
@@ -141,33 +132,8 @@ export default function TaskDetailModal({
         ai_flag: task.ai_flag || false,
       })
       loadFiles(task.id)
-      loadFeedbackMessages(task.id)
     }
   }, [task, isOpen])
-
-  // Scroll to bottom when messages change
-  useEffect(() => {
-    scrollToBottom()
-  }, [feedbackMessages, scrollToBottom])
-
-  async function loadFeedbackMessages(taskId: string) {
-    setLoadingFeedback(true)
-    try {
-      const { data, error } = await supabase
-        .from('task_feedback')
-        .select('*')
-        .eq('task_id', taskId)
-        .order('created_at', { ascending: true })
-
-      if (error) throw error
-      setFeedbackMessages(data || [])
-    } catch (error) {
-      console.error('Load feedback error:', error)
-      showErrorToast(error, 'Failed to load feedback')
-    } finally {
-      setLoadingFeedback(false)
-    }
-  }
 
   async function loadFiles(taskId: string) {
     setLoadingFiles(true)
@@ -185,40 +151,6 @@ export default function TaskDetailModal({
       showErrorToast(error, 'Failed to load attachments')
     } finally {
       setLoadingFiles(false)
-    }
-  }
-
-  async function handleSendMessage() {
-    if (!task || !newMessage.trim()) return
-    
-    setSendingMessage(true)
-    try {
-      const { data, error } = await supabase
-        .from('task_feedback')
-        .insert({
-          task_id: task.id,
-          author: userId || 'unknown',
-          message: newMessage.trim(),
-        })
-        .select()
-        .single()
-
-      if (error) throw error
-      
-      setFeedbackMessages(prev => [...prev, data])
-      setNewMessage('')
-    } catch (error) {
-      console.error('Send message error:', error)
-      showErrorToast(error, 'Failed to send message')
-    } finally {
-      setSendingMessage(false)
-    }
-  }
-
-  function handleKeyDown(e: React.KeyboardEvent<HTMLInputElement>) {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault()
-      handleSendMessage()
     }
   }
 
@@ -254,27 +186,9 @@ export default function TaskDetailModal({
   async function handleSendBackToAx() {
     if (!task) return
     
-    // Check if there's any feedback in the chat
-    if (feedbackMessages.length === 0 && !newMessage.trim()) {
-      showErrorToast(null, 'Please add feedback before sending back for revision')
-      return
-    }
-    
     setSaving(true)
     
     try {
-      // If there's a pending message, send it first
-      if (newMessage.trim()) {
-        await supabase
-          .from('task_feedback')
-          .insert({
-            task_id: task.id,
-            author: userId || 'unknown',
-            message: newMessage.trim(),
-          })
-        setNewMessage('')
-      }
-      
       const { error } = await supabase
         .from('tasks')
         .update({
@@ -543,80 +457,15 @@ export default function TaskDetailModal({
 
             <Divider />
 
-            {/* Chat-Style Feedback Section */}
-            <div className="space-y-3">
+            {/* Task Thread Section */}
+            <div className="space-y-3 h-[450px]">
               <h3 className="text-md font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-2">
-                <MessageCircle className="w-4 h-4" /> Feedback Thread
-                {feedbackMessages.length > 0 && (
-                  <Chip size="sm" variant="flat">{feedbackMessages.length}</Chip>
-                )}
+                <MessageCircle className="w-4 h-4" /> Conversation
               </h3>
               
-              {/* Chat Window */}
-              <div className="border border-slate-200 dark:border-slate-700 rounded-lg bg-slate-50 dark:bg-slate-900/50">
-                {/* Messages Container */}
-                <div className="h-64 overflow-y-auto p-4 space-y-3">
-                  {loadingFeedback ? (
-                    <div className="flex items-center justify-center h-full">
-                      <Spinner size="sm" />
-                      <span className="ml-2 text-slate-500">Loading messages...</span>
-                    </div>
-                  ) : feedbackMessages.length === 0 ? (
-                    <div className="flex items-center justify-center h-full text-slate-400">
-                      <p>No feedback yet. Start the conversation!</p>
-                    </div>
-                  ) : (
-                    feedbackMessages.map((msg) => (
-                      <div
-                        key={msg.id}
-                        className={`flex flex-col ${isAxMessage(msg.author) ? 'items-start' : 'items-end'}`}
-                      >
-                        <div
-                          className={`max-w-[80%] rounded-2xl px-4 py-2 ${
-                            isAxMessage(msg.author)
-                              ? 'bg-slate-200 dark:bg-slate-700 text-slate-800 dark:text-slate-200 rounded-bl-md'
-                              : 'bg-blue-500 text-white rounded-br-md'
-                          }`}
-                        >
-                          <p className="text-sm whitespace-pre-wrap">{msg.message}</p>
-                        </div>
-                        <div className={`flex items-center gap-1 mt-1 ${isAxMessage(msg.author) ? '' : 'flex-row-reverse'}`}>
-                          <span className="text-xs text-slate-500 dark:text-slate-400">
-                            {isAxMessage(msg.author) ? <><Bot className="w-3 h-3 inline" /> Ax</> : <><User className="w-3 h-3 inline" /> Alex</>}
-                          </span>
-                          <span className="text-xs text-slate-400 dark:text-slate-500">
-                            • {formatTimestamp(msg.created_at)}
-                          </span>
-                        </div>
-                      </div>
-                    ))
-                  )}
-                  <div ref={chatEndRef} />
-                </div>
-                
-                {/* Message Input */}
-                <div className="border-t border-slate-200 dark:border-slate-700 p-3 flex gap-2">
-                  <Input
-                    placeholder="Type your feedback..."
-                    value={newMessage}
-                    onChange={(e) => setNewMessage(e.target.value)}
-                    onKeyDown={handleKeyDown}
-                    isDisabled={sendingMessage}
-                    classNames={{
-                      input: "text-sm",
-                    }}
-                  />
-                  <Button
-                    color="primary"
-                    isIconOnly
-                    onPress={handleSendMessage}
-                    isDisabled={!newMessage.trim() || sendingMessage}
-                    isLoading={sendingMessage}
-                  >
-                    {!sendingMessage && '↑'}
-                  </Button>
-                </div>
-              </div>
+              {task && (
+                <TaskThread taskId={task.id} className="h-full" />
+              )}
               
               {/* Send Back Button */}
               <Button
