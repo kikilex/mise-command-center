@@ -353,6 +353,8 @@ function TasksPageContent() {
   }
 
   async function handleOpenTaskById(taskId: string) {
+    if (!taskId) return
+
     const existingTask = tasks.find(t => t.id === taskId)
     if (existingTask) {
       handleViewDetails(existingTask)
@@ -372,7 +374,10 @@ function TasksPageContent() {
       }
     } catch (error) {
       console.error('Failed to load task:', error)
-      showErrorToast(error, 'Failed to open task')
+      // Only show toast if it's not a background load
+      if (searchParams.get('openTask') === taskId) {
+        showErrorToast(error, 'Failed to open task')
+      }
     }
   }
 
