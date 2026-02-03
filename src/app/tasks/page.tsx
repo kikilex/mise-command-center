@@ -38,6 +38,7 @@ import Navbar from '@/components/Navbar'
 import { showErrorToast, showSuccessToast, getErrorMessage } from '@/lib/errors'
 import { ErrorFallback } from '@/components/ErrorBoundary'
 import TaskDetailModal from '@/components/TaskDetailModal'
+import AddTaskModal from '@/components/AddTaskModal'
 
 // Main export with Suspense wrapper
 export default function TasksPage() {
@@ -410,6 +411,17 @@ function TasksPageContent() {
   const displayTasks = showAllTasks ? allActiveTasks : focusTasks
   const hiddenCount = allActiveTasks.length - focusTasks.length
 
+  // Group tasks by project
+  const tasksByProject = useMemo(() => {
+    const grouped: Record<string, Task[]> = {}
+    displayTasks.forEach(task => {
+      const projectId = task.project_id || 'none'
+      if (!grouped[projectId]) grouped[projectId] = []
+      grouped[projectId].push(task)
+    })
+    return grouped
+  }, [displayTasks])
+
   // Render a clean task card
   const renderTaskCard = (task: Task) => (
     <div 
@@ -544,8 +556,8 @@ function TasksPageContent() {
           </div>
         ) : !loadError && (
           <>
-            {/* Task list */}
-            <div className="space-y-2 mb-6">
+            {/* Task list grouped by project */}
+            <div className="space-y-6 mb-6">
               {displayTasks.length === 0 ? (
                 <Card className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
                   <CardBody className="text-center py-12">
@@ -560,7 +572,25 @@ function TasksPageContent() {
                   </CardBody>
                 </Card>
               ) : (
-                displayTasks.map(task => renderTaskCard(task))
+                Object.entries(tasksByProject).map(([projectId, projectTasks]) => {
+                  const project = projects.find(p => p.id === projectId)
+                  return (
+                    <div key={projectId} className="space-y-2">
+                      <div className="flex items-center gap-2 px-1 mb-1">
+                        <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
+                          {project ? project.name : 'No Project'}
+                        </span>
+                        <div className="flex-1 h-[1px] bg-slate-100 dark:bg-slate-800" />
+                        <span className="text-[10px] text-slate-400 bg-slate-50 dark:bg-slate-800 px-1.5 py-0.5 rounded-full border border-slate-100 dark:border-slate-700">
+                          {projectTasks.length}
+                        </span>
+                      </div>
+                      <div className="space-y-2">
+                        {projectTasks.map(task => renderTaskCard(task))}
+                      </div>
+                    </div>
+                  )
+                })
               )}
             </div>
 
@@ -624,144 +654,13 @@ function TasksPageContent() {
       </main>
 
       {/* Create/Edit Modal */}
-      <Modal isOpen={isOpen} onClose={handleClose} size="lg">
-        <ModalContent>
-          <ModalHeader>
-            {editingTask ? 'Edit Task' : 'New Task'}
-          </ModalHeader>
-          <ModalBody>
-            <div className="flex flex-col gap-4">
-              <Input
-                label="Title"
-                placeholder="What needs to be done?"
-                value={formData.title}
-                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                isRequired
-                autoFocus
-              />
-              <Textarea
-                label="Description"
-                placeholder="Add details (optional)"
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-              />
-              <Input
-                label="Due Date"
-                type="date"
-                placeholder="Set a due date"
-                value={formData.due_date}
-                onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
-              />
-              <div className="grid grid-cols-2 gap-4">
-                <Select
-                  label="Status"
-                  selectedKeys={[formData.status]}
-                  onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                >
-                  {statusOptions.map(s => (
-                    <SelectItem key={s.key}>{s.label}</SelectItem>
-                  ))}
-                </Select>
-                <Select
-                  label="Priority"
-                  selectedKeys={[formData.priority]}
-                  onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
-                >
-                  {priorityOptions.map(p => (
-                    <SelectItem key={p.key}>{p.label}</SelectItem>
-                  ))}
-                </Select>
-              </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Select
-                  label="Assignee"
-                  placeholder="Select human"
-                  selectedKeys={formData.assignee_id ? [formData.assignee_id] : []}
-                  onChange={(e) => setFormData({ ...formData, assignee_id: e.target.value })}
-                  startContent={<User className="w-4 h-4 text-slate-400" />}
-                >
-                  {users.map(u => (
-                    <SelectItem key={u.id} textValue={u.name || u.email}>
-                      <span>{u.name || u.email}</span>
-                    </SelectItem>
-                  ))}
-                </Select>
-
-                <Select
-                  label="AI Agent"
-                  placeholder="Select agent"
-                  selectedKeys={formData.ai_agent ? [formData.ai_agent] : []}
-                  onChange={(e) => setFormData({ ...formData, ai_agent: e.target.value })}
-                  startContent={<Bot className="w-4 h-4 text-slate-400" />}
-                >
-                  {agents.map(a => (
-                    <SelectItem key={a.slug} textValue={a.name}>
-                      <div className="flex flex-col">
-                        <span className="font-medium">{a.name}</span>
-                        <span className="text-xs text-slate-400">{a.role}</span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </Select>
-              </div>
-
-              <Select
-                label="Project"
-                placeholder="Select project (optional)"
-                selectedKeys={formData.project_id ? [formData.project_id] : []}
-                onChange={(e) => setFormData({ ...formData, project_id: e.target.value })}
-              >
-                {projects.map(p => (
-                  <SelectItem key={p.id} textValue={p.name}>
-                    {p.name}
-                  </SelectItem>
-                ))}
-              </Select>
-
-              <Select
-                label="Space"
-                placeholder="Select space"
-                selectedKeys={formData.space_id ? [formData.space_id] : []}
-                onChange={(e) => setFormData({ ...formData, space_id: e.target.value })}
-                isRequired
-              >
-                {spaces.map(s => (
-                  <SelectItem key={s.id} textValue={s.name}>
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: s.color || '#3b82f6' }} />
-                      <span>{s.name}</span>
-                    </div>
-                  </SelectItem>
-                ))}
-              </Select>
-
-              <label className="flex items-center gap-2 cursor-pointer">
-                <Checkbox
-                  isSelected={formData.ai_flag}
-                  onValueChange={(checked) => setFormData({ ...formData, ai_flag: checked })}
-                />
-                <span className="text-sm text-slate-700 dark:text-slate-300 flex items-center gap-1">
-                  <Bot className="w-4 h-4" /> Allow AI to work on this task
-                </span>
-              </label>
-            </div>
-          </ModalBody>
-          <ModalFooter>
-            <Button variant="flat" onPress={handleClose}>
-              Cancel
-            </Button>
-            <Button 
-              color="primary" 
-              onPress={handleSubmit}
-              isDisabled={!formData.title.trim()}
-              isLoading={submitting}
-            >
-              {editingTask ? 'Save' : 'Create'}
-            </Button>
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
+      <AddTaskModal
+        isOpen={isOpen}
+        onClose={handleClose}
+        onSuccess={loadTasks}
+        initialSpaceId={localSpaceId !== 'all' ? localSpaceId : undefined}
+        userId={user?.id}
+      />
 
       {/* Task Detail Modal */}
       <TaskDetailModal

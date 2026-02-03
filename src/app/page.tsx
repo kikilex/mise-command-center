@@ -21,7 +21,7 @@ import {
   Divider,
   ScrollShadow,
 } from "@heroui/react";
-import { useState, useEffect, useMemo, useRef } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { createClient } from '@/lib/supabase/client'
 import Navbar from '@/components/Navbar'
 import { showErrorToast, showSuccessToast } from '@/lib/errors'
@@ -39,6 +39,7 @@ import {
   ArrowRight,
   MessageCircle,
 } from 'lucide-react'
+import { useRouter } from 'next/navigation'
 
 interface UserData {
   id: string
@@ -80,8 +81,6 @@ interface AIAgent {
   role: string
 }
 
-type FilterType = 'all' | 'personal' | 'business'
-
 const priorityOptions = [
   { key: 'critical', label: 'Critical' },
   { key: 'high', label: 'High' },
@@ -109,21 +108,19 @@ export default function Home() {
   });
   
   const supabase = createClient();
+  const router = useRouter();
 
-  // Get today's date in YYYY-MM-DD format
-  const getTodayString = () => {
-    const today = new Date();
-    return today.toISOString().split('T')[0];
-  };
+  useEffect(() => {
+    loadData();
+  }, []);
 
   async function loadData() {
     setLoading(true);
     setLoadError(null);
     
     try {
-      // Get user
       const { data: { user: authUser }, error: authError } = await supabase.auth.getUser();
-      if (authError || !authUser) throw new Error('Not authenticated');
+      if (authError || !authUser) return;
       
       const { data: profile } = await supabase.from('users').select('*').eq('id', authUser.id).single();
       setUser({
@@ -134,7 +131,6 @@ export default function Home() {
         role: profile?.role || 'member'
       });
 
-      // Load spaces, tasks, inbox, agents
       const [spacesRes, tasksRes, inboxRes, agentsRes] = await Promise.all([
         supabase.from('spaces').select('id, name, color'),
         supabase.from('tasks')
@@ -163,11 +159,21 @@ export default function Home() {
     }
   }
 
-  useEffect(() => {
-    loadData();
-  }, []);
+  async function toggleTaskDone(taskId: string) {
+    try {
+      const { error } = await supabase
+        .from('tasks')
+        .update({ status: 'done' })
+        .eq('id', taskId);
 
-  // Brain Dump Logic
+      if (error) throw error;
+      setTodaysTasks(prev => prev.filter(t => t.id !== taskId));
+      showSuccessToast('Task completed!');
+    } catch (error) {
+      showErrorToast(error, 'Failed to update task');
+    }
+  }
+
   async function handleBrainDump() {
     if (!brainDump.trim() || !user) return;
     setSubmitting(true);
@@ -197,9 +203,7 @@ export default function Home() {
     if (inboxItems.length === 0 || !user) return;
     setSubmitting(true);
     try {
-      // 1. Create organize request message for Ax
       const content = `Please organize my brain dump:\n${inboxItems.map(i => `- ${i.content}`).join('\n')}`;
-      
       const { error: msgError } = await supabase.from('inbox').insert({
         user_id: user.id,
         content,
@@ -209,7 +213,6 @@ export default function Home() {
       });
       if (msgError) throw msgError;
 
-      // 2. Mark items as processing
       const ids = inboxItems.map(i => i.id);
       await supabase.from('inbox').update({ status: 'processing' }).in('id', ids);
 
@@ -222,77 +225,6 @@ export default function Home() {
     }
   }
 
-  // Toggle task completion
-  async function toggleTaskDone(taskId: string) {
-    try {
-      const { error } = await supabase
-        .from('tasks')
-        .update({ status: 'done' })
-        .eq('id', taskId);
-
-      if (error) throw error;
-
-      // Remove from list
-      setTodaysTasks(prev => prev.filter(t => t.id !== taskId));
-      showSuccessToast('Task completed!');
-    } catch (error) {
-      console.error('Toggle task error:', error);
-      showErrorToast(error, 'Failed to update task');
-    }
-  }
-
-  // Quick add task
-  async function handleQuickAdd() {
-    if (!user) {
-      showErrorToast(null, 'Please sign in to add tasks');
-      return;
-    }
-
-    if (!formData.title.trim()) {
-      showErrorToast(null, 'Please enter a task title');
-      return;
-    }
-
-    setSubmitting(true);
-
-    try {
-      const todayStr = getTodayString();
-      const { error } = await supabase
-        .from('tasks')
-        .insert({
-          title: formData.title,
-          description: formData.description || null,
-          priority: formData.priority,
-          business_id: formData.business_id || null,
-          status: 'todo',
-          due_date: `${todayStr}T12:00:00`,
-          created_by: user.id,
-        });
-
-      if (error) throw error;
-
-      showSuccessToast('Task added!');
-      handleCloseModal();
-      loadData();
-    } catch (error) {
-      console.error('Add task error:', error);
-      showErrorToast(error, 'Failed to add task');
-    } finally {
-      setSubmitting(false);
-    }
-  }
-
-  function handleCloseModal() {
-    setFormData({
-      title: '',
-      description: '',
-      priority: 'medium',
-      business_id: '',
-    });
-    onClose();
-  }
-
-  // Get priority color
   const getPriorityColor = (priority: string) => {
     switch (priority) {
       case 'critical': return 'bg-red-500';
@@ -301,35 +233,6 @@ export default function Home() {
       case 'low': return 'bg-slate-400';
       default: return 'bg-slate-400';
     }
-  };
-
-  // Get context badge for a task
-  const getContextBadge = (task: Task) => {
-    if (task.business && task.business_id) {
-      return (
-        <Chip 
-          size="sm" 
-          variant="flat"
-          style={{ 
-            backgroundColor: `${task.business.color}20`,
-            color: task.business.color,
-            borderColor: task.business.color,
-          }}
-          className="border"
-        >
-          🏢 {task.business.name}
-        </Chip>
-      );
-    }
-    return (
-      <Chip 
-        size="sm" 
-        variant="flat"
-        className="bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-300"
-      >
-        👤 Personal
-      </Chip>
-    );
   };
 
   if (loadError && !loading) {
@@ -346,7 +249,6 @@ export default function Home() {
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
         <div className="flex flex-col lg:flex-row gap-8">
-          {/* LEFT COLUMN: Brain Dump + What's Next */}
           <div className="flex-1 space-y-8">
             {/* 🧠 Brain Dump System */}
             <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
@@ -387,27 +289,20 @@ export default function Home() {
                       inputWrapper: "bg-slate-100 dark:bg-slate-800 border-none h-12"
                     }}
                   />
-                  <Button 
-                    isIconOnly 
-                    color="primary" 
-                    className="h-12 w-12"
-                    onPress={handleBrainDump}
-                    isLoading={submitting}
-                  >
+                  <Button isIconOnly color="primary" className="h-12 w-12" onPress={handleBrainDump} isLoading={submitting}>
                     <Plus className="w-6 h-6" />
                   </Button>
                 </div>
-
                 <div className="space-y-3">
                   <p className="text-xs font-bold uppercase tracking-wider text-slate-400 px-1">Recent thoughts</p>
                   {inboxItems.length === 0 ? (
                     <div className="text-center py-8 bg-slate-50 dark:bg-slate-800/30 rounded-2xl border-2 border-dashed border-slate-100 dark:border-slate-800">
-                      <p className="text-sm text-slate-400 italic">No pending thoughts. Capturing is key.</p>
+                      <p className="text-sm text-slate-400 italic">No pending thoughts.</p>
                     </div>
                   ) : (
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
                       {inboxItems.slice(0, 6).map((item) => (
-                        <div key={item.id} className="p-3 rounded-xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
+                        <div key={item.id} className="p-3 rounded-xl bg-slate-50 dark:bg-slate-700/50 border border-slate-100 dark:border-slate-800">
                           <p className="text-sm text-slate-700 dark:text-slate-300 line-clamp-1 italic">"{item.content}"</p>
                         </div>
                       ))}
@@ -417,7 +312,7 @@ export default function Home() {
               </CardBody>
             </Card>
 
-            {/* ✅ What's Next (High Priority Tasks) */}
+            {/* ✅ What's Next */}
             <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
               <CardHeader className="px-6 py-5 flex items-center justify-between border-b border-slate-200 dark:border-slate-800">
                 <div className="flex items-center gap-3">
@@ -437,7 +332,7 @@ export default function Home() {
                 ) : todaysTasks.length === 0 ? (
                   <div className="text-center py-12">
                     <CheckCircle2 className="w-12 h-12 text-emerald-500 mx-auto mb-3" />
-                    <p className="text-slate-500">The hit list is empty. Go find some work.</p>
+                    <p className="text-slate-500">The hit list is empty.</p>
                   </div>
                 ) : (
                   todaysTasks.slice(0, 5).map((task) => (
@@ -468,9 +363,7 @@ export default function Home() {
             </Card>
           </div>
 
-          {/* RIGHT COLUMN: Messages + Agent Status */}
           <div className="w-full lg:w-96 space-y-8">
-            {/* 📥 Messages Widget */}
             <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
               <CardHeader className="px-6 pt-5 pb-2">
                 <div className="flex items-center justify-between w-full">
@@ -481,144 +374,44 @@ export default function Home() {
                 </div>
               </CardHeader>
               <CardBody className="px-4 pb-4">
-                <div className="space-y-4">
-                  <p className="text-center py-12 text-slate-400 text-sm italic border-2 border-dashed border-slate-100 dark:border-slate-800 rounded-2xl">
-                    No new intel. Keep it that way.
-                  </p>
-                </div>
+                <p className="text-center py-12 text-slate-400 text-sm italic border-2 border-dashed border-slate-100 dark:border-slate-800 rounded-2xl">
+                  No new intel.
+                </p>
               </CardBody>
             </Card>
 
-            {/* 🤖 Agent Status Cards */}
             <div className="space-y-4">
               <h2 className="text-sm font-black uppercase tracking-widest text-slate-400 px-1 flex items-center gap-2">
                 <Bot className="w-4 h-4" /> Agent Status
               </h2>
-              <div className="grid grid-cols-1 gap-4">
-                {agents.map((agent) => (
-                  <Card 
-                    key={agent.id} 
-                    isPressable 
-                    onPress={() => router.push('/ai')}
-                    className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden"
-                  >
-                    <div className={`h-1 w-full ${agent.is_active ? 'bg-emerald-500' : 'bg-slate-400'}`} />
-                    <CardBody className="p-4">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-3">
-                          <Avatar 
-                            name={agent.name} 
-                            size="sm" 
-                            className="bg-gradient-to-br from-violet-500 to-purple-600 text-white font-black" 
-                          />
-                          <div>
-                            <p className="font-bold text-slate-800 dark:text-slate-100 leading-none mb-1">{agent.name}</p>
-                            <p className="text-[10px] uppercase font-bold text-slate-400 tracking-tight">{agent.role.replace(/_/g, ' ')}</p>
-                          </div>
-                        </div>
-                        <div className="text-right">
-                          <Chip 
-                            size="sm" 
-                            variant="dot" 
-                            color={agent.is_active ? 'success' : 'default'}
-                            className="h-6"
-                          >
-                            {agent.is_active ? 'Online' : 'Offline'}
-                          </Chip>
+              {agents.map((agent) => (
+                <Card 
+                  key={agent.id} 
+                  isPressable 
+                  onPress={() => router.push('/ai')}
+                  className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden"
+                >
+                  <div className={`h-1 w-full ${agent.is_active ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+                  <CardBody className="p-4">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <Avatar name={agent.name} size="sm" className="bg-gradient-to-br from-violet-500 to-purple-600 text-white font-black" />
+                        <div>
+                          <p className="font-bold text-slate-800 dark:text-slate-100 leading-none mb-1">{agent.name}</p>
+                          <p className="text-[10px] uppercase font-bold text-slate-400 tracking-tight">{agent.role.replace(/_/g, ' ')}</p>
                         </div>
                       </div>
-                    </CardBody>
-                  </Card>
-                ))}
-              </div>
+                      <Chip size="sm" variant="dot" color={agent.is_active ? 'success' : 'default'} className="h-6">
+                        {agent.is_active ? 'Online' : 'Offline'}
+                      </Chip>
+                    </div>
+                  </CardBody>
+                </Card>
+              ))}
             </div>
           </div>
         </div>
       </main>
-    </div>
-  );
-}
-
-      {/* Floating Quick Add Button */}
-      <div className="fixed bottom-6 right-6 z-50">
-        <Button
-          color="primary"
-          size="lg"
-          className="rounded-full w-14 h-14 min-w-[56px] min-h-[56px] shadow-lg"
-          isIconOnly
-          onPress={onOpen}
-          aria-label="Add task"
-        >
-          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-          </svg>
-        </Button>
-      </div>
-
-      {/* Quick Add Modal */}
-      <Modal isOpen={isOpen} onClose={handleCloseModal} size="lg">
-        <ModalContent>
-          <ModalHeader className="text-lg font-semibold">
-            Quick Add Task
-          </ModalHeader>
-          <ModalBody>
-            <div className="flex flex-col gap-4">
-              <Input
-                label="What needs to be done?"
-                placeholder="Task title"
-                value={formData.title}
-                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                autoFocus
-                isRequired
-              />
-              <Textarea
-                label="Description (optional)"
-                placeholder="Add details..."
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                minRows={2}
-              />
-              <div className="grid grid-cols-2 gap-4">
-                <Select
-                  label="Priority"
-                  selectedKeys={[formData.priority]}
-                  onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
-                >
-                  {priorityOptions.map(p => (
-                    <SelectItem key={p.key}>{p.label}</SelectItem>
-                  ))}
-                </Select>
-                <Select
-                  label="Context"
-                  selectedKeys={formData.business_id ? [formData.business_id] : []}
-                  onChange={(e) => setFormData({ ...formData, business_id: e.target.value })}
-                  placeholder="Personal"
-                >
-                  {businesses.map(biz => (
-                    <SelectItem key={biz.id}>🏢 {biz.name}</SelectItem>
-                  ))}
-                </Select>
-              </div>
-              <p className="text-sm text-slate-500 dark:text-slate-400">
-                Task will be due today
-              </p>
-            </div>
-          </ModalBody>
-          <ModalFooter>
-            <Button variant="flat" onPress={handleCloseModal}>
-              Cancel
-            </Button>
-            <Button 
-              color="primary" 
-              onPress={handleQuickAdd}
-              isDisabled={!formData.title.trim()}
-              isLoading={submitting}
-            >
-              Add Task
-            </Button>
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
     </div>
   );
 }

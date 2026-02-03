@@ -20,6 +20,8 @@ import Link from 'next/link'
 import Navbar from '@/components/Navbar'
 import { useSpace } from '@/lib/space-context'
 import { toast } from 'react-hot-toast'
+import AddTaskModal from '@/components/AddTaskModal'
+import { useDisclosure } from '@heroui/react'
 
 export default function SpaceDetailPage() {
   const { id } = useParams()
@@ -28,9 +30,19 @@ export default function SpaceDetailPage() {
   const [space, setSpace] = useState<any>(null)
   const [members, setMembers] = useState<any[]>([])
   const [tasks, setTasks] = useState<any[]>([])
+  const [documents, setDocuments] = useState<any[]>([])
+  const [threads, setThreads] = useState<any[]>([])
+  const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [showAllTasks, setShowAllTasks] = useState(false)
+  
+  const { isOpen: isTaskOpen, onOpen: onTaskOpen, onClose: onTaskClose } = useDisclosure()
+  
   const supabase = createClient()
+
+  useEffect(() => {
+    loadUser()
+  }, [])
 
   useEffect(() => {
     if (id) {
@@ -38,10 +50,15 @@ export default function SpaceDetailPage() {
     }
   }, [id])
 
+  async function loadUser() {
+    const { data: { user } } = await supabase.auth.getUser()
+    setUser(user)
+  }
+
   async function loadSpaceData() {
     setLoading(true)
     try {
-      const [spaceRes, membersRes, tasksRes] = await Promise.all([
+      const [spaceRes, membersRes, tasksRes, docsRes, threadsRes] = await Promise.all([
         supabase.from('spaces').select('*').eq('id', id).single(),
         supabase.from('space_members').select('*, users(*)').eq('space_id', id),
         supabase.from('tasks')
@@ -49,6 +66,14 @@ export default function SpaceDetailPage() {
           .eq('space_id', id)
           .order('due_date', { ascending: true, nullsFirst: false })
           .order('priority', { ascending: false })
+          .order('created_at', { ascending: false }),
+        supabase.from('documents')
+          .select('*')
+          .eq('space_id', id)
+          .order('updated_at', { ascending: false }),
+        supabase.from('inbox')
+          .select('*')
+          .eq('space_id', id)
           .order('created_at', { ascending: false })
       ])
 
@@ -56,6 +81,8 @@ export default function SpaceDetailPage() {
       setSpace(spaceRes.data)
       setMembers(membersRes.data || [])
       setTasks(tasksRes.data || [])
+      setDocuments(docsRes.data || [])
+      setThreads(threadsRes.data || [])
     } catch (error) {
       console.error('Error loading space:', error)
       toast.error('Failed to load space')
@@ -173,7 +200,7 @@ export default function SpaceDetailPage() {
                     variant="flat" 
                     size="sm"
                     startContent={<Plus className="w-4 h-4" />}
-                    onPress={() => router.push(`/tasks?space=${id}`)}
+                    onPress={onTaskOpen}
                   >
                     Add Task
                   </Button>
@@ -346,7 +373,7 @@ export default function SpaceDetailPage() {
                 <Button 
                   color="primary" 
                   startContent={<Plus className="w-4 h-4" />}
-                  onPress={() => router.push(`/tasks?space=${id}`)}
+                  onPress={onTaskOpen}
                 >
                   Add Task
                 </Button>
@@ -392,15 +419,54 @@ export default function SpaceDetailPage() {
               <div className="flex items-center gap-2">
                 <FileText className="w-4 h-4" />
                 <span>Documents</span>
+                {documents.length > 0 && (
+                  <span className="text-xs bg-default-100 text-default-600 px-2 py-0.5 rounded-full">
+                    {documents.length}
+                  </span>
+                )}
               </div>
             }
           >
-             <Card className="mt-6">
-              <CardBody className="py-12 text-center text-default-400">
-                <FileText className="w-12 h-12 mx-auto mb-4" />
-                <p>Documents coming soon.</p>
-              </CardBody>
-            </Card>
+            <div className="mt-6">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="text-xl font-semibold text-foreground">Documents</h2>
+                  <p className="text-sm text-default-500 mt-1">Research and intel in this space</p>
+                </div>
+                <Button 
+                  color="primary" 
+                  startContent={<Plus className="w-4 h-4" />}
+                  onPress={() => router.push(`/docs?space=${id}`)}
+                >
+                  New Doc
+                </Button>
+              </div>
+
+              {documents.length === 0 ? (
+                <Card className="py-12">
+                  <CardBody className="text-center text-default-400">
+                    <FileText className="w-12 h-12 mx-auto mb-4" />
+                    <p>No documents in this space yet.</p>
+                  </CardBody>
+                </Card>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {documents.map(doc => (
+                    <Card key={doc.id} isPressable onPress={() => router.push(`/docs/${doc.id}`)}>
+                      <CardBody className="p-4">
+                        <div className="flex items-center justify-between mb-2">
+                          <h3 className="font-semibold text-foreground truncate">{doc.title}</h3>
+                          <Chip size="sm" variant="flat" color={doc.doc_type === 'note' ? 'secondary' : 'primary'}>
+                            {doc.doc_type}
+                          </Chip>
+                        </div>
+                        <p className="text-xs text-default-500">Updated {new Date(doc.updated_at).toLocaleDateString()}</p>
+                      </CardBody>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
           </Tab>
 
           <Tab 
@@ -409,15 +475,53 @@ export default function SpaceDetailPage() {
               <div className="flex items-center gap-2">
                 <MessageSquare className="w-4 h-4" />
                 <span>Threads</span>
+                {threads.length > 0 && (
+                  <span className="text-xs bg-default-100 text-default-600 px-2 py-0.5 rounded-full">
+                    {threads.length}
+                  </span>
+                )}
               </div>
             }
           >
-             <Card className="mt-6">
-              <CardBody className="py-12 text-center text-default-400">
-                <MessageSquare className="w-12 h-12 mx-auto mb-4" />
-                <p>Linked message threads coming soon.</p>
-              </CardBody>
-            </Card>
+            <div className="mt-6">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="text-xl font-semibold text-foreground">Threads</h2>
+                  <p className="text-sm text-default-500 mt-1">Conversations linked to this space</p>
+                </div>
+                <Button 
+                  color="primary" 
+                  variant="flat"
+                  startContent={<Plus className="w-4 h-4" />}
+                  onPress={() => router.push(`/inbox?space=${id}`)}
+                >
+                  New Thread
+                </Button>
+              </div>
+
+              {threads.length === 0 ? (
+                <Card className="py-12">
+                  <CardBody className="text-center text-default-400">
+                    <MessageSquare className="w-12 h-12 mx-auto mb-4" />
+                    <p>No message threads linked to this space.</p>
+                  </CardBody>
+                </Card>
+              ) : (
+                <div className="space-y-3">
+                  {threads.map(thread => (
+                    <Card key={thread.id} isPressable onPress={() => router.push(`/inbox?thread=${thread.thread_id}`)}>
+                      <CardBody className="p-4">
+                        <div className="flex items-center justify-between mb-1">
+                          <span className="font-semibold text-foreground">{thread.subject || 'No Subject'}</span>
+                          <span className="text-[10px] text-default-400">{new Date(thread.created_at).toLocaleString()}</span>
+                        </div>
+                        <p className="text-sm text-default-500 line-clamp-1">{thread.content}</p>
+                      </CardBody>
+                    </Card>
+                  ))}
+                </div>
+              )}
+            </div>
           </Tab>
 
           <Tab 
@@ -460,6 +564,14 @@ export default function SpaceDetailPage() {
           </Tab>
         </Tabs>
       </main>
+
+      <AddTaskModal
+        isOpen={isTaskOpen}
+        onClose={onTaskClose}
+        onSuccess={loadSpaceData}
+        initialSpaceId={id as string}
+        userId={user?.id}
+      />
     </div>
   )
 }

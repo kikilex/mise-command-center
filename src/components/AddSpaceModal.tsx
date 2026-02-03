@@ -33,16 +33,32 @@ const COLOR_OPTIONS = [
   '#84cc16', // Lime
 ]
 
-const ICON_OPTIONS = ['🏢', '🏠', '🚀', '📚', '🧪', '💼', '🛒', '🎨', '🧠', '🌐']
+const ICON_OPTIONS = [
+  '🏢', '🏠', '🚀', '📚', '🧪', '💼', '🛒', '🎨', '🧠', '🌐', 
+  '⚡', '🎯', '🔥', '💎', '📈', '🔑', '🛡️', '🌍', '🛠️', '📣'
+]
 
 export default function AddSpaceModal({ isOpen, onClose, onSuccess }: AddSpaceModalProps) {
   const [name, setName] = useState('')
   const [description, setDescription] = useState('')
   const [color, setColor] = useState(COLOR_OPTIONS[0])
   const [icon, setIcon] = useState(ICON_OPTIONS[0])
+  const [invitedUsers, setInvitedUsers] = useState<string[]>([])
+  const [allUsers, setAllUsers] = useState<any[]>([])
   const [saving, setSaving] = useState(false)
   
   const supabase = createClient()
+
+  useEffect(() => {
+    if (isOpen) {
+      loadUsers()
+    }
+  }, [isOpen])
+
+  async function loadUsers() {
+    const { data } = await supabase.from('users').select('id, name, email')
+    setAllUsers(data || [])
+  }
 
   async function handleSubmit() {
     if (!name.trim()) {
@@ -57,7 +73,7 @@ export default function AddSpaceModal({ isOpen, onClose, onSuccess }: AddSpaceMo
         throw new Error('You must be logged in to create a space')
       }
 
-      // Create the space
+      // 1. Create the space
       const { data: space, error: createError } = await supabase
         .from('spaces')
         .insert({
@@ -72,18 +88,23 @@ export default function AddSpaceModal({ isOpen, onClose, onSuccess }: AddSpaceMo
 
       if (createError) throw createError
 
-      // Add current user as owner in space_members
+      // 2. Add creator as owner
+      const membersToInsert = [
+        { space_id: space.id, user_id: user.id, role: 'owner' }
+      ]
+
+      // 3. Add invited users as editors
+      invitedUsers.forEach(userId => {
+        if (userId !== user.id) {
+          membersToInsert.push({ space_id: space.id, user_id: userId, role: 'editor' })
+        }
+      })
+
       const { error: memberError } = await supabase
         .from('space_members')
-        .insert({
-          space_id: space.id,
-          user_id: user.id,
-          role: 'owner',
-        })
+        .insert(membersToInsert)
 
-      if (memberError) {
-        console.error('Failed to add owner to space_members:', memberError)
-      }
+      if (memberError) throw memberError
 
       showSuccessToast('Space created successfully')
       resetForm()
@@ -102,6 +123,7 @@ export default function AddSpaceModal({ isOpen, onClose, onSuccess }: AddSpaceMo
     setDescription('')
     setColor(COLOR_OPTIONS[0])
     setIcon(ICON_OPTIONS[0])
+    setInvitedUsers([])
   }
 
   function handleClose() {
@@ -154,6 +176,21 @@ export default function AddSpaceModal({ isOpen, onClose, onSuccess }: AddSpaceMo
               variant="bordered"
               minRows={2}
             />
+
+            <Select
+              label="Invite Members"
+              placeholder="Select users to add"
+              selectionMode="multiple"
+              selectedKeys={new Set(invitedUsers)}
+              onSelectionChange={(keys) => setInvitedUsers(Array.from(keys) as string[])}
+              variant="bordered"
+            >
+              {allUsers.map(u => (
+                <SelectItem key={u.id} textValue={u.name || u.email}>
+                  {u.name || u.email}
+                </SelectItem>
+              ))}
+            </Select>
 
             <div>
               <label className="text-sm font-medium text-default-700 mb-2 block">

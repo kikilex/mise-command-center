@@ -9,8 +9,8 @@ export interface MenuConfig {
 }
 
 export const DEFAULT_MENU_CONFIG: MenuConfig = {
-  personal: ['inbox', 'dashboard', 'spaces', 'tasks', 'projects', 'calendar', 'notes', 'docs', 'family', 'agent-chat'],
-  business: ['inbox', 'dashboard', 'spaces', 'tasks', 'projects', 'content', 'docs', 'calendar', 'ai', 'agent-chat'],
+  personal: ['inbox', 'dashboard', 'spaces', 'tasks', 'calendar', 'docs', 'agent-chat'],
+  business: ['inbox', 'dashboard', 'spaces', 'tasks', 'content', 'docs', 'calendar', 'ai', 'agent-chat'],
 }
 
 export const PERSONAL_MENU_OPTIONS = [
@@ -18,11 +18,8 @@ export const PERSONAL_MENU_OPTIONS = [
   { key: 'dashboard', label: 'Dashboard', icon: 'dashboard', href: '/' },
   { key: 'spaces', label: 'Spaces', icon: 'layout', href: '/spaces' },
   { key: 'tasks', label: 'Tasks', icon: 'tasks', href: '/tasks' },
-  { key: 'projects', label: 'Projects', icon: 'projects', href: '/projects' },
   { key: 'calendar', label: 'Calendar', icon: 'calendar', href: '/calendar' },
-  { key: 'notes', label: 'Notes', icon: 'notes', href: '/notes' },
-  { key: 'docs', label: 'Documents', icon: 'docs', href: '/docs' },
-  { key: 'family', label: 'Family', icon: 'family', href: '/family' },
+  { key: 'docs', label: 'Intel', icon: 'docs', href: '/docs' },
   { key: 'agent-chat', label: 'Agent Chat', icon: 'bot', href: '/agent-chat' },
 ]
 
@@ -31,9 +28,8 @@ export const BUSINESS_MENU_OPTIONS = [
   { key: 'dashboard', label: 'Dashboard', icon: 'dashboard', href: '/' },
   { key: 'spaces', label: 'Spaces', icon: 'layout', href: '/spaces' },
   { key: 'tasks', label: 'Tasks', icon: 'tasks', href: '/tasks' },
-  { key: 'projects', label: 'Projects', icon: 'projects', href: '/projects' },
   { key: 'content', label: 'Content', icon: 'content', href: '/content' },
-  { key: 'docs', label: 'Documents', icon: 'docs', href: '/docs' },
+  { key: 'docs', label: 'Intel', icon: 'docs', href: '/docs' },
   { key: 'calendar', label: 'Calendar', icon: 'calendar', href: '/calendar' },
   { key: 'ai', label: 'AI Workspace', icon: 'ai', href: '/ai' },
   { key: 'agent-chat', label: 'Agent Chat', icon: 'bot', href: '/agent-chat' },
