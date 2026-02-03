@@ -34,7 +34,6 @@ import {
   Checkbox,
 } from "@heroui/react"
 import { createClient } from '@/lib/supabase/client'
-import { useSpace } from '@/lib/space-context'
 import Navbar from '@/components/Navbar'
 import { showErrorToast, showSuccessToast, getErrorMessage } from '@/lib/errors'
 import { ErrorFallback } from '@/components/ErrorBoundary'
@@ -147,7 +146,6 @@ function TasksPageContent() {
   })
   
   const supabase = createClient()
-  const { selectedSpaceId, spaces } = useSpace()
   const searchParams = useSearchParams()
   const router = useRouter()
 
@@ -242,7 +240,7 @@ function TasksPageContent() {
     
     setSubmitting(true)
     
-    const targetSpaceId = formData.space_id || (localSpaceId !== 'all' ? localSpaceId : selectedSpaceId)
+    const targetSpaceId = formData.space_id || (localSpaceId !== 'all' ? localSpaceId : null)
 
     try {
       if (editingTask) {
@@ -328,7 +326,7 @@ function TasksPageContent() {
       assignee_id: '',
       ai_agent: '',
       project_id: '',
-      space_id: (localSpaceId !== 'all' ? localSpaceId : selectedSpaceId) || '',
+      space_id: (localSpaceId !== 'all' ? localSpaceId : '') || '',
     })
     onClose()
   }

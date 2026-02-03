@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 import { 
   Button, 
@@ -33,6 +33,8 @@ export default function ProfilePage() {
   const [profile, setProfile] = useState<Profile | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [uploading, setUploading] = useState(false)
+  const fileInputRef = useRef<HTMLInputElement>(null)
   const supabase = createClient()
 
   useEffect(() => {
@@ -87,6 +89,48 @@ export default function ProfilePage() {
     }
   }
 
+  async function handleAvatarUpload(event: React.ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    if (!file || !profile) return
+
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please upload an image file')
+      return
+    }
+
+    setUploading(true)
+    try {
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${profile.id}-${Math.random()}.${fileExt}`
+      const filePath = `${fileName}`
+
+      const { error: uploadError } = await supabase.storage
+        .from('avatars')
+        .upload(filePath, file)
+
+      if (uploadError) throw uploadError
+
+      const { data: { publicUrl } } = supabase.storage
+        .from('avatars')
+        .getPublicUrl(filePath)
+
+      const { error: updateError } = await supabase
+        .from('users')
+        .update({ avatar_url: publicUrl })
+        .eq('id', profile.id)
+
+      if (updateError) throw updateError
+
+      setProfile({ ...profile, avatar_url: publicUrl })
+      toast.success('Avatar updated')
+    } catch (error) {
+      console.error('Error uploading avatar:', error)
+      toast.error('Failed to upload avatar')
+    } finally {
+      setUploading(false)
+    }
+  }
+
   if (loading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -118,7 +162,21 @@ export default function ProfilePage() {
                 name={profile.display_name || profile.name}
                 className="w-32 h-32 text-4xl"
               />
-              <Button size="sm" variant="flat">Change Photo</Button>
+              <input
+                type="file"
+                ref={fileInputRef}
+                className="hidden"
+                accept="image/*"
+                onChange={handleAvatarUpload}
+              />
+              <Button 
+                size="sm" 
+                variant="flat" 
+                onPress={() => fileInputRef.current?.click()}
+                isLoading={uploading}
+              >
+                Change Photo
+              </Button>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

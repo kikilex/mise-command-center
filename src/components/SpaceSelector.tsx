@@ -14,7 +14,7 @@ import {
 import { PencilIcon, PlusIcon, UserIcon, BriefcaseIcon } from '@heroicons/react/24/outline'
 import { useSpace, Space } from '@/lib/space-context'
 import AddSpaceModal from './AddSpaceModal'
-// import EditSpaceModal from './EditSpaceModal'
+import EditSpaceModal from './EditSpaceModal'
 
 export default function SpaceSelector() {
   const { 
@@ -34,13 +34,17 @@ export default function SpaceSelector() {
     onClose: onAddClose 
   } = useDisclosure()
   
-  // const { 
-  //   isOpen: isEditOpen, 
-  //   onOpen: onEditOpen, 
-  //   onClose: onEditClose 
-  // } = useDisclosure()
+  const { 
+    isOpen: isEditOpen, 
+    onOpen: onEditOpen, 
+    onClose: onEditClose 
+  } = useDisclosure()
 
   function handleAddSuccess() {
+    refreshSpaces()
+  }
+
+  function handleEditSuccess() {
     refreshSpaces()
   }
 
@@ -115,21 +119,22 @@ export default function SpaceSelector() {
                     />
                   )
                 }
-                // Edit button commented out until EditSpaceModal is implemented
-                // endContent={
-                //   <Button
-                //     isIconOnly
-                //     size="sm"
-                //     variant="light"
-                //     className="min-w-6 w-6 h-6"
-                //     onPress={(e) => {
-                //       setEditingSpace(space)
-                //       // onEditOpen() - TODO
-                //     }}
-                //   >
-                //     <PencilIcon className="w-3.5 h-3.5 text-default-500" />
-                //   </Button>
-                // }
+                // Edit button
+                endContent={
+                  <Button
+                    isIconOnly
+                    size="sm"
+                    variant="light"
+                    className="min-w-6 w-6 h-6"
+                    onPress={(e) => {
+                      e.stopPropagation()
+                      setEditingSpace(space)
+                      onEditOpen()
+                    }}
+                  >
+                    <PencilIcon className="w-3.5 h-3.5 text-default-500" />
+                  </Button>
+                }
               >
                 {space.name}
               </DropdownItem>
@@ -154,6 +159,13 @@ export default function SpaceSelector() {
         isOpen={isAddOpen}
         onClose={onAddClose}
         onSuccess={handleAddSuccess}
+      />
+
+      <EditSpaceModal
+        space={editingSpace}
+        isOpen={isEditOpen}
+        onClose={onEditClose}
+        onSuccess={handleEditSuccess}
       />
     </>
   )

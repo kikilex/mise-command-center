@@ -43,6 +43,7 @@ interface InboxItem {
   cc_recipients: string[] | null
   subject: string | null
   thread_id: string | null
+  space_id: string | null
   status: 'pending' | 'processed' | 'archived'
   processed_to: string | null
   processed_to_id: string | null
@@ -80,6 +81,7 @@ export default function InboxPage() {
   const [selectedItem, setSelectedItem] = useState<InboxItem | null>(null)
   const [scheduleDate, setScheduleDate] = useState('')
   const [selectedProject, setSelectedProject] = useState('')
+  const [selectedSpace, setSelectedSpace] = useState('')
   const [expandedThreads, setExpandedThreads] = useState<Set<string>>(new Set())
   const [selectedThread, setSelectedThread] = useState<Thread | null>(null)
   const [replyMessage, setReplyMessage] = useState('')
