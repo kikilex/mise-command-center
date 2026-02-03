@@ -232,6 +232,43 @@ export default function InboxPage() {
     }
   }
 
+  // Parse @mentions from message content
+  const parseMentions = (content: string): string[] => {
+    const mentionRegex = /@(\w+)/gi
+    const matches = content.match(mentionRegex) || []
+    const mentions = matches
+      .map(m => m.substring(1).toLowerCase()) // remove @ and lowercase
+      .filter(m => RECIPIENTS.some(r => r.id === m || r.name.toLowerCase() === m))
+      .map(m => {
+        // Find the recipient id
+        const recipient = RECIPIENTS.find(r => r.id === m || r.name.toLowerCase() === m)
+        return recipient?.id || m
+      })
+    return [...new Set(mentions)] // dedupe
+  }
+
+  // Notify mentioned recipients
+  const notifyMentions = async (mentions: string[], message: string, sender: string) => {
+    for (const mention of mentions) {
+      const recipient = RECIPIENTS.find(r => r.id === mention)
+      if (recipient?.type === 'ai') {
+        try {
+          await fetch('/api/inbox/message-agent', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              agent: mention,
+              message: `[Mentioned] ${message}`,
+              sender
+            })
+          })
+        } catch (err) {
+          console.error(`Failed to notify ${mention}:`, err)
+        }
+      }
+    }
+  }
+
   // Send message to recipient
   const handleSendMessage = async () => {
     if (!composeTo || !composeMessage.trim() || !user) return
@@ -302,15 +339,21 @@ export default function InboxPage() {
     setSubmitting(true)
     try {
       const recipient = RECIPIENTS.find(r => r.id === selectedThread.recipient)
+      const messageContent = replyMessage.trim()
+      const senderName = user.name || user.email
+      
+      // Parse @mentions from the message
+      const mentions = parseMentions(messageContent)
       
       // Save to inbox with the same thread_id
       const { data, error: dbError } = await supabase
         .from('inbox')
         .insert({
           user_id: user.id,
-          content: replyMessage.trim(),
+          content: messageContent,
           item_type: 'message',
           to_recipient: selectedThread.recipient,
+          cc_recipients: mentions.length > 0 ? mentions : null,
           thread_id: selectedThread.id,
           status: 'pending',
         })
@@ -319,7 +362,7 @@ export default function InboxPage() {
 
       if (dbError) throw dbError
 
-      // Try to notify AI agents
+      // Notify main recipient (if AI)
       if (recipient?.type === 'ai') {
         try {
           const response = await fetch('/api/inbox/message-agent', {
@@ -327,14 +370,20 @@ export default function InboxPage() {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({
               agent: selectedThread.recipient,
-              message: replyMessage.trim(),
-              sender: user.name || user.email
+              message: messageContent,
+              sender: senderName
             })
           })
           if (!response.ok) console.warn('Failed to notify agent')
         } catch (webhookErr) {
           console.error('Webhook error:', webhookErr)
         }
+      }
+
+      // Notify any @mentioned recipients (excluding main recipient to avoid double notify)
+      const mentionsToNotify = mentions.filter(m => m !== selectedThread.recipient)
+      if (mentionsToNotify.length > 0) {
+        await notifyMentions(mentionsToNotify, messageContent, senderName)
       }
 
       // Add to items (this will trigger the effect to update selectedThread)
@@ -853,18 +902,42 @@ export default function InboxPage() {
                   <p className="text-xs text-default-500">{selectedThread.subject}</p>
                 )}
               </div>
-              <Button
-                size="sm"
-                variant="flat"
-                color="success"
-                onPress={() => {
-                  handleArchiveThread(selectedThread)
-                  closeThreadChat()
-                }}
-                startContent={<Check className="w-4 h-4" />}
-              >
-                Archive
-              </Button>
+              <Dropdown>
+                <DropdownTrigger>
+                  <Button
+                    size="sm"
+                    variant="light"
+                    isIconOnly
+                    className="text-default-500"
+                  >
+                    <MoreVertical className="w-5 h-5" />
+                  </Button>
+                </DropdownTrigger>
+                <DropdownMenu aria-label="Thread actions">
+                  <DropdownItem
+                    key="archive"
+                    startContent={<Archive className="w-4 h-4" />}
+                    onPress={() => {
+                      handleArchiveThread(selectedThread)
+                      closeThreadChat()
+                    }}
+                  >
+                    Archive
+                  </DropdownItem>
+                  <DropdownItem
+                    key="delete"
+                    startContent={<Trash2 className="w-4 h-4" />}
+                    className="text-danger"
+                    color="danger"
+                    onPress={() => {
+                      handleDeleteThread(selectedThread)
+                      closeThreadChat()
+                    }}
+                  >
+                    Delete Thread
+                  </DropdownItem>
+                </DropdownMenu>
+              </Dropdown>
             </div>
 
             {/* Chat Messages */}
