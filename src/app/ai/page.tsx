@@ -180,12 +180,11 @@ export default function AIWorkspacePage() {
   const renderDashboard = () => (
     <div className="space-y-6">
       {/* Stats Row */}
-      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
+      <div className="grid grid-cols-3 gap-3 lg:gap-4">
         {[
           { label: 'Tasks Done', value: stats.tasksDone, color: 'text-emerald-600' },
-          { label: 'Tokens Used', value: stats.tokens.toLocaleString(), color: 'text-blue-600' },
           { label: 'Agents Online', value: `${stats.agentsOnline}/${agents.length}`, color: 'text-violet-600' },
-          { label: 'Handoffs', value: stats.handoffs, color: 'text-amber-600' },
+          { label: 'Agent Tasks', value: stats.handoffs, color: 'text-amber-600' },
         ].map((stat, i) => (
           <Card key={i} className="bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700">
             <CardBody className="p-4">
@@ -558,8 +557,9 @@ export default function AIWorkspacePage() {
             size="sm"
             classNames={{
               tabList: "bg-slate-200 dark:bg-slate-800",
-              cursor: "bg-white dark:bg-slate-700",
-              tab: "px-4"
+              cursor: "bg-violet-600 shadow-md",
+              tab: "px-4 data-[selected=true]:text-white",
+              tabContent: "group-data-[selected=true]:text-white"
             }}
           >
             <Tab key="dashboard" title={<LayoutDashboard className="w-4 h-4" />} />
