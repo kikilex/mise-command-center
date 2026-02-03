@@ -941,7 +941,7 @@ export default function InboxPage() {
                     isPressable
                     onPress={() => openThreadChat(thread)}
                   >
-                    <CardBody className="p-4">
+                    <CardBody className="p-4 min-h-[100px]">
                       {/* Thread Header */}
                       <div className="flex items-start justify-between gap-4">
                         <div className="flex items-center gap-3">
@@ -1018,7 +1018,7 @@ export default function InboxPage() {
             <div className="space-y-3">
               {thoughts.map((item) => (
                 <Card key={item.id} className="shadow-sm hover:shadow-md transition-shadow">
-                  <CardBody className="p-4">
+                  <CardBody className="p-4 min-h-[100px]">
                     <div className="flex items-start justify-between gap-4">
                       <div className="flex-1 min-w-0">
                         {item.from_agent && (
