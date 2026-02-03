@@ -8,15 +8,6 @@ import {
   Input,
   Spinner,
   Chip,
-  Modal,
-  ModalContent,
-  ModalHeader,
-  ModalBody,
-  ModalFooter,
-  useDisclosure,
-  Select,
-  SelectItem,
-  Textarea,
 } from "@heroui/react"
 import { createClient } from '@/lib/supabase/client'
 import Navbar from '@/components/Navbar'
@@ -46,17 +37,6 @@ export default function InboxPage() {
   const [user, setUser] = useState<UserData | null>(null)
   const [newItem, setNewItem] = useState('')
   const [submitting, setSubmitting] = useState(false)
-  const [agents, setAgents] = useState<any[]>([])
-  const [projects, setProjects] = useState<any[]>([])
-  const [selectedItem, setSelectedItem] = useState<InboxItem | null>(null)
-  const [messageForm, setMessageForm] = useState({ agent: '', content: '' })
-  const [scheduleDate, setScheduleDate] = useState('')
-  const [selectedProject, setSelectedProject] = useState('')
-  
-  const { isOpen: isMessageOpen, onOpen: onMessageOpen, onClose: onMessageClose } = useDisclosure()
-  const { isOpen: isScheduleOpen, onOpen: onScheduleOpen, onClose: onScheduleClose } = useDisclosure()
-  const { isOpen: isProjectOpen, onOpen: onProjectOpen, onClose: onProjectClose } = useDisclosure()
-  
   const inputRef = useRef<HTMLInputElement>(null)
   
   const supabase = createClient()
@@ -90,12 +70,6 @@ export default function InboxPage() {
 
         if (error) throw error
         setItems(inboxData || [])
-
-        // Load agents and projects
-        const { data: agentsData } = await supabase.from('ai_agents').select('name, slug').eq('is_active', true)
-        const { data: projectsData } = await supabase.from('projects').select('id, name')
-        setAgents(agentsData || [])
-        setProjects(projectsData || [])
       } catch (error) {
         console.error('Error loading inbox:', error)
         showErrorToast('Failed to load inbox')
@@ -109,133 +83,29 @@ export default function InboxPage() {
 
   // Add new item to inbox
   const handleAddItem = async () => {
-    // ... existing code
-  }
+    if (!newItem.trim() || !user) return
 
-  const handleMessageAgent = async () => {
-    if (!messageForm.agent || !messageForm.content.trim() || !user) return
     setSubmitting(true)
     try {
-      // 1. Save to inbox
-      const { error: dbError } = await supabase
+      const { data, error } = await supabase
         .from('inbox')
         .insert({
           user_id: user.id,
-          content: messageForm.content.trim(),
-          item_type: 'message',
+          content: newItem.trim(),
+          item_type: 'thought',
           status: 'pending',
-          from_agent: null, // From human
-          metadata: { to_agent: messageForm.agent }
-        })
-
-      if (dbError) throw dbError
-
-      // 2. Hit webhook via internal API
-      const response = await fetch('/api/inbox/message-agent', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          agent: messageForm.agent,
-          message: messageForm.content.trim(),
-          sender: user.name || user.email
-        })
-      })
-
-      if (!response.ok) throw new Error('Failed to notify agent')
-
-      showSuccessToast(`Message sent to ${messageForm.agent}`)
-      setMessageForm({ agent: '', content: '' })
-      onMessageClose()
-      
-      // Reload inbox
-      const { data: inboxData } = await supabase
-        .from('inbox')
-        .select('*')
-        .eq('user_id', user.id)
-        .eq('status', 'pending')
-        .order('created_at', { ascending: false })
-      setItems(inboxData || [])
-
-    } catch (error) {
-      console.error('Error messaging agent:', error)
-      showErrorToast('Failed to send message')
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  const handleScheduleLater = async () => {
-    if (!selectedItem || !scheduleDate || !user) return
-    setSubmitting(true)
-    try {
-      const { data: taskData, error: taskError } = await supabase
-        .from('tasks')
-        .insert({
-          title: selectedItem.content,
-          status: 'todo',
-          priority: 'medium',
-          due_date: scheduleDate,
-          created_by: user.id,
         })
         .select()
         .single()
 
-      if (taskError) throw taskError
+      if (error) throw error
 
-      await supabase
-        .from('inbox')
-        .update({
-          status: 'processed',
-          processed_to: 'task',
-          processed_to_id: taskData.id,
-        })
-        .eq('id', selectedItem.id)
-
-      setItems(items.filter(i => i.id !== selectedItem.id))
-      showSuccessToast(`Scheduled for ${scheduleDate}`)
-      onScheduleClose()
+      setItems([data, ...items])
+      setNewItem('')
+      inputRef.current?.focus()
     } catch (error) {
-      console.error('Error scheduling:', error)
-      showErrorToast('Failed to schedule')
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  const handleMoveToProject = async () => {
-    if (!selectedItem || !selectedProject || !user) return
-    setSubmitting(true)
-    try {
-      const { data: taskData, error: taskError } = await supabase
-        .from('tasks')
-        .insert({
-          title: selectedItem.content,
-          status: 'todo',
-          priority: 'medium',
-          project_id: selectedProject,
-          created_by: user.id,
-        })
-        .select()
-        .single()
-
-      if (taskError) throw taskError
-
-      await supabase
-        .from('inbox')
-        .update({
-          status: 'processed',
-          processed_to: 'task',
-          processed_to_id: taskData.id,
-        })
-        .eq('id', selectedItem.id)
-
-      const projectName = projects.find(p => p.id === selectedProject)?.name || 'Project'
-      setItems(items.filter(i => i.id !== selectedItem.id))
-      showSuccessToast(`Moved to ${projectName}`)
-      onProjectClose()
-    } catch (error) {
-      console.error('Error moving to project:', error)
-      showErrorToast('Failed to move to project')
+      console.error('Error adding item:', error)
+      showErrorToast('Failed to add item')
     } finally {
       setSubmitting(false)
     }
@@ -405,15 +275,6 @@ export default function InboxPage() {
               </p>
             </div>
           </div>
-          <Button 
-            color="primary" 
-            variant="flat" 
-            size="sm" 
-            onPress={onMessageOpen}
-            startContent={<MessageCircle className="w-4 h-4" />}
-          >
-            Message Agent
-          </Button>
         </div>
 
         {/* Quick capture input */}
@@ -495,32 +356,6 @@ export default function InboxPage() {
                     <Button
                       size="sm"
                       variant="flat"
-                      color="secondary"
-                      isIconOnly
-                      onPress={() => {
-                        setSelectedItem(item)
-                        onScheduleOpen()
-                      }}
-                      className="text-violet-500"
-                    >
-                      <Calendar className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="flat"
-                      color="primary"
-                      isIconOnly
-                      onPress={() => {
-                        setSelectedItem(item)
-                        onProjectOpen()
-                      }}
-                      className="text-blue-500"
-                    >
-                      <FolderOpen className="w-4 h-4" />
-                    </Button>
-                    <Button
-                      size="sm"
-                      variant="flat"
                       onPress={() => handleToTask(item)}
                       startContent={<ArrowRight className="w-3.5 h-3.5" />}
                       className="min-w-0 px-3"
@@ -543,106 +378,6 @@ export default function InboxPage() {
           ))}
         </div>
       </main>
-
-      {/* Message Agent Modal */}
-      <Modal isOpen={isMessageOpen} onClose={onMessageClose}>
-        <ModalContent>
-          <ModalHeader>Message Agent</ModalHeader>
-          <ModalBody>
-            <div className="flex flex-col gap-4">
-              <Select
-                label="Select Agent"
-                placeholder="Choose an agent to message"
-                selectedKeys={messageForm.agent ? [messageForm.agent] : []}
-                onChange={(e) => setMessageForm({ ...messageForm, agent: e.target.value })}
-              >
-                {agents.map(a => (
-                  <SelectItem key={a.slug}>{a.name}</SelectItem>
-                ))}
-              </Select>
-              <Textarea
-                label="Message"
-                placeholder="What do you want to say?"
-                value={messageForm.content}
-                onChange={(e) => setMessageForm({ ...messageForm, content: e.target.value })}
-              />
-            </div>
-          </ModalBody>
-          <ModalFooter>
-            <Button variant="flat" onPress={onMessageClose}>Cancel</Button>
-            <Button 
-              color="primary" 
-              onPress={handleMessageAgent}
-              isLoading={submitting}
-              isDisabled={!messageForm.agent || !messageForm.content.trim()}
-            >
-              Send Message
-            </Button>
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
-
-      {/* Schedule Later Modal */}
-      <Modal isOpen={isScheduleOpen} onClose={onScheduleClose}>
-        <ModalContent>
-          <ModalHeader>Schedule for Later</ModalHeader>
-          <ModalBody>
-            <div className="flex flex-col gap-4">
-              <p className="text-sm text-default-500 italic">"{selectedItem?.content}"</p>
-              <Input
-                label="Select Date"
-                type="date"
-                value={scheduleDate}
-                onChange={(e) => setScheduleDate(e.target.value)}
-              />
-            </div>
-          </ModalBody>
-          <ModalFooter>
-            <Button variant="flat" onPress={onScheduleClose}>Cancel</Button>
-            <Button 
-              color="primary" 
-              onPress={handleScheduleLater}
-              isLoading={submitting}
-              isDisabled={!scheduleDate}
-            >
-              Schedule
-            </Button>
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
-
-      {/* Move to Project Modal */}
-      <Modal isOpen={isProjectOpen} onClose={onProjectClose}>
-        <ModalContent>
-          <ModalHeader>Move to Project</ModalHeader>
-          <ModalBody>
-            <div className="flex flex-col gap-4">
-              <p className="text-sm text-default-500 italic">"{selectedItem?.content}"</p>
-              <Select
-                label="Select Project"
-                placeholder="Choose a project"
-                selectedKeys={selectedProject ? [selectedProject] : []}
-                onChange={(e) => setSelectedProject(e.target.value)}
-              >
-                {projects.map(p => (
-                  <SelectItem key={p.id}>{p.name}</SelectItem>
-                ))}
-              </Select>
-            </div>
-          </ModalBody>
-          <ModalFooter>
-            <Button variant="flat" onPress={onProjectClose}>Cancel</Button>
-            <Button 
-              color="primary" 
-              onPress={handleMoveToProject}
-              isLoading={submitting}
-              isDisabled={!selectedProject}
-            >
-              Move to Project
-            </Button>
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
     </div>
   )
 }

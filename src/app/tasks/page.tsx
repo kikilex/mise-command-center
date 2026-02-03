@@ -56,8 +56,6 @@ interface Task {
   status: string
   priority: string
   assignee_id: string | null
-  project_id: string | null
-  business_id: string | null
   due_date: string | null
   tags: string[]
   ai_flag: boolean
@@ -65,20 +63,6 @@ interface Task {
   feedback: string | null
   created_at: string
   updated_at?: string
-}
-
-interface AIAgent {
-  id: string
-  name: string
-  slug: string
-  role: string
-  is_active: boolean
-}
-
-interface Project {
-  id: string
-  name: string
-  business_id: string | null
 }
 
 interface UserData {
@@ -134,16 +118,12 @@ const reminderWindowsByPriority: Record<string, string[]> = {
 
 function TasksPageContent() {
   const [tasks, setTasks] = useState<Task[]>([])
-  const [users, setUsers] = useState<UserData[]>([])
-  const [agents, setAgents] = useState<AIAgent[]>([])
-  const [projects, setProjects] = useState<Project[]>([])
   const [user, setUser] = useState<UserData | null>(null)
   const [loading, setLoading] = useState(true)
   const [loadError, setLoadError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [currentView, setCurrentView] = useState<ViewType>('kanban')
   const [filter, setFilter] = useState<string>('all')
-  const [projectFilter, setProjectFilter] = useState<string>('all')
   const [sortDescriptor, setSortDescriptor] = useState<SortDescriptor>({
     column: 'created_at',
     direction: 'descending',
@@ -160,9 +140,6 @@ function TasksPageContent() {
     priority: 'medium',
     ai_flag: false,
     due_date: '',
-    assignee_id: '',
-    ai_agent: '',
-    project_id: '',
   })
   
   const supabase = createClient()
@@ -202,42 +179,7 @@ function TasksPageContent() {
   // Reload tasks when business context changes
   useEffect(() => {
     loadTasks()
-    loadDropdownData()
   }, [selectedBusinessId])
-
-  async function loadDropdownData() {
-    try {
-      // Fetch Users
-      const { data: usersData } = await supabase
-        .from('users')
-        .select('id, name, email, avatar_url')
-      
-      // Fetch Active Agents
-      const { data: agentsData } = await supabase
-        .from('ai_agents')
-        .select('id, name, slug, role')
-        .eq('is_active', true)
-      
-      // Fetch Projects
-      let projectQuery = supabase
-        .from('projects')
-        .select('id, name, business_id')
-      
-      if (selectedBusinessId) {
-        projectQuery = projectQuery.eq('business_id', selectedBusinessId)
-      } else {
-        projectQuery = projectQuery.is('business_id', null)
-      }
-      
-      const { data: projectsData } = await projectQuery
-
-      setUsers(usersData || [])
-      setAgents(agentsData || [])
-      setProjects(projectsData || [])
-    } catch (error) {
-      console.error('Error loading dropdown data:', error)
-    }
-  }
 
   async function loadUser() {
     try {
@@ -338,9 +280,6 @@ function TasksPageContent() {
             priority: formData.priority,
             ai_flag: formData.ai_flag,
             due_date: formData.due_date || null,
-            assignee_id: formData.assignee_id || null,
-            ai_agent: formData.ai_agent || null,
-            project_id: formData.project_id || null,
           })
           .eq('id', editingTask.id)
         
@@ -364,9 +303,6 @@ function TasksPageContent() {
             created_by: user.id,
             due_date: formData.due_date || null,
             business_id: selectedBusinessId, // null for Personal, business ID for business context
-            assignee_id: formData.assignee_id || null,
-            ai_agent: formData.ai_agent || null,
-            project_id: formData.project_id || null,
           })
         
         if (error) {
@@ -432,9 +368,6 @@ function TasksPageContent() {
       priority: task.priority,
       ai_flag: task.ai_flag,
       due_date: task.due_date || '',
-      assignee_id: task.assignee_id || '',
-      ai_agent: task.ai_agent || '',
-      project_id: task.project_id || '',
     })
     onOpen()
   }
@@ -448,9 +381,6 @@ function TasksPageContent() {
       priority: 'medium',
       ai_flag: false,
       due_date: '',
-      assignee_id: '',
-      ai_agent: '',
-      project_id: '',
     })
     onClose()
   }
@@ -464,9 +394,6 @@ function TasksPageContent() {
       priority: 'medium',
       ai_flag: false,
       due_date: '',
-      assignee_id: '',
-      ai_agent: '',
-      project_id: '',
     })
     onOpen()
   }
@@ -523,11 +450,6 @@ function TasksPageContent() {
     // Apply status filter (for list view and kanban when not "all")
     if (filter !== 'all' && currentView !== 'kanban') {
       filtered = filtered.filter(t => t.status === filter)
-    }
-
-    // Apply project filter
-    if (projectFilter !== 'all') {
-      filtered = filtered.filter(t => t.project_id === projectFilter)
     }
 
     return filtered
@@ -658,11 +580,6 @@ function TasksPageContent() {
               {task.ai_agent && (
                 <Chip size="sm" variant="flat" className="capitalize text-xs">
                   {task.ai_agent}
-                </Chip>
-              )}
-              {task.project_id && (
-                <Chip size="sm" variant="dot" color="primary" className="text-xs">
-                  {projects.find(p => p.id === task.project_id)?.name || 'Project'}
                 </Chip>
               )}
               {task.feedback && (
@@ -1079,47 +996,29 @@ function TasksPageContent() {
           </Button>
         </div>
 
-        {/* Filters */}
-        <div className="flex flex-col md:flex-row gap-4 mb-6">
-          {/* Project Filter */}
-          <div className="w-full md:w-64">
-            <Select
-              label="Filter by Project"
-              size="sm"
-              selectedKeys={[projectFilter]}
-              onChange={(e) => setProjectFilter(e.target.value)}
+        {/* Status filter (for list view only) */}
+        {currentView === 'list' && (
+          <div className="flex gap-2 flex-wrap mb-6">
+            <Button 
+              size="sm" 
+              variant={filter === 'all' ? 'solid' : 'flat'}
+              color="primary"
+              onPress={() => setFilter('all')}
             >
-              <SelectItem key="all">All Projects</SelectItem>
-              {projects.map(p => (
-                <SelectItem key={p.id}>{p.name}</SelectItem>
-              ))}
-            </Select>
-          </div>
-
-          {/* Status filter (for list view only) */}
-          {currentView === 'list' && (
-            <div className="flex gap-2 flex-wrap items-center">
-              <Button 
-                size="sm" 
-                variant={filter === 'all' ? 'solid' : 'flat'}
-                color="primary"
-                onPress={() => setFilter('all')}
+              All ({tasks.length})
+            </Button>
+            {statusOptions.map(status => (
+              <Button
+                key={status.key}
+                size="sm"
+                variant={filter === status.key ? 'solid' : 'flat'}
+                onPress={() => setFilter(status.key)}
               >
-                All ({tasks.length})
+                {status.label} ({tasks.filter(t => t.status === status.key).length})
               </Button>
-              {statusOptions.map(status => (
-                <Button
-                  key={status.key}
-                  size="sm"
-                  variant={filter === status.key ? 'solid' : 'flat'}
-                  onPress={() => setFilter(status.key)}
-                >
-                  {status.label} ({tasks.filter(t => t.status === status.key).length})
-                </Button>
-              ))}
-            </div>
-          )}
-        </div>
+            ))}
+          </div>
+        )}
 
         {/* Error State */}
         {loadError && !loading && (
@@ -1184,55 +1083,6 @@ function TasksPageContent() {
                   ))}
                 </Select>
               </div>
-
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                <Select
-                  label="Assignee"
-                  placeholder="Select human"
-                  selectedKeys={formData.assignee_id ? [formData.assignee_id] : []}
-                  onChange={(e) => setFormData({ ...formData, assignee_id: e.target.value })}
-                  startContent={<User className="w-4 h-4 text-slate-400" />}
-                >
-                  {users.map(u => (
-                    <SelectItem key={u.id} textValue={u.name || u.email}>
-                      <span>{u.name || u.email}</span>
-                    </SelectItem>
-                  ))}
-                </Select>
-
-                <Select
-                  label="AI Agent"
-                  placeholder="Select agent"
-                  selectedKeys={formData.ai_agent ? [formData.ai_agent] : []}
-                  onChange={(e) => setFormData({ ...formData, ai_agent: e.target.value })}
-                  startContent={<Bot className="w-4 h-4 text-slate-400" />}
-                >
-                  {agents.map(a => (
-                    <SelectItem key={a.slug} textValue={a.name}>
-                      <div className="flex flex-col">
-                        <span className="font-medium">{a.name}</span>
-                        <span className="text-xs text-slate-400">{a.role}</span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </Select>
-
-                <Select
-                  label="Project"
-                  placeholder="Select project"
-                  selectedKeys={formData.project_id ? [formData.project_id] : []}
-                  onChange={(e) => setFormData({ ...formData, project_id: e.target.value })}
-                  className="sm:col-span-2"
-                  startContent={<ClipboardList className="w-4 h-4 text-slate-400" />}
-                >
-                  {projects.map(p => (
-                    <SelectItem key={p.id} textValue={p.name}>
-                      {p.name}
-                    </SelectItem>
-                  ))}
-                </Select>
-              </div>
-
               <label className="flex items-center gap-2 cursor-pointer">
                 <input
                   type="checkbox"
