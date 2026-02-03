@@ -174,6 +174,7 @@ export default function AddSpaceModal({ isOpen, onClose, onSuccess }: AddSpaceMo
               selectedKeys={new Set(invitedUsers)}
               onSelectionChange={(keys) => setInvitedUsers(Array.from(keys) as string[])}
               variant="bordered"
+              description="Invited users will have 'Editor' access by default"
             >
               {allUsers.map(u => (
                 <SelectItem key={u.id} textValue={u.name || u.email}>

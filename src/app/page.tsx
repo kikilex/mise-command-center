@@ -35,6 +35,10 @@ import {
   Bot,
   ArrowRight,
   MessageCircle,
+  Trash2,
+  Pencil,
+  Check,
+  X,
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
@@ -92,10 +96,15 @@ export default function Home() {
   const [inboxItems, setInboxItems] = useState<InboxItem[]>([]);
   const [messages, setMessages] = useState<InboxItem[]>([]);
   const [agents, setAgents] = useState<AIAgent[]>([]);
+  const [completedTasks, setCompletedTasks] = useState<Task[]>([]);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [brainDump, setBrainDump] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [viewingDump, setViewingDump] = useState<InboxItem | null>(null);
+  const [editingDump, setEditingDump] = useState<InboxItem | null>(null);
+  const [editContent, setEditContent] = useState('');
+  const { isOpen: isViewOpen, onOpen: onViewOpen, onClose: onViewClose } = useDisclosure();
   
   const { isOpen, onOpen, onClose } = useDisclosure();
   const [formData, setFormData] = useState({
@@ -129,18 +138,23 @@ export default function Home() {
         role: profile?.role || 'member'
       });
 
-      const [spacesRes, tasksRes, inboxRes, messagesRes, agentsRes] = await Promise.all([
+      const [spacesRes, tasksRes, completedRes, inboxRes, messagesRes, agentsRes] = await Promise.all([
         supabase.from('spaces').select('id, name, color'),
         supabase.from('tasks')
           .select('*')
           .neq('status', 'done')
           .order('priority', { ascending: false }),
+        supabase.from('tasks')
+          .select('*')
+          .eq('status', 'done')
+          .order('updated_at', { ascending: false })
+          .limit(5),
         supabase.from('inbox')
           .select('*')
           .eq('item_type', 'thought')
           .eq('status', 'pending')
           .order('created_at', { ascending: false })
-          .limit(10),
+          .limit(20),
         supabase.from('inbox')
           .select('*')
           .eq('item_type', 'message')
@@ -151,6 +165,7 @@ export default function Home() {
 
       setSpaces(spacesRes.data || []);
       setTodaysTasks(tasksRes.data || []);
+      setCompletedTasks(completedRes.data || []);
       setInboxItems(inboxRes.data || []);
       setMessages(messagesRes.data || []);
       setAgents(agentsRes.data || []);
@@ -165,16 +180,51 @@ export default function Home() {
 
   async function toggleTaskDone(taskId: string) {
     try {
+      const task = todaysTasks.find(t => t.id === taskId);
       const { error } = await supabase
         .from('tasks')
-        .update({ status: 'done' })
+        .update({ status: 'done', updated_at: new Date().toISOString() })
         .eq('id', taskId);
 
       if (error) throw error;
       setTodaysTasks(prev => prev.filter(t => t.id !== taskId));
+      if (task) setCompletedTasks(prev => [{ ...task, status: 'done' }, ...prev].slice(0, 5));
       showSuccessToast('Task completed!');
     } catch (error) {
       showErrorToast(error, 'Failed to update task');
+    }
+  }
+
+  async function handleDeleteDump(id: string) {
+    try {
+      const { error } = await supabase.from('inbox').delete().eq('id', id);
+      if (error) throw error;
+      setInboxItems(prev => prev.filter(i => i.id !== id));
+      showSuccessToast('Removed');
+    } catch (error) {
+      showErrorToast(error, 'Failed to delete');
+    }
+  }
+
+  async function handleEditDump(item: InboxItem) {
+    setEditingDump(item);
+    setEditContent(item.content);
+  }
+
+  async function handleSaveEdit() {
+    if (!editingDump || !editContent.trim()) return;
+    try {
+      const { error } = await supabase
+        .from('inbox')
+        .update({ content: editContent.trim() })
+        .eq('id', editingDump.id);
+      if (error) throw error;
+      setInboxItems(prev => prev.map(i => i.id === editingDump.id ? { ...i, content: editContent.trim() } : i));
+      setEditingDump(null);
+      setEditContent('');
+      showSuccessToast('Updated');
+    } catch (error) {
+      showErrorToast(error, 'Failed to update');
     }
   }
 
@@ -264,7 +314,7 @@ export default function Home() {
                     </div>
                     <div>
                       <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100">Brain Dump</h2>
-                      <p className="text-xs text-slate-500">{inboxItems.length} pending thoughts</p>
+                      <p className="text-xs text-slate-500">{inboxItems.length} pending thought{inboxItems.length !== 1 ? 's' : ''}</p>
                     </div>
                   </div>
                   {inboxItems.length > 0 && (
@@ -282,39 +332,106 @@ export default function Home() {
                 </div>
               </CardHeader>
               <CardBody className="p-6">
-                <div className="flex gap-2 mb-6">
-                  <Input 
+                <div className="flex items-end gap-2 mb-6">
+                  <Textarea 
                     placeholder="What's on your mind? Hit enter to capture..."
                     value={brainDump}
                     onChange={(e) => setBrainDump(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleBrainDump()}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        handleBrainDump();
+                      }
+                    }}
+                    minRows={1}
+                    maxRows={6}
                     className="flex-1"
                     classNames={{
-                      inputWrapper: "bg-slate-100 dark:bg-slate-800 border-none h-12"
+                      inputWrapper: "bg-slate-100 dark:bg-slate-800 border-none shadow-none"
                     }}
                   />
-                  <Button isIconOnly color="primary" className="h-12 w-12" onPress={handleBrainDump} isLoading={submitting}>
-                    <Plus className="w-6 h-6" />
+                  <Button isIconOnly color="primary" className="h-10 w-10 min-w-10 mb-0.5" radius="full" onPress={handleBrainDump} isLoading={submitting}>
+                    <Plus className="w-5 h-5" />
                   </Button>
                 </div>
-                <div className="space-y-3">
-                  <p className="text-xs font-bold uppercase tracking-wider text-slate-400 px-1">Recent thoughts</p>
-                  {inboxItems.length === 0 ? (
-                    <div className="text-center py-8 bg-slate-50 dark:bg-slate-800/30 rounded-2xl border-2 border-dashed border-slate-100 dark:border-slate-800">
-                      <p className="text-sm text-slate-400 italic">No pending thoughts.</p>
-                    </div>
-                  ) : (
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                      {inboxItems.slice(0, 6).map((item) => (
-                        <div key={item.id} className="p-3 rounded-xl bg-slate-50 dark:bg-slate-700/50 border border-slate-100 dark:border-slate-800">
-                          <p className="text-sm text-slate-700 dark:text-slate-300 line-clamp-1 italic">"{item.content}"</p>
-                        </div>
-                      ))}
-                    </div>
-                  )}
-                </div>
+
+                {inboxItems.length === 0 ? (
+                  <div className="text-center py-8 bg-slate-50 dark:bg-slate-800/30 rounded-2xl border-2 border-dashed border-slate-100 dark:border-slate-800">
+                    <p className="text-sm text-slate-400">No pending thoughts. Dump away.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-1">
+                    {inboxItems.map((item) => (
+                      <div key={item.id} className="group">
+                        {editingDump?.id === item.id ? (
+                          <div className="flex items-center gap-2 p-2 rounded-xl bg-slate-50 dark:bg-slate-800">
+                            <Input
+                              value={editContent}
+                              onChange={(e) => setEditContent(e.target.value)}
+                              onKeyDown={(e) => e.key === 'Enter' && handleSaveEdit()}
+                              size="sm"
+                              autoFocus
+                              className="flex-1"
+                            />
+                            <Button isIconOnly size="sm" color="primary" variant="flat" onPress={handleSaveEdit}>
+                              <Check className="w-4 h-4" />
+                            </Button>
+                            <Button isIconOnly size="sm" variant="light" onPress={() => setEditingDump(null)}>
+                              <X className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <div 
+                            className="flex items-center gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors"
+                            onClick={() => { setViewingDump(item); onViewOpen(); }}
+                          >
+                            <div className="w-1.5 h-1.5 rounded-full bg-violet-400 flex-shrink-0" />
+                            <p className="flex-1 text-sm text-slate-700 dark:text-slate-300 truncate">{item.content}</p>
+                            <div className="hidden group-hover:flex items-center gap-1 flex-shrink-0">
+                              <Button 
+                                isIconOnly size="sm" variant="light" 
+                                className="w-7 h-7 min-w-7"
+                                onPress={(e) => { handleEditDump(item); }}
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <Pencil className="w-3.5 h-3.5 text-slate-400" />
+                              </Button>
+                              <Button 
+                                isIconOnly size="sm" variant="light" color="danger"
+                                className="w-7 h-7 min-w-7"
+                                onPress={() => handleDeleteDump(item.id)}
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </Button>
+                            </div>
+                            <span className="text-[10px] text-slate-400 flex-shrink-0 group-hover:hidden">
+                              {new Date(item.created_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
               </CardBody>
             </Card>
+
+            {/* Brain Dump View Modal */}
+            <Modal isOpen={isViewOpen} onClose={onViewClose} size="md">
+              <ModalContent>
+                <ModalHeader className="flex items-center gap-2">
+                  <Brain className="w-5 h-5 text-violet-500" />
+                  Thought
+                </ModalHeader>
+                <ModalBody className="pb-6">
+                  <p className="text-slate-700 dark:text-slate-300 whitespace-pre-wrap">{viewingDump?.content}</p>
+                  <p className="text-xs text-slate-400 mt-4">
+                    {viewingDump && new Date(viewingDump.created_at).toLocaleString()}
+                  </p>
+                </ModalBody>
+              </ModalContent>
+            </Modal>
 
             {/* ✅ What's Next */}
             <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
@@ -325,43 +442,70 @@ export default function Home() {
                   </div>
                   <div>
                     <h2 className="text-lg font-bold">What's Next</h2>
-                    <p className="text-xs text-slate-500">Highest priority hits</p>
+                    <p className="text-xs text-slate-500">Top 3 priorities</p>
                   </div>
                 </div>
                 <Button variant="light" color="primary" onPress={() => router.push('/tasks')}>View All</Button>
               </CardHeader>
-              <CardBody className="p-4 space-y-2">
+              <CardBody className="p-4">
                 {loading ? (
-                  [1, 2, 3].map(i => <Skeleton key={i} className="h-16 rounded-xl w-full" />)
-                ) : todaysTasks.length === 0 ? (
+                  <div className="space-y-2">
+                    {[1, 2, 3].map(i => <Skeleton key={i} className="h-16 rounded-xl w-full" />)}
+                  </div>
+                ) : todaysTasks.length === 0 && completedTasks.length === 0 ? (
                   <div className="text-center py-12">
                     <CheckCircle2 className="w-12 h-12 text-emerald-500 mx-auto mb-3" />
                     <p className="text-slate-500">The hit list is empty.</p>
                   </div>
                 ) : (
-                  todaysTasks.slice(0, 5).map((task) => (
-                    <div 
-                      key={task.id}
-                      onClick={() => router.push(`/tasks?openTask=${task.id}`)}
-                      className="group flex items-center gap-4 p-4 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer transition-all border border-transparent hover:border-slate-200 dark:hover:border-slate-700"
-                    >
-                      <div className={`w-3 h-3 rounded-full flex-shrink-0 ${getPriorityColor(task.priority)} shadow-lg shadow-current/20`} />
-                      <div className="flex-1 min-w-0">
-                        <p className="font-bold text-slate-800 dark:text-slate-200 truncate">{task.title}</p>
-                        <div className="flex items-center gap-2 mt-1">
-                          <Chip size="sm" variant="flat" color="default" className="h-5 text-[10px] uppercase font-bold tracking-tight">
-                            {spaces.find(s => s.id === task.space_id)?.name || 'General'}
-                          </Chip>
+                  <>
+                    {/* Active tasks - max 3 */}
+                    <div className="space-y-2">
+                      {todaysTasks.slice(0, 3).map((task) => (
+                        <div 
+                          key={task.id}
+                          onClick={() => router.push(`/tasks?openTask=${task.id}`)}
+                          className="group flex items-center gap-4 p-4 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer transition-all border border-transparent hover:border-slate-200 dark:hover:border-slate-700"
+                        >
+                          <div className={`w-3 h-3 rounded-full flex-shrink-0 ${getPriorityColor(task.priority)} shadow-lg shadow-current/20`} />
+                          <div className="flex-1 min-w-0">
+                            <p className="font-bold text-slate-800 dark:text-slate-200 truncate">{task.title}</p>
+                            <div className="flex items-center gap-2 mt-1">
+                              <Chip size="sm" variant="flat" color="default" className="h-5 text-[10px] uppercase font-bold tracking-tight">
+                                {spaces.find(s => s.id === task.space_id)?.name || 'General'}
+                              </Chip>
+                            </div>
+                          </div>
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); toggleTaskDone(task.id); }}
+                            className="w-10 h-10 rounded-xl border-2 border-slate-200 dark:border-slate-700 flex items-center justify-center group-hover:border-emerald-500 group-hover:bg-emerald-50 dark:group-hover:bg-emerald-900/20 transition-all"
+                          >
+                            <CheckCircle2 className="w-5 h-5 text-transparent group-hover:text-emerald-500" />
+                          </button>
+                        </div>
+                      ))}
+                      {todaysTasks.length === 0 && (
+                        <div className="text-center py-6">
+                          <p className="text-sm text-slate-400">All caught up 🎉</p>
+                        </div>
+                      )}
+                    </div>
+
+                    {/* Completed tasks */}
+                    {completedTasks.length > 0 && (
+                      <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2 px-1">Completed</p>
+                        <div className="space-y-1">
+                          {completedTasks.slice(0, 3).map(task => (
+                            <div key={task.id} className="flex items-center gap-3 px-3 py-2 rounded-lg">
+                              <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                              <span className="text-sm text-slate-400 line-through truncate">{task.title}</span>
+                            </div>
+                          ))}
                         </div>
                       </div>
-                      <button 
-                        onClick={(e) => { e.stopPropagation(); toggleTaskDone(task.id); }}
-                        className="w-10 h-10 rounded-xl border-2 border-slate-200 dark:border-slate-700 flex items-center justify-center group-hover:border-emerald-500 group-hover:bg-emerald-50 dark:group-hover:bg-emerald-900/20 transition-all"
-                      >
-                        <CheckCircle2 className="w-5 h-5 text-transparent group-hover:text-emerald-500" />
-                      </button>
-                    </div>
-                  ))
+                    )}
+                  </>
                 )}
               </CardBody>
             </Card>
