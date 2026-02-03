@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { 
@@ -16,13 +16,14 @@ import {
   Link as NextUILink,
   useDisclosure
 } from '@heroui/react'
-import { Plus, Settings, ArrowRight, ListTodo, Calendar, Users, FileText, MessageSquare, ChevronRight } from 'lucide-react'
+import { Plus, Settings, ArrowRight, ListTodo, Calendar, Users, FileText, MessageSquare, ChevronRight, FolderKanban } from 'lucide-react'
 import * as LucideIcons from 'lucide-react'
 import Link from 'next/link'
 import Navbar from '@/components/Navbar'
 import { useSpace } from '@/lib/space-context'
 import { toast } from 'react-hot-toast'
 import AddTaskModal from '@/components/AddTaskModal'
+import AddProjectModal from '@/components/AddProjectModal'
 
 export default function SpaceDetailPage() {
   // ... rest
@@ -32,15 +33,29 @@ export default function SpaceDetailPage() {
   const [space, setSpace] = useState<any>(null)
   const [members, setMembers] = useState<any[]>([])
   const [tasks, setTasks] = useState<any[]>([])
+  const [projects, setProjects] = useState<any[]>([])
   const [documents, setDocuments] = useState<any[]>([])
   const [threads, setThreads] = useState<any[]>([])
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [showAllTasks, setShowAllTasks] = useState(false)
+  const [selectedTab, setSelectedTab] = useState<string>('overview')
   
   const { isOpen: isTaskOpen, onOpen: onTaskOpen, onClose: onTaskClose } = useDisclosure()
+  const { isOpen: isProjectOpen, onOpen: onProjectOpen, onClose: onProjectClose } = useDisclosure()
   
   const supabase = createClient()
+
+  // Compute task counts per project
+  const projectTaskCounts = useMemo(() => {
+    const counts: Record<string, number> = {}
+    tasks.forEach(task => {
+      if (task.project_id) {
+        counts[task.project_id] = (counts[task.project_id] || 0) + 1
+      }
+    })
+    return counts
+  }, [tasks])
 
   useEffect(() => {
     loadUser()
@@ -60,7 +75,7 @@ export default function SpaceDetailPage() {
   async function loadSpaceData() {
     setLoading(true)
     try {
-      const [spaceRes, membersRes, tasksRes, docsRes, threadsRes] = await Promise.all([
+      const [spaceRes, membersRes, tasksRes, projectsRes, docsRes, threadsRes] = await Promise.all([
         supabase.from('spaces').select('*').eq('id', id).single(),
         supabase.from('space_members').select('*, users(*)').eq('space_id', id),
         supabase.from('tasks')
@@ -68,6 +83,10 @@ export default function SpaceDetailPage() {
           .eq('space_id', id)
           .order('due_date', { ascending: true, nullsFirst: false })
           .order('priority', { ascending: false })
+          .order('created_at', { ascending: false }),
+        supabase.from('projects')
+          .select('*')
+          .eq('space_id', id)
           .order('created_at', { ascending: false }),
         supabase.from('documents')
           .select('*')
@@ -83,6 +102,7 @@ export default function SpaceDetailPage() {
       setSpace(spaceRes.data)
       setMembers(membersRes.data || [])
       setTasks(tasksRes.data || [])
+      setProjects(projectsRes.data || [])
       setDocuments(docsRes.data || [])
       setThreads(threadsRes.data || [])
     } catch (error) {
@@ -135,6 +155,17 @@ export default function SpaceDetailPage() {
     }
   }
 
+  // Get project status color
+  const getProjectStatusColor = (status: string) => {
+    switch (status) {
+      case 'active': return 'success'
+      case 'on_hold': return 'warning'
+      case 'completed': return 'primary'
+      case 'archived': return 'default'
+      default: return 'default'
+    }
+  }
+
   const renderSpaceIcon = (iconName: string, fallback: string) => {
     const Icon = (LucideIcons as any)[iconName]
     if (Icon) return <Icon className="w-5 h-5" />
@@ -170,6 +201,10 @@ export default function SpaceDetailPage() {
               <span>{tasks.length} tasks</span>
             </div>
             <div className="flex items-center gap-2">
+              <FolderKanban className="w-4 h-4" />
+              <span>{projects.length} projects</span>
+            </div>
+            <div className="flex items-center gap-2">
               <Users className="w-4 h-4" />
               <span>{members.length} members</span>
             </div>
@@ -185,6 +220,8 @@ export default function SpaceDetailPage() {
           variant="underlined" 
           color="primary"
           className="mb-6"
+          selectedKey={selectedTab}
+          onSelectionChange={(key) => setSelectedTab(key as string)}
         >
           <Tab 
             key="overview" 
@@ -200,7 +237,7 @@ export default function SpaceDetailPage() {
               <div className="bg-white dark:bg-default-100 rounded-2xl p-6 border border-default-200">
                 <div className="flex items-center justify-between mb-6">
                   <div>
-                    <h2 className="text-xl font-semibold text-foreground">What's Next</h2>
+                    <h2 className="text-xl font-semibold text-foreground">What&apos;s Next</h2>
                     <p className="text-sm text-default-500 mt-1">Top priorities for this space</p>
                   </div>
                   <Button 
@@ -308,6 +345,77 @@ export default function SpaceDetailPage() {
                 )}
               </div>
 
+              {/* Projects Section - Overview cards */}
+              {projects.length > 0 && (
+                <div className="bg-white dark:bg-default-100 rounded-2xl p-6 border border-default-200">
+                  <div className="flex items-center justify-between mb-6">
+                    <div>
+                      <h2 className="text-xl font-semibold text-foreground">Projects</h2>
+                      <p className="text-sm text-default-500 mt-1">Active projects in this space</p>
+                    </div>
+                    <Button
+                      color="primary"
+                      variant="flat"
+                      size="sm"
+                      startContent={<Plus className="w-4 h-4" />}
+                      onPress={onProjectOpen}
+                    >
+                      New Project
+                    </Button>
+                  </div>
+
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                    {projects.slice(0, 4).map(project => (
+                      <Card
+                        key={project.id}
+                        isPressable
+                        className="hover:shadow-sm transition-shadow"
+                        onPress={() => router.push(`/projects/${project.id}`)}
+                      >
+                        <CardBody className="p-4">
+                          <div className="flex items-start justify-between">
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="w-9 h-9 rounded-lg bg-primary-50 dark:bg-primary-900/20 flex items-center justify-center flex-shrink-0">
+                                <FolderKanban className="w-4 h-4 text-primary-600 dark:text-primary-400" />
+                              </div>
+                              <div className="min-w-0">
+                                <h3 className="font-semibold text-foreground truncate">{project.name}</h3>
+                                <div className="flex items-center gap-2 mt-1">
+                                  <span className="text-xs text-default-400">
+                                    {projectTaskCounts[project.id] || 0} tasks
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                            <Chip
+                              size="sm"
+                              color={getProjectStatusColor(project.status) as any}
+                              variant="flat"
+                              className="flex-shrink-0"
+                            >
+                              {project.status === 'on_hold' ? 'On Hold' : project.status}
+                            </Chip>
+                          </div>
+                        </CardBody>
+                      </Card>
+                    ))}
+                  </div>
+
+                  {projects.length > 4 && (
+                    <div className="mt-4 pt-4 border-t border-default-200">
+                      <Button
+                        variant="light"
+                        className="w-full"
+                        onPress={() => setSelectedTab('projects')}
+                        endContent={<ArrowRight className="w-4 h-4" />}
+                      >
+                        View All {projects.length} Projects
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
+
               {/* Team Members - Minimal view */}
               <div className="bg-white dark:bg-default-100 rounded-2xl p-6 border border-default-200">
                 <div className="flex items-center justify-between mb-6">
@@ -347,7 +455,7 @@ export default function SpaceDetailPage() {
                     <Button
                       variant="light"
                       className="w-full"
-                      onPress={() => {/* TODO: Navigate to members tab */}}
+                      onPress={() => setSelectedTab('members')}
                       endContent={<ArrowRight className="w-4 h-4" />}
                     >
                       View All {members.length} Members
@@ -355,6 +463,105 @@ export default function SpaceDetailPage() {
                   </div>
                 )}
               </div>
+            </div>
+          </Tab>
+
+          <Tab 
+            key="projects"
+            title={
+              <div className="flex items-center gap-2">
+                <FolderKanban className="w-4 h-4" />
+                <span>Projects</span>
+                {projects.length > 0 && (
+                  <span className="text-xs bg-primary-100 text-primary-800 dark:bg-primary-900 dark:text-primary-300 px-2 py-0.5 rounded-full">
+                    {projects.length}
+                  </span>
+                )}
+              </div>
+            }
+          >
+            <div className="mt-6">
+              <div className="flex items-center justify-between mb-6">
+                <div>
+                  <h2 className="text-xl font-semibold text-foreground">Projects</h2>
+                  <p className="text-sm text-default-500 mt-1">All projects in this space</p>
+                </div>
+                <Button 
+                  color="primary" 
+                  startContent={<Plus className="w-4 h-4" />}
+                  onPress={onProjectOpen}
+                >
+                  New Project
+                </Button>
+              </div>
+
+              {projects.length === 0 ? (
+                <Card className="py-12">
+                  <CardBody className="text-center text-default-400">
+                    <FolderKanban className="w-12 h-12 mx-auto mb-4" />
+                    <p className="mb-4">No projects in this space yet.</p>
+                    <Button 
+                      color="primary" 
+                      variant="flat"
+                      startContent={<Plus className="w-4 h-4" />}
+                      onPress={onProjectOpen}
+                    >
+                      Create First Project
+                    </Button>
+                  </CardBody>
+                </Card>
+              ) : (
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                  {projects.map(project => {
+                    const taskCount = projectTaskCounts[project.id] || 0
+                    const doneTasks = tasks.filter(t => t.project_id === project.id && t.status === 'done').length
+
+                    return (
+                      <Card
+                        key={project.id}
+                        isPressable
+                        className="hover:shadow-md transition-shadow"
+                        onPress={() => router.push(`/projects/${project.id}`)}
+                      >
+                        <CardBody className="p-5">
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="flex items-center gap-3">
+                              <div className="w-10 h-10 rounded-lg bg-primary-50 dark:bg-primary-900/20 flex items-center justify-center">
+                                <FolderKanban className="w-5 h-5 text-primary-600 dark:text-primary-400" />
+                              </div>
+                              <div>
+                                <h3 className="font-semibold text-foreground">{project.name}</h3>
+                                <span className="text-xs text-default-400 capitalize">{project.status === 'on_hold' ? 'On Hold' : project.status}</span>
+                              </div>
+                            </div>
+                            <Chip
+                              size="sm"
+                              color={getProjectStatusColor(project.status) as any}
+                              variant="flat"
+                            >
+                              {project.status === 'on_hold' ? 'On Hold' : project.status}
+                            </Chip>
+                          </div>
+
+                          {project.description && (
+                            <p className="text-sm text-default-500 mb-3 line-clamp-2">{project.description}</p>
+                          )}
+
+                          <div className="flex items-center justify-between text-xs text-default-400 pt-3 border-t border-default-100">
+                            <div className="flex items-center gap-1">
+                              <ListTodo className="w-3 h-3" />
+                              <span>{taskCount} task{taskCount !== 1 ? 's' : ''}</span>
+                            </div>
+                            {taskCount > 0 && (
+                              <span>{doneTasks}/{taskCount} done</span>
+                            )}
+                          </div>
+                        </CardBody>
+                      </Card>
+                    )
+                  })}
+                </div>
+              )}
             </div>
           </Tab>
           
@@ -397,7 +604,7 @@ export default function SpaceDetailPage() {
               ) : (
                 <div className="space-y-3">
                   {tasks.map(task => (
-                    <Card key={task.id} isPressable>
+                    <Card key={task.id} isPressable onPress={() => router.push(`/tasks?task=${task.id}`)}>
                       <CardBody className="flex-row items-center justify-between py-3">
                         <div className="flex items-center gap-3">
                           <div className={`w-2 h-2 rounded-full ${getPriorityColor(task.priority)}`} />
@@ -578,6 +785,14 @@ export default function SpaceDetailPage() {
         onClose={onTaskClose}
         onSuccess={loadSpaceData}
         initialSpaceId={id as string}
+        userId={user?.id}
+      />
+
+      <AddProjectModal
+        isOpen={isProjectOpen}
+        onClose={onProjectClose}
+        onSuccess={loadSpaceData}
+        spaceId={id as string}
         userId={user?.id}
       />
     </div>
