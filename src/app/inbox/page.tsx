@@ -702,7 +702,7 @@ export default function InboxPage() {
     <div className="min-h-screen bg-slate-50 dark:bg-slate-900">
       <Navbar user={user} />
       
-      <main className="max-w-3xl mx-auto px-4 py-8">
+      <main className="max-w-4xl mx-auto px-4 py-8">
         {/* Header */}
         <div className="mb-6">
           <div className="flex items-center justify-between">
@@ -912,67 +912,50 @@ export default function InboxPage() {
 
         {/* Thread Chat View - Full Screen */}
         {selectedThread && (
-          <div className="fixed inset-0 bg-slate-50 dark:bg-slate-900 z-50 flex flex-col">
-            {/* Chat Header */}
-            <div className="flex items-center gap-3 px-4 py-3 border-b border-default-200 bg-white dark:bg-slate-800">
-              <Button
-                isIconOnly
-                variant="light"
-                onPress={closeThreadChat}
-                className="text-default-500"
-              >
-                <ArrowLeft className="w-5 h-5" />
-              </Button>
-              
-              {/* All participants - main recipient + anyone CC'd */}
-              {(() => {
-                // Collect all unique participants from thread messages
-                const allParticipants = new Set<string>([selectedThread.recipient])
-                selectedThread.messages.forEach(msg => {
-                  if (msg.cc_recipients) {
-                    msg.cc_recipients.forEach(cc => allParticipants.add(cc))
-                  }
-                })
-                const participants = Array.from(allParticipants)
+          <div className="fixed inset-0 bg-slate-50 dark:bg-slate-950 z-50 flex flex-col items-center">
+            {/* Chat Container (Centering for desktop) */}
+            <div className="w-full max-w-2xl h-full flex flex-col bg-white dark:bg-slate-900 shadow-2xl">
+              {/* Chat Header */}
+              <div className="flex items-center gap-3 px-4 py-3 border-b border-default-200 bg-white/80 dark:bg-slate-900/80 backdrop-blur-md sticky top-0 z-10">
+                <Button
+                  isIconOnly
+                  variant="light"
+                  onPress={closeThreadChat}
+                  className="text-default-500"
+                >
+                  <ArrowLeft className="w-5 h-5" />
+                </Button>
                 
-                return (
-                  <div className="flex items-center gap-1">
-                    {participants.map((pid, idx) => {
-                      const pInfo = getRecipientInfo(pid)
-                      return (
-                        <div 
-                          key={pid}
-                          className={`w-10 h-10 rounded-full bg-default-100 flex items-center justify-center ${idx > 0 ? '-ml-3' : ''} border-2 border-white dark:border-slate-800`}
-                          title={pInfo.name}
-                        >
-                          {pInfo?.type === 'ai' 
-                            ? <Bot className="w-5 h-5 text-violet-500" /> 
-                            : <User className="w-5 h-5 text-pink-500" />}
-                        </div>
-                      )
-                    })}
-                  </div>
-                )
-              })()}
-              
-              <div className="flex-1">
-                <h2 className="font-semibold text-foreground">
-                  {(() => {
-                    const allParticipants = new Set<string>([selectedThread.recipient])
-                    selectedThread.messages.forEach(msg => {
-                      if (msg.cc_recipients) {
-                        msg.cc_recipients.forEach(cc => allParticipants.add(cc))
+                <div className="flex-1 flex flex-col items-center">
+                  <div className="flex -space-x-2">
+                    {(() => {
+                      const participants = [selectedThread.recipient]
+                      if (selectedThread.lastMessage.cc_recipients) {
+                        participants.push(...selectedThread.lastMessage.cc_recipients)
                       }
-                    })
-                    return Array.from(allParticipants)
-                      .map(pid => getRecipientInfo(pid).name)
-                      .join(', ')
-                  })()}
-                </h2>
-                {selectedThread.subject && (
-                  <p className="text-xs text-default-500">{selectedThread.subject}</p>
-                )}
-              </div>
+                      return Array.from(new Set(participants)).map((pid) => (
+                        <Avatar 
+                          key={pid}
+                          size="sm"
+                          src={getRecipientInfo(pid).avatar}
+                          name={getRecipientInfo(pid).name}
+                          className="ring-2 ring-white dark:ring-slate-900"
+                        />
+                      ))
+                    })()}
+                  </div>
+                  <h2 className="text-xs font-semibold text-foreground mt-1">
+                    {(() => {
+                      const participants = [selectedThread.recipient]
+                      if (selectedThread.lastMessage.cc_recipients) {
+                        participants.push(...selectedThread.lastMessage.cc_recipients)
+                      }
+                      return Array.from(new Set(participants))
+                        .map(pid => getRecipientInfo(pid).name)
+                        .join(', ')
+                    })()}
+                  </h2>
+                </div>
               <Dropdown>
                 <DropdownTrigger>
                   <Button
@@ -1032,66 +1015,69 @@ export default function InboxPage() {
                 return (
                   <div 
                     key={msg.id} 
-                    className={`flex ${isFromUser ? 'justify-end' : 'justify-start'}`}
+                    className={`flex flex-col ${isFromUser ? 'items-end' : 'items-start'}`}
                   >
-                    <div className={`max-w-[80%] ${isFromUser ? 'order-2' : 'order-1'}`}>
-                      {/* Sender label */}
-                      <div className={`flex items-center gap-1.5 mb-1 ${isFromUser ? 'justify-end' : 'justify-start'}`}>
-                        {!isFromUser && <Bot className="w-3 h-3 text-violet-500" />}
-                        <span className="text-xs text-default-500">
-                          {isFromUser ? 'You' : msg.from_agent || selectedThread.recipient}
+                    <div className={`flex gap-2 max-w-[85%] ${isFromUser ? 'flex-row-reverse' : 'flex-row'}`}>
+                      {/* Avatar */}
+                      <Avatar 
+                        size="sm"
+                        src={isFromUser ? user?.avatar_url : getRecipientInfo(selectedThread.recipient).avatar}
+                        name={isFromUser ? user?.name : msg.from_agent || selectedThread.recipient}
+                        className="flex-shrink-0 mt-auto mb-1"
+                      />
+
+                      <div className="flex flex-col">
+                        {/* Bubble */}
+                        <div 
+                          className={`px-4 py-2 rounded-2xl shadow-sm ${
+                            isFromUser 
+                              ? 'bg-blue-600 text-white rounded-br-none' 
+                              : 'bg-slate-200 dark:bg-slate-800 text-slate-800 dark:text-slate-200 rounded-bl-none'
+                          }`}
+                        >
+                          <p className="text-sm whitespace-pre-wrap leading-relaxed">{msg.content}</p>
+                        </div>
+                        
+                        {/* Timestamp */}
+                        <span className={`text-[10px] text-slate-400 mt-1 px-1 ${isFromUser ? 'text-right' : 'text-left'}`}>
+                          {formatTime(msg.created_at)}
                         </span>
-                        {isFromUser && <User className="w-3 h-3 text-default-400" />}
                       </div>
-                      
-                      {/* Message bubble */}
-                      <div 
-                        className={`px-4 py-2.5 rounded-2xl ${
-                          isFromUser 
-                            ? 'bg-violet-500 text-white rounded-br-md' 
-                            : 'bg-default-100 text-foreground rounded-bl-md'
-                        }`}
-                      >
-                        <p className="text-sm whitespace-pre-wrap">{msg.content}</p>
-                      </div>
-                      
-                      {/* Timestamp */}
-                      <p className={`text-xs text-default-400 mt-1 ${isFromUser ? 'text-right' : 'text-left'}`}>
-                        {formatTime(msg.created_at)}
-                      </p>
                     </div>
                   </div>
                 )
               })}
             </div>
 
-            {/* Reply Input */}
-            <div className="border-t border-default-200 bg-white dark:bg-slate-800 p-3">
-              <div className="flex items-end gap-2 max-w-3xl mx-auto">
-                <Textarea
-                  ref={replyInputRef}
-                  placeholder="Type a message..."
-                  value={replyMessage}
-                  onChange={(e) => setReplyMessage(e.target.value)}
-                  onKeyDown={handleReplyKeyDown}
-                  minRows={1}
-                  maxRows={4}
-                  className="flex-1"
-                  classNames={{
-                    input: "text-base",
-                    inputWrapper: "shadow-none bg-default-100",
-                  }}
-                />
-                <Button
-                  isIconOnly
-                  color="primary"
-                  onPress={handleSendReply}
-                  isLoading={submitting}
-                  isDisabled={!replyMessage.trim()}
-                  className="h-10 w-10 min-w-10"
-                >
-                  <Send className="w-4 h-4" />
-                </Button>
+              {/* Reply Input */}
+              <div className="border-t border-default-200 bg-white dark:bg-slate-900 p-3">
+                <div className="flex items-end gap-2 max-w-2xl mx-auto">
+                  <Textarea
+                    ref={replyInputRef}
+                    placeholder="Type a message..."
+                    value={replyMessage}
+                    onChange={(e) => setReplyMessage(e.target.value)}
+                    onKeyDown={handleReplyKeyDown}
+                    minRows={1}
+                    maxRows={4}
+                    className="flex-1"
+                    classNames={{
+                      input: "text-base",
+                      inputWrapper: "shadow-none bg-default-100 dark:bg-slate-800",
+                    }}
+                  />
+                  <Button
+                    isIconOnly
+                    color="primary"
+                    radius="full"
+                    onPress={handleSendReply}
+                    isLoading={submitting}
+                    isDisabled={!replyMessage.trim()}
+                    className="h-10 w-10 min-w-10"
+                  >
+                    <Send className="w-4 h-4" />
+                  </Button>
+                </div>
               </div>
             </div>
           </div>
