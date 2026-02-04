@@ -860,7 +860,7 @@ export default function ChatWidget() {
                   ) : messages.map((msg) => {
                     const isMe = !msg.from_agent
                     return (
-                      <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
+                      <div key={msg.id} className={`flex group/msg ${isMe ? 'justify-end' : 'justify-start'}`}>
                         <div className={`max-w-[80%] px-3 py-2 rounded-2xl text-sm ${
                           isMe
                             ? 'bg-blue-500 text-white rounded-br-md'
@@ -872,9 +872,23 @@ export default function ChatWidget() {
                             </p>
                           )}
                           <p className="leading-relaxed break-words">{renderMentions(msg.content)}</p>
-                          <p className={`text-[9px] mt-1 ${isMe ? 'text-blue-200' : 'text-slate-400'}`}>
-                            {new Date(msg.created_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
-                          </p>
+                          <div className={`flex items-center gap-1.5 mt-1`}>
+                            <span className={`text-[9px] ${isMe ? 'text-blue-200' : 'text-slate-400'}`}>
+                              {new Date(msg.created_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                            </span>
+                            <button
+                              onClick={async (e) => {
+                                e.stopPropagation()
+                                const { error } = await supabase.from('inbox').delete().eq('id', msg.id)
+                                if (error) showErrorToast(error)
+                                else setMessages(prev => prev.filter(m => m.id !== msg.id))
+                              }}
+                              className={`opacity-0 group-hover/msg:opacity-100 transition-opacity ${isMe ? 'text-blue-200 hover:text-white' : 'text-slate-400 hover:text-red-500'}`}
+                              title="Delete message"
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          </div>
                         </div>
                       </div>
                     )
