@@ -63,21 +63,18 @@ export default function SpaceDetailPage() {
   }, [tasks])
 
   useEffect(() => {
-    loadUser()
-  }, [])
-
-  useEffect(() => {
-    if (id) {
-      loadSpaceData()
+    async function init() {
+      const { data: { user: authUser } } = await supabase.auth.getUser()
+      setUser(authUser)
+      if (id && authUser) {
+        loadSpaceData(authUser.id)
+      }
     }
+    init()
   }, [id])
 
-  async function loadUser() {
-    const { data: { user } } = await supabase.auth.getUser()
-    setUser(user)
-  }
-
-  async function loadSpaceData() {
+  async function loadSpaceData(userId?: string) {
+    const uid = userId || user?.id
     setLoading(true)
     try {
       const [spaceRes, membersRes, tasksRes, projectsRes, docsRes, threadsRes, userRoleRes] = await Promise.all([
@@ -102,10 +99,10 @@ export default function SpaceDetailPage() {
           .eq('space_id', id)
           .order('created_at', { ascending: false }),
         // Get current user's role in this space
-        user?.id ? supabase.from('space_members')
+        uid ? supabase.from('space_members')
           .select('role')
           .eq('space_id', id)
-          .eq('user_id', user.id)
+          .eq('user_id', uid)
           .single() : Promise.resolve({ data: null, error: null })
       ])
 
