@@ -704,7 +704,27 @@ export default function SpaceDetailPage() {
                 <Button 
                   color="primary" 
                   startContent={<Plus className="w-4 h-4" />}
-                  onPress={() => router.push(`/docs?space=${id}`)}
+                  onPress={async () => {
+                    if (!user) return toast.error('Please sign in')
+                    try {
+                      const { data, error } = await supabase
+                        .from('documents')
+                        .insert({
+                          title: 'Untitled Document',
+                          content: '# New Document\n\nStart writing here...',
+                          status: 'draft',
+                          created_by: user.id,
+                          space_id: id,
+                          doc_type: 'document',
+                        })
+                        .select().single()
+                      if (error) throw error
+                      router.push(`/docs/${data.id}/edit`)
+                    } catch (error) {
+                      console.error('Create doc error:', error)
+                      toast.error('Failed to create document')
+                    }
+                  }}
                 >
                   New Doc
                 </Button>
