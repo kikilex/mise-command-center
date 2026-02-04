@@ -334,7 +334,7 @@ export default function ChatWidget() {
                     color="primary" 
                     className="w-full font-black uppercase tracking-widest h-12 rounded-2xl" 
                     onPress={handleStartNewChat}
-                    isLoading={submitting}
+                    isLoading={loading}
                     isDisabled={!newRecipient || !newMessage.trim()}
                   >
                     Launch Thread

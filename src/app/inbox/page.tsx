@@ -34,6 +34,7 @@ import {
   User, Users, ArrowLeft, MoreVertical, Archive, Briefcase as BriefcaseIcon
 } from 'lucide-react'
 import { useSearchParams } from 'next/navigation'
+import { Suspense } from 'react'
 
 interface InboxItem {
   id: string
@@ -73,6 +74,14 @@ const RECIPIENTS = [
 ]
 
 export default function InboxPage() {
+  return (
+    <Suspense fallback={<div className="flex items-center justify-center h-screen"><Spinner size="lg" /></div>}>
+      <InboxPageInner />
+    </Suspense>
+  )
+}
+
+function InboxPageInner() {
   const [items, setItems] = useState<InboxItem[]>([])
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState<UserData | null>(null)
