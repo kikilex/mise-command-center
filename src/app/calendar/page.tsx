@@ -584,20 +584,44 @@ export default function CalendarPage() {
                           {dayTasks.slice(0, 1).map(task => (
                             <div 
                               key={task.id}
-                              className="text-xs p-1 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 truncate"
+                              className="text-xs p-1 rounded bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 truncate cursor-pointer hover:opacity-80 group relative"
                               title={task.title}
-                              onClick={(e) => e.stopPropagation()}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                window.location.href = `/tasks?task=${task.id}`
+                              }}
                             >
-                              📋 {task.title}
+                              <div className="flex items-center justify-between">
+                                <span className="truncate">📋 {task.title}</span>
+                                <button
+                                  onClick={(e) => {
+                                    e.stopPropagation()
+                                    // Delete task directly
+                                    if (window.confirm('Delete this task?')) {
+                                      supabase.from('tasks').delete().eq('id', task.id).then(() => {
+                                        setTasks(prev => prev.filter(t => t.id !== task.id))
+                                        toast.success('Task deleted')
+                                      })
+                                    }
+                                  }}
+                                  className="opacity-0 group-hover:opacity-100 transition-opacity ml-1 p-0.5 hover:bg-blue-200 dark:hover:bg-blue-800 rounded flex-shrink-0"
+                                  title="Delete task"
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </button>
+                              </div>
                             </div>
                           ))}
                           
                           {dayContent.slice(0, 1).map(item => (
                             <div 
                               key={item.id}
-                              className="text-xs p-1 rounded bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 truncate"
+                              className="text-xs p-1 rounded bg-purple-100 dark:bg-purple-900/30 text-purple-700 dark:text-purple-300 truncate cursor-pointer hover:opacity-80"
                               title={item.title}
-                              onClick={(e) => e.stopPropagation()}
+                              onClick={(e) => {
+                                e.stopPropagation()
+                                window.location.href = `/content/${item.id}`
+                              }}
                             >
                               🎬 {item.title}
                             </div>
