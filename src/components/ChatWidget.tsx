@@ -96,7 +96,6 @@ export default function ChatWidget() {
   const [newMessage, setNewMessage] = useState('')
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(false)
-  const [currentUserName, setCurrentUserName] = useState<string>('ax') // Default to 'ax' for Alex
 
   /* ---- mobile ---- */
   const [mobileShowConversation, setMobileShowConversation] = useState(false)
@@ -230,15 +229,14 @@ export default function ChatWidget() {
       .on('postgres_changes', { 
         event: 'INSERT', 
         schema: 'public', 
-        table: 'inbox',
-        filter: `to_recipient=eq.${currentUserName}` // Messages to current user
+        table: 'inbox'
       }, (payload) => {
         handleIncomingMessage(payload.new as any)
       })
       .subscribe()
 
     return () => { supabase.removeChannel(channel) }
-  }, [currentUserName])
+  }, [])
 
   // Listen for open-chat-thread from dashboard
   useEffect(() => {
@@ -304,8 +302,6 @@ export default function ChatWidget() {
       .from('inbox')
       .select('*')
       .eq('item_type', 'message')
-      .eq('status', 'pending')
-      .eq('to_recipient', currentUserName) // Only messages to current user
       .order('created_at', { ascending: false })
 
     if (!data) return
