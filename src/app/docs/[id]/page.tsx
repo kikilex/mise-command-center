@@ -8,7 +8,7 @@ import remarkGfm from 'remark-gfm'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import { useTheme } from 'next-themes'
-import { ArrowLeft, Edit, FileText, List, ExternalLink, Share2, Check, RotateCcw, MessageSquare, Send, AlertCircle, Trash2, CheckCircle2, Clock, ChevronDown, ChevronRight, ArrowUp, ArrowDown, ChevronsDownUp, ChevronsUpDown, Folder, Tag as TagIcon, X, Plus, Settings } from 'lucide-react'
+import { ArrowLeft, Edit, FileText, List, ExternalLink, Share2, Check, RotateCcw, MessageSquare, Send, AlertCircle, Trash2, CheckCircle2, Clock, ChevronDown, ChevronRight, ArrowUp, ArrowDown, ChevronsDownUp, ChevronsUpDown, Folder, Tag as TagIcon, X, Plus, Settings, History } from 'lucide-react'
 import {
   Button,
   Chip,
@@ -141,6 +141,13 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
   // Document properties popover state
   const [propertiesOpen, setPropertiesOpen] = useState(false)
   
+  // Document history state
+  const { isOpen: isHistoryOpen, onOpen: onHistoryOpen, onClose: onHistoryClose } = useDisclosure()
+  const [versions, setVersions] = useState<any[]>([])
+  const [loadingVersions, setLoadingVersions] = useState(false)
+  const [selectedVersion, setSelectedVersion] = useState<any>(null)
+  const { isOpen: isVersionViewOpen, onOpen: onVersionViewOpen, onClose: onVersionViewClose } = useDisclosure()
+  
   // Theme for syntax highlighting
   const { resolvedTheme } = useTheme()
   const isDark = resolvedTheme === 'dark'
@@ -265,6 +272,38 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
     } finally {
       setLoadingComments(false)
     }
+  }
+
+  async function loadVersions() {
+    setLoadingVersions(true)
+    try {
+      const { data, error } = await supabase
+        .from('document_versions')
+        .select(`
+          *,
+          users:created_by (id, email, name)
+        `)
+        .eq('document_id', id)
+        .order('version', { ascending: false })
+
+      if (error) throw error
+      setVersions(data || [])
+    } catch (error) {
+      console.error('Load versions error:', error)
+      showErrorToast(error, 'Failed to load version history')
+    } finally {
+      setLoadingVersions(false)
+    }
+  }
+
+  function handleViewVersion(version: any) {
+    setSelectedVersion(version)
+    onVersionViewOpen()
+  }
+
+  function handleOpenHistory() {
+    onHistoryOpen()
+    loadVersions()
   }
 
   async function saveDocumentMeta() {
@@ -812,6 +851,14 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
                 </div>
               </PopoverContent>
             </Popover>
+            <Button
+              variant="flat"
+              isIconOnly
+              title="Version History"
+              onPress={handleOpenHistory}
+            >
+              <History className="w-5 h-5" />
+            </Button>
             <Link href={`/docs/${id}/edit`}>
               <Button color="primary" isIconOnly title="Edit document">
                 <Edit className="w-5 h-5" />
@@ -1325,6 +1372,143 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
               isLoading={deleting}
             >
               Delete
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+
+      {/* Version History Modal */}
+      <Modal isOpen={isHistoryOpen} onClose={onHistoryClose} size="2xl">
+        <ModalContent>
+          <ModalHeader className="flex items-center gap-2">
+            <History className="w-5 h-5" />
+            Version History
+          </ModalHeader>
+          <ModalBody>
+            {loadingVersions ? (
+              <div className="flex justify-center py-8">
+                <Spinner size="lg" />
+              </div>
+            ) : versions.length === 0 ? (
+              <div className="text-center py-8 text-slate-500 dark:text-slate-400">
+                <History className="w-12 h-12 mx-auto mb-4 opacity-50" />
+                <p className="text-lg font-medium mb-2">No version history yet</p>
+                <p>Previous versions will appear here after you edit the document.</p>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="text-sm text-slate-500 dark:text-slate-400 mb-2">
+                  Showing {versions.length} previous version{versions.length !== 1 ? 's' : ''}
+                </div>
+                {versions.map((version) => (
+                  <div
+                    key={version.id}
+                    className="border border-slate-200 dark:border-slate-700 rounded-lg p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors cursor-pointer"
+                    onClick={() => handleViewVersion(version)}
+                  >
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <Chip size="sm" variant="flat">v{version.version}</Chip>
+                        <span className="font-medium text-slate-900 dark:text-slate-100">
+                          {version.title}
+                        </span>
+                      </div>
+                      <div className="text-xs text-slate-500 dark:text-slate-400">
+                        {formatDate(version.created_at)}
+                      </div>
+                    </div>
+                    <div className="text-sm text-slate-600 dark:text-slate-300 mb-2">
+                      {version.change_summary || 'No change summary'}
+                    </div>
+                    <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-400">
+                      <div className="flex items-center gap-1">
+                        <span>Status:</span>
+                        <Chip
+                          size="sm"
+                          color={getStatusColor(version.status) as any}
+                          variant="flat"
+                        >
+                          {getStatusLabel(version.status)}
+                        </Chip>
+                      </div>
+                      <div>
+                        {version.users?.name || version.users?.email || 'Unknown user'}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="flat" onPress={onHistoryClose}>
+              Close
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+
+      {/* Version View Modal */}
+      <Modal isOpen={isVersionViewOpen} onClose={onVersionViewClose} size="4xl" scrollBehavior="inside">
+        <ModalContent>
+          <ModalHeader className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <History className="w-5 h-5" />
+              <span>Version v{selectedVersion?.version}: {selectedVersion?.title}</span>
+            </div>
+            <Chip
+              size="sm"
+              color={selectedVersion ? getStatusColor(selectedVersion.status) as any : 'default'}
+              variant="flat"
+            >
+              {selectedVersion ? getStatusLabel(selectedVersion.status) : ''}
+            </Chip>
+          </ModalHeader>
+          <ModalBody>
+            {selectedVersion && (
+              <div className="space-y-4">
+                <div className="text-sm text-slate-500 dark:text-slate-400">
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-4">
+                    <div>
+                      <div className="font-medium">Created</div>
+                      <div>{formatDate(selectedVersion.created_at)}</div>
+                    </div>
+                    <div>
+                      <div className="font-medium">By</div>
+                      <div>{selectedVersion.users?.name || selectedVersion.users?.email || 'Unknown user'}</div>
+                    </div>
+                    <div>
+                      <div className="font-medium">Change Summary</div>
+                      <div>{selectedVersion.change_summary || 'No change summary'}</div>
+                    </div>
+                  </div>
+                </div>
+                
+                <Divider />
+                
+                <div className="prose prose-slate dark:prose-invert max-w-none
+                  prose-headings:scroll-mt-8
+                  prose-h1:text-xl prose-h1:font-bold prose-h1:mb-4 prose-h1:mt-6
+                  prose-h2:text-lg prose-h2:font-semibold prose-h2:mb-3 prose-h2:mt-5
+                  prose-h3:text-base prose-h3:font-medium prose-h3:mb-2 prose-h3:mt-4
+                  prose-p:text-sm prose-p:leading-relaxed prose-p:mb-3
+                  prose-ul:my-3 prose-ol:my-3
+                  prose-li:my-0.5
+                  prose-a:text-violet-600 dark:prose-a:text-violet-400
+                  prose-code:bg-slate-100 dark:prose-code:bg-slate-900 prose-code:px-1 prose-code:py-0.5 prose-code:rounded prose-code:text-xs prose-code:before:content-none prose-code:after:content-none
+                  prose-pre:bg-slate-900 prose-pre:rounded-lg prose-pre:p-3 prose-pre:text-xs
+                  prose-blockquote:border-l-violet-500 prose-blockquote:bg-violet-50 dark:prose-blockquote:bg-violet-900/20 prose-blockquote:py-1 prose-blockquote:px-3 prose-blockquote:rounded-r prose-blockquote:text-sm
+                ">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                    {selectedVersion.content || '*No content*'}
+                  </ReactMarkdown>
+                </div>
+              </div>
+            )}
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="flat" onPress={onVersionViewClose}>
+              Close
             </Button>
           </ModalFooter>
         </ModalContent>

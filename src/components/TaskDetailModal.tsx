@@ -46,7 +46,7 @@ interface AIAgent {
   name: string
   slug: string
   role: string
-  is_active: boolean
+  is_active?: boolean
   model?: string
   system_prompt?: string
   capabilities?: string[]
@@ -61,7 +61,7 @@ interface AIAgent {
 interface Project {
   id: string
   name: string
-  business_id: string | null
+  business_id?: string | null
   space_id?: string | null
   description?: string | null
   status?: string
@@ -74,6 +74,9 @@ interface UserData {
   email: string
   name?: string
   avatar_url?: string
+  user_type?: string
+  is_agent?: boolean
+  display_name?: string
 }
 
 interface TaskFile {
@@ -160,6 +163,8 @@ export default function TaskDetailModal({
   const [isDragging, setIsDragging] = useState(false)
   const [viewingFile, setViewingFile] = useState<TaskFile | null>(null)
   const [viewFileUrl, setViewFileUrl] = useState<string | null>(null)
+  const [isEditing, setIsEditing] = useState(false)
+  const [assignToUserId, setAssignToUserId] = useState<string>('')
   const fileInputRef = useRef<HTMLInputElement>(null)
   
   const supabase = createClient()
@@ -178,6 +183,7 @@ export default function TaskDetailModal({
         project_id: task.project_id || '',
         space_id: task.space_id || '',
       })
+      setIsEditing(false) // Reset to read-only mode when modal opens
       loadFiles(task.id)
       loadDropdownData(task.space_id)
     }
@@ -186,12 +192,13 @@ export default function TaskDetailModal({
   async function loadDropdownData(spaceId: string | null) {
     setLoadingData(true)
     try {
-      // Fetch Users
+      // Fetch all users (humans + AI agents) for the "Assign to..." dropdown
       const { data: usersData } = await supabase
         .from('users')
-        .select('id, name, email, avatar_url')
+        .select('id, email, name, avatar_url, user_type, is_agent, display_name')
+        .order('is_agent', { ascending: true }) // Humans first, then agents
       
-      // Fetch Active Agents
+      // Fetch Active Agents (for the AI Agent dropdown in edit mode)
       const { data: agentsData } = await supabase
         .from('ai_agents')
         .select('id, name, slug, role')
@@ -260,6 +267,7 @@ export default function TaskDetailModal({
       if (error) throw error
       
       showSuccessToast('Task updated successfully')
+      setIsEditing(false) // Switch back to read-only mode after saving
       onTaskUpdated()
     } catch (error) {
       console.error('Save task error:', error)
@@ -269,27 +277,48 @@ export default function TaskDetailModal({
     }
   }
 
-  async function handleSendBackToAx() {
-    if (!task) return
+  async function handleAssignTo() {
+    if (!task || !assignToUserId) return
     
     setSaving(true)
     
     try {
+      // Find the user being assigned to
+      const userToAssign = users.find(u => u.id === assignToUserId)
+      if (!userToAssign) throw new Error('User not found')
+      
+      // Determine if this is an AI agent or human
+      const isAgent = userToAssign.is_agent || userToAssign.user_type === 'ai_agent'
+      
+      const updateData: any = {
+        status: isAgent ? 'in_progress' : 'todo',
+      }
+      
+      if (isAgent) {
+        // For AI agents, we need to find the corresponding ai_agent slug
+        const agent = agents.find(a => a.name.toLowerCase() === userToAssign.name?.toLowerCase() || 
+                                      a.slug === userToAssign.name?.toLowerCase())
+        updateData.ai_agent = agent?.slug || userToAssign.name?.toLowerCase()
+        updateData.assignee_id = null // Clear human assignee
+      } else {
+        // For humans
+        updateData.assignee_id = assignToUserId
+        updateData.ai_agent = null // Clear AI agent
+      }
+      
       const { error } = await supabase
         .from('tasks')
-        .update({
-          status: 'in_progress',
-          ai_agent: 'ax',
-        })
+        .update(updateData)
         .eq('id', task.id)
 
       if (error) throw error
       
-      showSuccessToast('Task sent back to Ax for revision')
+      showSuccessToast(`Task assigned to ${userToAssign.name || userToAssign.email}`)
+      setAssignToUserId('') // Reset dropdown
       onTaskUpdated()
     } catch (error) {
-      console.error('Send back error:', error)
-      showErrorToast(error, 'Failed to send back for revision')
+      console.error('Assign error:', error)
+      showErrorToast(error, 'Failed to assign task')
     } finally {
       setSaving(false)
     }
@@ -454,6 +483,65 @@ export default function TaskDetailModal({
 
   const isAxMessage = (author: string) => author === 'ax'
 
+  // Helper function to get user display name
+  const getUserDisplayName = (user: UserData) => {
+    if (user.display_name) return user.display_name
+    if (user.name) return user.name
+    return user.email
+  }
+
+  // Helper function to get user type label
+  const getUserTypeLabel = (user: UserData) => {
+    if (user.is_agent || user.user_type === 'ai_agent') return 'AI Agent'
+    return 'Human'
+  }
+
+  // Helper function to get status chip color
+  const getStatusChipColor = (status: string) => {
+    const statusOption = statusOptions.find(s => s.key === status)
+    return statusOption?.color || 'default'
+  }
+
+  // Helper function to get priority chip color
+  const getPriorityChipColor = (priority: string) => {
+    const priorityOption = priorityOptions.find(p => p.key === priority)
+    return priorityOption?.color || 'bg-slate-400'
+  }
+
+  // Helper function to get status label
+  const getStatusLabel = (status: string) => {
+    const statusOption = statusOptions.find(s => s.key === status)
+    return statusOption?.label || status
+  }
+
+  // Helper function to get priority label
+  const getPriorityLabel = (priority: string) => {
+    const priorityOption = priorityOptions.find(p => p.key === priority)
+    return priorityOption?.label || priority
+  }
+
+  // Helper function to get assigned user name
+  const getAssignedUserName = () => {
+    if (formData.assignee_id) {
+      const user = users.find(u => u.id === formData.assignee_id)
+      return user ? getUserDisplayName(user) : 'Unknown user'
+    }
+    if (formData.ai_agent) {
+      const agent = agents.find(a => a.slug === formData.ai_agent)
+      return agent ? agent.name : formData.ai_agent
+    }
+    return 'Unassigned'
+  }
+
+  // Helper function to get project name
+  const getProjectName = () => {
+    if (formData.project_id) {
+      const project = projects.find(p => p.id === formData.project_id)
+      return project ? project.name : 'Unknown project'
+    }
+    return 'No project'
+  }
+
   if (!task) return null
 
   return (
@@ -466,13 +554,27 @@ export default function TaskDetailModal({
     >
       <ModalContent>
         <ModalHeader className="flex flex-col gap-1">
-          <div className="flex items-center gap-2">
-            <ClipboardList className="w-5 h-5 text-slate-600 dark:text-slate-400" />
-            <span>Task Details</span>
-            {task.ai_agent && (
-              <Chip size="sm" variant="flat" className="capitalize">
-                Agent: {task.ai_agent}
-              </Chip>
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <ClipboardList className="w-5 h-5 text-slate-600 dark:text-slate-400" />
+              <span>Task Details</span>
+              {task.ai_agent && (
+                <Chip size="sm" variant="flat" className="capitalize">
+                  Agent: {task.ai_agent}
+                </Chip>
+              )}
+            </div>
+            {!isEditing && (
+              <Button
+                size="sm"
+                variant="flat"
+                startContent={<svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                </svg>}
+                onPress={() => setIsEditing(true)}
+              >
+                Edit
+              </Button>
             )}
           </div>
         </ModalHeader>
@@ -481,98 +583,194 @@ export default function TaskDetailModal({
           <div className="flex flex-col gap-6">
             {/* Basic Info */}
             <div className="space-y-4">
-              <Input
-                label="Title"
-                value={formData.title}
-                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                isRequired
-              />
-              
-              <Textarea
-                label="Description"
-                placeholder="Task description..."
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                minRows={3}
-              />
-              
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <Select
-                  label="Status"
-                  selectedKeys={[formData.status]}
-                  onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                >
-                  {statusOptions.map(s => (
-                    <SelectItem key={s.key}>{s.label}</SelectItem>
-                  ))}
-                </Select>
-                
-                <Select
-                  label="Priority"
-                  selectedKeys={[formData.priority]}
-                  onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
-                >
-                  {priorityOptions.map(p => (
-                    <SelectItem key={p.key}>{p.label}</SelectItem>
-                  ))}
-                </Select>
-                
-                <Input
-                  label="Due Date"
-                  type="date"
-                  value={formData.due_date}
-                  onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
-                />
-              </div>
+              {isEditing ? (
+                <>
+                  <Input
+                    label="Title"
+                    value={formData.title}
+                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                    isRequired
+                  />
+                  
+                  <Textarea
+                    label="Description"
+                    placeholder="Task description..."
+                    value={formData.description}
+                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                    minRows={3}
+                  />
+                  
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <Select
+                      label="Status"
+                      selectedKeys={[formData.status]}
+                      onChange={(e) => setFormData({ ...formData, status: e.target.value })}
+                    >
+                      {statusOptions.map(s => (
+                        <SelectItem key={s.key}>{s.label}</SelectItem>
+                      ))}
+                    </Select>
+                    
+                    <Select
+                      label="Priority"
+                      selectedKeys={[formData.priority]}
+                      onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
+                    >
+                      {priorityOptions.map(p => (
+                        <SelectItem key={p.key}>{p.label}</SelectItem>
+                      ))}
+                    </Select>
+                    
+                    <Input
+                      label="Due Date"
+                      type="date"
+                      value={formData.due_date}
+                      onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
+                    />
+                  </div>
 
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <Select
-                  label="Assignee"
-                  placeholder="Select human"
-                  selectedKeys={formData.assignee_id ? [formData.assignee_id] : []}
-                  onChange={(e) => setFormData({ ...formData, assignee_id: e.target.value })}
-                  startContent={<User className="w-4 h-4 text-slate-400" />}
-                >
-                  {users.map(u => (
-                    <SelectItem key={u.id} textValue={u.name || u.email}>
-                      <div className="flex items-center gap-2">
-                        <span>{u.name || u.email}</span>
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                    <Select
+                      label="Assignee"
+                      placeholder="Select human"
+                      selectedKeys={formData.assignee_id ? [formData.assignee_id] : []}
+                      onChange={(e) => setFormData({ ...formData, assignee_id: e.target.value })}
+                      startContent={<User className="w-4 h-4 text-slate-400" />}
+                    >
+                      {users.filter(u => !u.is_agent && u.user_type !== 'ai_agent').map(u => (
+                        <SelectItem key={u.id} textValue={u.name || u.email}>
+                          <div className="flex items-center gap-2">
+                            <span>{u.name || u.email}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </Select>
+
+                    <Select
+                      label="AI Agent"
+                      placeholder="Select agent"
+                      selectedKeys={formData.ai_agent ? [formData.ai_agent] : []}
+                      onChange={(e) => setFormData({ ...formData, ai_agent: e.target.value })}
+                      startContent={<Bot className="w-4 h-4 text-slate-400" />}
+                    >
+                      {agents.map(a => (
+                        <SelectItem key={a.slug} textValue={a.name}>
+                          <div className="flex flex-col">
+                            <span className="font-medium">{a.name}</span>
+                            <span className="text-xs text-slate-400">{a.role}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </Select>
+
+                    <Select
+                      label="Project"
+                      placeholder="Select project"
+                      selectedKeys={formData.project_id ? [formData.project_id] : []}
+                      onChange={(e) => setFormData({ ...formData, project_id: e.target.value })}
+                      startContent={<FileText className="w-4 h-4 text-slate-400" />}
+                    >
+                      {projects.map(p => (
+                        <SelectItem key={p.id} textValue={p.name}>
+                          {p.name}
+                        </SelectItem>
+                      ))}
+                    </Select>
+                  </div>
+                </>
+              ) : (
+                <>
+                  {/* Read-only view */}
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-sm font-medium text-slate-500 dark:text-slate-400">Title</label>
+                      <p className="text-lg font-semibold text-slate-800 dark:text-slate-200 mt-1">{formData.title}</p>
+                    </div>
+                    
+                    {formData.description && (
+                      <div>
+                        <label className="text-sm font-medium text-slate-500 dark:text-slate-400">Description</label>
+                        <p className="text-slate-700 dark:text-slate-300 mt-1 whitespace-pre-wrap">{formData.description}</p>
                       </div>
-                    </SelectItem>
-                  ))}
-                </Select>
-
-                <Select
-                  label="AI Agent"
-                  placeholder="Select agent"
-                  selectedKeys={formData.ai_agent ? [formData.ai_agent] : []}
-                  onChange={(e) => setFormData({ ...formData, ai_agent: e.target.value })}
-                  startContent={<Bot className="w-4 h-4 text-slate-400" />}
-                >
-                  {agents.map(a => (
-                    <SelectItem key={a.slug} textValue={a.name}>
-                      <div className="flex flex-col">
-                        <span className="font-medium">{a.name}</span>
-                        <span className="text-xs text-slate-400">{a.role}</span>
+                    )}
+                    
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div>
+                        <label className="text-sm font-medium text-slate-500 dark:text-slate-400">Status</label>
+                        <div className="mt-1">
+                          <Select
+                            size="sm"
+                            selectedKeys={[formData.status]}
+                            onChange={(e) => {
+                              setFormData({ ...formData, status: e.target.value })
+                              // Auto-save status change
+                              if (task) {
+                                supabase
+                                  .from('tasks')
+                                  .update({ status: e.target.value })
+                                  .eq('id', task.id)
+                                  .then(() => {
+                                    showSuccessToast('Status updated')
+                                    onTaskUpdated()
+                                  })
+                                  .catch(error => {
+                                    console.error('Update status error:', error)
+                                    showErrorToast(error, 'Failed to update status')
+                                  })
+                              }
+                            }}
+                            className="w-full"
+                          >
+                            {statusOptions.map(s => (
+                              <SelectItem key={s.key}>{s.label}</SelectItem>
+                            ))}
+                          </Select>
+                        </div>
                       </div>
-                    </SelectItem>
-                  ))}
-                </Select>
+                      
+                      <div>
+                        <label className="text-sm font-medium text-slate-500 dark:text-slate-400">Priority</label>
+                        <div className="mt-1">
+                          <Chip
+                            size="lg"
+                            color={getStatusChipColor(formData.priority) as any}
+                            variant="flat"
+                            className="capitalize"
+                          >
+                            {getPriorityLabel(formData.priority)}
+                          </Chip>
+                        </div>
+                      </div>
+                      
+                      <div>
+                        <label className="text-sm font-medium text-slate-500 dark:text-slate-400">Due Date</label>
+                        <p className="text-slate-700 dark:text-slate-300 mt-1">
+                          {formData.due_date ? new Date(formData.due_date).toLocaleDateString() : 'No due date'}
+                        </p>
+                      </div>
+                    </div>
 
-                <Select
-                  label="Project"
-                  placeholder="Select project"
-                  selectedKeys={formData.project_id ? [formData.project_id] : []}
-                  onChange={(e) => setFormData({ ...formData, project_id: e.target.value })}
-                  startContent={<FileText className="w-4 h-4 text-slate-400" />}
-                >
-                  {projects.map(p => (
-                    <SelectItem key={p.id} textValue={p.name}>
-                      {p.name}
-                    </SelectItem>
-                  ))}
-                </Select>
-              </div>
+                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                      <div>
+                        <label className="text-sm font-medium text-slate-500 dark:text-slate-400">Assigned To</label>
+                        <p className="text-slate-700 dark:text-slate-300 mt-1">{getAssignedUserName()}</p>
+                      </div>
+                      
+                      <div>
+                        <label className="text-sm font-medium text-slate-500 dark:text-slate-400">Project</label>
+                        <p className="text-slate-700 dark:text-slate-300 mt-1">{getProjectName()}</p>
+                      </div>
+                      
+                      <div>
+                        <label className="text-sm font-medium text-slate-500 dark:text-slate-400">Space</label>
+                        <p className="text-slate-700 dark:text-slate-300 mt-1">
+                          {formData.space_id ? `Space ${formData.space_id.substring(0, 8)}...` : 'No space'}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+                </>
+              )}
             </div>
 
             <Divider />
@@ -587,16 +785,48 @@ export default function TaskDetailModal({
                 <TaskThread taskId={task.id} className="h-full" />
               )}
               
-              {/* Send Back Button */}
-              <Button
-                color="warning"
-                variant="flat"
-                onPress={handleSendBackToAx}
-                isDisabled={saving}
-                className="w-full"
-              >
-                <RotateCcw className="w-4 h-4" /> Send back to Ax for revision
-              </Button>
+              {/* Assign to... dropdown (only in read-only mode) */}
+              {!isEditing && (
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-slate-500 dark:text-slate-400">Assign to...</label>
+                  <div className="flex gap-2">
+                    <Select
+                      placeholder="Select user or agent"
+                      selectedKeys={assignToUserId ? [assignToUserId] : []}
+                      onChange={(e) => setAssignToUserId(e.target.value)}
+                      className="flex-grow"
+                    >
+                      {users.map(u => (
+                        <SelectItem 
+                          key={u.id} 
+                          textValue={getUserDisplayName(u)}
+                          startContent={
+                            u.is_agent || u.user_type === 'ai_agent' ? (
+                              <Bot className="w-4 h-4 text-purple-500" />
+                            ) : (
+                              <User className="w-4 h-4 text-blue-500" />
+                            )
+                          }
+                        >
+                          <div className="flex flex-col">
+                            <span className="font-medium">{getUserDisplayName(u)}</span>
+                            <span className="text-xs text-slate-400">{getUserTypeLabel(u)}</span>
+                          </div>
+                        </SelectItem>
+                      ))}
+                    </Select>
+                    <Button
+                      color="primary"
+                      variant="flat"
+                      onPress={handleAssignTo}
+                      isDisabled={!assignToUserId || saving}
+                      isLoading={saving}
+                    >
+                      Assign
+                    </Button>
+                  </div>
+                </div>
+              )}
             </div>
 
             <Divider />
@@ -785,17 +1015,25 @@ export default function TaskDetailModal({
         </ModalBody>
 
         <ModalFooter>
-          <Button variant="flat" onPress={onClose}>
-            Close
-          </Button>
-          <Button
-            color="primary"
-            onPress={handleSave}
-            isLoading={saving}
-            isDisabled={!formData.title.trim()}
-          >
-            Save Changes
-          </Button>
+          {isEditing ? (
+            <>
+              <Button variant="flat" onPress={() => setIsEditing(false)}>
+                Cancel
+              </Button>
+              <Button
+                color="primary"
+                onPress={handleSave}
+                isLoading={saving}
+                isDisabled={!formData.title.trim()}
+              >
+                Save Changes
+              </Button>
+            </>
+          ) : (
+            <Button variant="flat" onPress={onClose}>
+              Close
+            </Button>
+          )}
         </ModalFooter>
       </ModalContent>
     </Modal>

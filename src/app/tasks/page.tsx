@@ -77,7 +77,7 @@ interface AIAgent {
   name: string
   slug: string
   role: string
-  is_active: boolean
+  is_active?: boolean
   model?: string
   system_prompt?: string
   capabilities?: string[]
@@ -92,7 +92,7 @@ interface AIAgent {
 interface Project {
   id: string
   name: string
-  business_id: string | null
+  business_id?: string | null
   space_id?: string | null
   description?: string | null
   status?: string
@@ -105,6 +105,9 @@ interface UserData {
   email: string
   name?: string
   avatar_url?: string
+  user_type?: string
+  is_agent?: boolean
+  display_name?: string
 }
 
 const statusOptions = [

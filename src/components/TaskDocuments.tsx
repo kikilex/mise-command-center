@@ -132,6 +132,7 @@ export default function TaskDocuments({ taskId, taskTitle, spaceId, userId }: Ta
           task_id: taskId,
           space_id: spaceId,
           created_by: userId,
+          doc_type: 'document',
         })
         .select()
         .single()
@@ -196,15 +197,6 @@ export default function TaskDocuments({ taskId, taskTitle, spaceId, userId }: Ta
           <p className="text-sm text-slate-500 dark:text-slate-400 mb-3">
             No documents linked to this task
           </p>
-          <Button
-            size="sm"
-            color="primary"
-            startContent={<Plus className="w-4 h-4" />}
-            onPress={handleCreateDocument}
-            isLoading={creating}
-          >
-            Create Document
-          </Button>
         </div>
       ) : (
         <div className="space-y-2">

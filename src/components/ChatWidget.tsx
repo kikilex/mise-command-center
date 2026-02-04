@@ -123,6 +123,7 @@ export default function ChatWidget() {
   const [assignSpaceId, setAssignSpaceId] = useState('')
   const [assignProjectId, setAssignProjectId] = useState('')
   const [deleteConfirm, setDeleteConfirm] = useState(false)
+  const [memberToRemove, setMemberToRemove] = useState<string | null>(null)
 
   /* ---- @mention ---- */
   const [showMentions, setShowMentions] = useState(false)
@@ -389,6 +390,15 @@ export default function ChatWidget() {
 
     const threadId = activeThread.id.startsWith('dm-') ? null : activeThread.id
 
+    // Extract @mentions from the message
+    const mentionRegex = /@(\w+)/g
+    const mentions: string[] = []
+    let match
+    while ((match = mentionRegex.exec(content)) !== null) {
+      mentions.push(match[1].toLowerCase())
+    }
+
+    // Send the main message
     const { data, error } = await supabase
       .from('inbox')
       .insert({
@@ -404,14 +414,63 @@ export default function ChatWidget() {
       })
       .select().single()
 
-    if (error) showErrorToast(error)
-    else setMessages(prev => [...prev, data])
+    if (error) {
+      showErrorToast(error)
+      return
+    }
+
+    setMessages(prev => [...prev, data])
+
+    // Add mentioned users to the thread if they're not already participants
+    if (threadId && mentions.length > 0) {
+      const currentParticipants = activeThread.participants.length > 0 
+        ? activeThread.participants 
+        : [activeThread.recipient]
+      
+      for (const mentionedUser of mentions) {
+        // Check if this is a valid recipient
+        const recipientInfo = RECIPIENTS.find(r => r.id.toLowerCase() === mentionedUser)
+        if (!recipientInfo) continue
+        
+        // Check if already a participant
+        if (currentParticipants.includes(recipientInfo.id)) continue
+        
+        // Add them to the thread by inserting a message
+        await supabase
+          .from('inbox')
+          .insert({
+            user_id: user.id,
+            content: `@${recipientInfo.name} was mentioned in this thread`,
+            item_type: 'message',
+            to_recipient: recipientInfo.id,
+            thread_id: threadId,
+            subject: activeThread.subject,
+            space_id: activeThread.spaceId || null,
+            project_id: activeThread.projectId || null,
+            status: 'pending',
+          })
+        
+        // Update local state
+        const updatedParticipants = [...currentParticipants, recipientInfo.id]
+        const updatedThread = { ...activeThread, participants: updatedParticipants }
+        setActiveThread(updatedThread)
+        setThreads(prev => prev.map(t => t.id === activeThread.id ? updatedThread : t))
+      }
+    }
   }
 
   async function handleStartNewChat() {
     if (!newRecipient || !newMessage.trim() || !user) return
     const content = newMessage.trim()
     const threadId = `thread-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+
+    // Extract @mentions from the message
+    const mentionRegex = /@(\w+)/g
+    const mentions: string[] = []
+    let match
+    while ((match = mentionRegex.exec(content)) !== null) {
+      mentions.push(match[1].toLowerCase())
+    }
 
     const { data, error } = await supabase
       .from('inbox')
@@ -430,6 +489,33 @@ export default function ChatWidget() {
 
     if (error) { showErrorToast(error); return }
 
+    // Start with the primary recipient as participant
+    const participants = [newRecipient]
+
+    // Add mentioned users to the thread
+    for (const mentionedUser of mentions) {
+      // Check if this is a valid recipient and not the primary recipient
+      const recipientInfo = RECIPIENTS.find(r => r.id.toLowerCase() === mentionedUser)
+      if (!recipientInfo || recipientInfo.id === newRecipient) continue
+      
+      // Add them to the thread by inserting a message
+      await supabase
+        .from('inbox')
+        .insert({
+          user_id: user.id,
+          content: `@${recipientInfo.name} was mentioned in this thread`,
+          item_type: 'message',
+          to_recipient: recipientInfo.id,
+          thread_id: threadId,
+          subject: newSubject.trim() || null,
+          space_id: composeSpaceId || null,
+          project_id: composeProjectId || null,
+          status: 'pending',
+        })
+      
+      participants.push(recipientInfo.id)
+    }
+
     const newThread: ChatThread = {
       id: threadId,
       recipient: newRecipient,
@@ -439,7 +525,7 @@ export default function ChatWidget() {
       unreadCount: 0,
       spaceId: composeSpaceId || null,
       projectId: composeProjectId || null,
-      participants: [newRecipient],
+      participants,
     }
 
     setThreads(prev => [newThread, ...prev])
@@ -494,6 +580,39 @@ export default function ChatWidget() {
     setThreads(prev => prev.map(t => t.id === activeThread.id ? { ...t, spaceId: assignSpaceId || null, projectId: assignProjectId || null } : t))
     setShowAssignPanel(false)
     showSuccessToast('Project assigned')
+  }
+
+  async function removeMember(memberName: string) {
+    if (!activeThread || !user) return
+    
+    // Don't allow removing the primary recipient (the thread starter)
+    if (memberName === activeThread.recipient) {
+      showErrorToast('Cannot remove the primary recipient from the thread')
+      return
+    }
+    
+    // For thread-based chats, we need to delete all messages for this member in the thread
+    if (!activeThread.id.startsWith('dm-')) {
+      const { error } = await supabase
+        .from('inbox')
+        .delete()
+        .eq('thread_id', activeThread.id)
+        .or(`from_agent.eq.${memberName},to_recipient.eq.${memberName}`)
+      
+      if (error) {
+        showErrorToast(error)
+        return
+      }
+    }
+    
+    // Update local state
+    const updatedParticipants = activeThread.participants.filter(p => p !== memberName)
+    const updatedThread = { ...activeThread, participants: updatedParticipants }
+    setActiveThread(updatedThread)
+    setThreads(prev => prev.map(t => t.id === activeThread.id ? updatedThread : t))
+    
+    setMemberToRemove(null)
+    showSuccessToast(`Removed ${cap(memberName)} from thread`)
   }
 
   async function handleDeleteThread() {
@@ -854,12 +973,45 @@ export default function ChatWidget() {
                     </div>
                     <div className="flex flex-wrap gap-1.5 mb-2">
                       {(activeThread.participants.length > 0 ? activeThread.participants : [activeThread.recipient]).map(p => (
-                        <span key={p} className="inline-flex items-center gap-1 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-full px-2.5 py-1 text-xs font-medium text-slate-700 dark:text-slate-200">
+                        <div key={p} className="inline-flex items-center gap-1 bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-full px-2.5 py-1 text-xs font-medium text-slate-700 dark:text-slate-200 group">
                           {cap(p)}
                           {isAI(p) && <Bot className="w-3 h-3 text-violet-500" />}
-                        </span>
+                          {/* Show trash icon for non-primary recipients */}
+                          {p !== activeThread.recipient && (
+                            <button
+                              onClick={() => setMemberToRemove(p)}
+                              className="ml-1 text-slate-400 hover:text-red-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                              title={`Remove ${cap(p)} from thread`}
+                            >
+                              <Trash2 className="w-3 h-3" />
+                            </button>
+                          )}
+                        </div>
                       ))}
                     </div>
+                    
+                    {/* Removal confirmation */}
+                    {memberToRemove && (
+                      <div className="mb-2 p-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg">
+                        <p className="text-xs text-red-700 dark:text-red-300 mb-2">
+                          Remove {cap(memberToRemove)} from this thread?
+                        </p>
+                        <div className="flex gap-2">
+                          <button
+                            onClick={() => removeMember(memberToRemove)}
+                            className="flex-1 px-2 py-1 text-xs font-medium bg-red-500 text-white rounded hover:bg-red-600 transition-colors"
+                          >
+                            Yes, remove
+                          </button>
+                          <button
+                            onClick={() => setMemberToRemove(null)}
+                            className="flex-1 px-2 py-1 text-xs font-medium bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300 rounded hover:bg-slate-300 dark:hover:bg-slate-600 transition-colors"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      </div>
+                    )}
                     <select
                       className="w-full h-8 rounded-lg bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 px-2 text-xs outline-none"
                       defaultValue=""

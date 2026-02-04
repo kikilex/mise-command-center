@@ -131,16 +131,32 @@ export default function DocumentEditPage({ params }: { params: Promise<{ id: str
 
     setSaving(true)
     try {
+      // First, save current version to document_versions table
+      if (document) {
+        const { error: versionError } = await supabase
+          .from('document_versions')
+          .insert({
+            document_id: id,
+            version: document.version || 1,
+            title: document.title,
+            content: document.content,
+            status: document.status,
+            created_by: user?.id || document.created_by,
+            change_summary: `Edited: ${document.title} → ${title.trim()}`
+          })
+
+        if (versionError) {
+          console.error('Save version error:', versionError)
+          // Continue anyway - don't fail the save if versioning fails
+        }
+      }
+
       const updates: Partial<Document> & { updated_at: string } = {
         title: title.trim(),
         content,
         status: status as 'draft' | 'in_review' | 'approved',
         updated_at: new Date().toISOString(),
-      }
-
-      // Increment version if status changed to approved
-      if (status === 'approved' && document?.status !== 'approved') {
-        updates.version = (document?.version || 1) + 1
+        version: (document?.version || 1) + 1, // Always increment version
       }
 
       const { error } = await supabase
