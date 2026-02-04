@@ -25,6 +25,7 @@ import {
   Users,
   FolderOpen,
   Trash2,
+  ArrowLeft,
 } from 'lucide-react'
 import { showErrorToast, showSuccessToast } from '@/lib/errors'
 
@@ -96,6 +97,9 @@ export default function ChatWidget() {
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(false)
 
+  /* ---- mobile ---- */
+  const [mobileShowConversation, setMobileShowConversation] = useState(false)
+
   /* ---- search ---- */
   const [search, setSearch] = useState('')
 
@@ -139,6 +143,16 @@ export default function ChatWidget() {
     return { w: 750, h: 550 }
   })
   const resizing = useRef<{ startX: number; startY: number; startW: number; startH: number } | null>(null)
+
+  /* ---- detect mobile (md breakpoint = 768px) ---- */
+  const [isMobile, setIsMobile] = useState(false)
+  useEffect(() => {
+    const mql = window.matchMedia('(max-width: 767px)')
+    setIsMobile(mql.matches)
+    const handler = (e: MediaQueryListEvent) => setIsMobile(e.matches)
+    mql.addEventListener('change', handler)
+    return () => mql.removeEventListener('change', handler)
+  }, [])
 
   const onResizeStart = useCallback((e: React.MouseEvent) => {
     e.preventDefault()
@@ -228,6 +242,7 @@ export default function ChatWidget() {
       if (thread) {
         setActiveThread(thread)
         setIsComposing(false)
+        setMobileShowConversation(true)
       }
       setIsOpen(true)
     }
@@ -497,6 +512,7 @@ export default function ChatWidget() {
     setActiveThread(null)
     setMessages([])
     setDeleteConfirm(false)
+    setMobileShowConversation(false)
     showSuccessToast('Thread deleted')
   }
 
@@ -562,13 +578,13 @@ export default function ChatWidget() {
     <div className="fixed bottom-6 right-6 z-[100] flex flex-col items-end gap-4">
       {isOpen && (
         <div
-          style={{ width: size.w, height: size.h }}
-          className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 flex overflow-hidden mb-2 animate-in fade-in slide-in-from-bottom-4 duration-200 relative"
+          style={isMobile ? undefined : { width: size.w, height: size.h }}
+          className="fixed inset-0 md:inset-auto md:relative bg-white dark:bg-slate-900 md:rounded-2xl shadow-2xl md:border border-slate-200 dark:border-slate-800 flex overflow-hidden md:mb-2 animate-in fade-in slide-in-from-bottom-4 duration-200 z-[101] md:z-auto"
         >
-          {/* resize handle — top-left corner */}
+          {/* resize handle — top-left corner (hidden on mobile) */}
           <div
             onMouseDown={onResizeStart}
-            className="absolute top-0 left-0 w-4 h-4 cursor-nw-resize z-50 group"
+            className="hidden md:block absolute top-0 left-0 w-4 h-4 cursor-nw-resize z-50 group"
             title="Drag to resize"
           >
             <div className="absolute top-1 left-1 w-2 h-2 border-t-2 border-l-2 border-slate-300 dark:border-slate-600 group-hover:border-blue-500 transition-colors rounded-tl" />
@@ -577,13 +593,13 @@ export default function ChatWidget() {
           {/* ============================================================ */}
           {/*  LEFT SIDEBAR                                                */}
           {/* ============================================================ */}
-          <div className="w-[250px] border-r border-slate-200 dark:border-slate-800 flex flex-col bg-slate-50 dark:bg-slate-950 flex-shrink-0">
+          <div className={`w-full md:w-[250px] border-r border-slate-200 dark:border-slate-800 flex flex-col bg-slate-50 dark:bg-slate-950 md:flex-shrink-0 ${mobileShowConversation ? 'hidden md:flex' : 'flex'}`}>
             {/* sidebar header */}
             <div className="p-3 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-2">
               <span className="font-bold text-sm text-slate-700 dark:text-slate-200 tracking-tight">Messages</span>
               <div className="flex items-center gap-1">
                 <button
-                  onClick={() => { setIsComposing(true); setActiveThread(null); setMessages([]) }}
+                  onClick={() => { setIsComposing(true); setActiveThread(null); setMessages([]); setMobileShowConversation(true) }}
                   className="w-7 h-7 rounded-lg bg-blue-500 hover:bg-blue-600 text-white flex items-center justify-center transition-colors"
                   title="New Thread"
                 >
@@ -624,7 +640,7 @@ export default function ChatWidget() {
                 return (
                   <div
                     key={t.id}
-                    onClick={() => { setActiveThread(t); setIsComposing(false) }}
+                    onClick={() => { setActiveThread(t); setIsComposing(false); setMobileShowConversation(true) }}
                     className={`px-3 py-2.5 cursor-pointer transition-colors flex items-center gap-2.5 ${
                       active
                         ? 'bg-blue-500 text-white'
@@ -723,11 +739,18 @@ export default function ChatWidget() {
           {/* ============================================================ */}
           {/*  RIGHT PANEL                                                 */}
           {/* ============================================================ */}
-          <div className="flex-1 flex flex-col min-w-0">
+          <div className={`flex-1 flex flex-col min-w-0 ${mobileShowConversation ? 'flex' : 'hidden md:flex'}`}>
             {activeThread ? (
               <>
                 {/* ---- header bar ---- */}
                 <div className="px-4 py-2.5 border-b border-slate-200 dark:border-slate-800 flex items-center gap-3 bg-white dark:bg-slate-900 flex-shrink-0">
+                  {/* Mobile back button */}
+                  <button
+                    onClick={() => setMobileShowConversation(false)}
+                    className="md:hidden w-8 h-8 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center transition-colors text-slate-500 flex-shrink-0"
+                  >
+                    <ArrowLeft className="w-5 h-5" />
+                  </button>
                   <div className="flex-1 min-w-0">
                     {editingTitle ? (
                       <div className="flex items-center gap-2">
@@ -1037,7 +1060,13 @@ export default function ChatWidget() {
             ) : isComposing ? (
               /* ---- compose new thread ---- */
               <div className="flex flex-col h-full">
-                <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex-shrink-0">
+                <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 flex-shrink-0 flex items-center gap-2">
+                  <button
+                    onClick={() => { setMobileShowConversation(false); setIsComposing(false) }}
+                    className="md:hidden w-8 h-8 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 flex items-center justify-center transition-colors text-slate-500 flex-shrink-0"
+                  >
+                    <ArrowLeft className="w-5 h-5" />
+                  </button>
                   <h3 className="font-semibold text-sm text-slate-800 dark:text-slate-100">New Conversation</h3>
                 </div>
                 <div className="flex-1 p-4 space-y-3 overflow-y-auto bg-slate-50 dark:bg-slate-950">

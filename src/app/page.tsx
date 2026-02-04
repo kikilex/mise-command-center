@@ -516,7 +516,7 @@ export default function Home() {
                                 </div>
                               )}
                             </div>
-                            <div className="hidden group-hover:flex items-center gap-1 flex-shrink-0">
+                            <div className="flex md:hidden md:group-hover:flex items-center gap-1 flex-shrink-0">
                               <Button 
                                 isIconOnly size="sm" variant="light" 
                                 className="w-7 h-7 min-w-7"
@@ -534,7 +534,7 @@ export default function Home() {
                                 <Trash2 className="w-3.5 h-3.5" />
                               </Button>
                             </div>
-                            <span className="text-[10px] text-slate-400 flex-shrink-0 group-hover:hidden mt-1">
+                            <span className="text-[10px] text-slate-400 flex-shrink-0 hidden md:block md:group-hover:hidden mt-1">
                               {new Date(item.created_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
                             </span>
                           </div>
