@@ -15,11 +15,17 @@ import {
   Select,
   SelectItem,
   Spinner,
+  Modal,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
+  Textarea,
 } from '@heroui/react'
 import { createClient } from '@/lib/supabase/client'
 import { useBusiness } from '@/lib/business-context'
 import Navbar from '@/components/Navbar'
-import { showErrorToast } from '@/lib/errors'
+import { showErrorToast, showSuccessToast } from '@/lib/errors'
 import toast from 'react-hot-toast'
 
 interface Document {
@@ -126,6 +132,12 @@ function DocsPageContent() {
   const [editArchived, setEditArchived] = useState(false)
   const [saving, setSaving] = useState(false)
   
+  // Quick note modal state
+  const [isNoteModalOpen, setIsNoteModalOpen] = useState(false)
+  const [noteTitle, setNoteTitle] = useState('')
+  const [noteContent, setNoteContent] = useState('')
+  const [creatingNote, setCreatingNote] = useState(false)
+  
   const supabase = createClient()
   const router = useRouter()
   const { selectedBusinessId } = useBusiness()
@@ -219,13 +231,21 @@ function DocsPageContent() {
   }
 
   async function handleCreateNote() {
+    setIsNoteModalOpen(true)
+  }
+
+  async function handleSaveQuickNote() {
     if (!user) return showErrorToast(null, 'Please sign in');
+    if (!noteTitle.trim()) return showErrorToast(null, 'Please enter a title');
+    if (!noteContent.trim()) return showErrorToast(null, 'Please enter content');
+
+    setCreatingNote(true)
     try {
       const { data, error } = await supabase
         .from('documents')
         .insert({
-          title: 'New Note',
-          content: 'Quick note content...',
+          title: noteTitle.trim(),
+          content: noteContent.trim(),
           status: 'approved',
           created_by: user.id,
           space_id: selectedBusinessId,
@@ -233,9 +253,16 @@ function DocsPageContent() {
         })
         .select().single()
       if (error) throw error
-      router.push(`/docs/${data.id}/edit`)
+      
+      showSuccessToast('Note created successfully')
+      setIsNoteModalOpen(false)
+      setNoteTitle('')
+      setNoteContent('')
+      loadDocuments() // Refresh the list
     } catch (error) {
       showErrorToast(error, 'Failed to create note')
+    } finally {
+      setCreatingNote(false)
     }
   }
 
@@ -278,13 +305,44 @@ function DocsPageContent() {
             <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Docs</h1>
           </div>
           <div className="flex gap-2">
-            <Button color="primary" onPress={handleCreateDocument} startContent={<Plus className="w-4 h-4" />}>
-              New Doc
+            <Button color="primary" size="sm" onPress={handleCreateDocument} startContent={<Plus className="w-4 h-4" />}>
+              + Doc
             </Button>
-            <Button color="secondary" variant="flat" onPress={handleCreateNote} startContent={<NotebookPen className="w-4 h-4" />}>
-              New Note
+            <Button color="secondary" size="sm" variant="flat" onPress={handleCreateNote} startContent={<NotebookPen className="w-4 h-4" />}>
+              + Note
             </Button>
           </div>
+        </div>
+
+        {/* Filter tabs */}
+        <div className="flex gap-1 mb-4">
+          <Button
+            size="sm"
+            variant={docTypeFilter === 'all' ? 'solid' : 'flat'}
+            color={docTypeFilter === 'all' ? 'primary' : 'default'}
+            onPress={() => setDocTypeFilter('all')}
+            className="rounded-full"
+          >
+            All
+          </Button>
+          <Button
+            size="sm"
+            variant={docTypeFilter === 'document' ? 'solid' : 'flat'}
+            color={docTypeFilter === 'document' ? 'primary' : 'default'}
+            onPress={() => setDocTypeFilter('document')}
+            className="rounded-full"
+          >
+            Documents
+          </Button>
+          <Button
+            size="sm"
+            variant={docTypeFilter === 'note' ? 'solid' : 'flat'}
+            color={docTypeFilter === 'note' ? 'primary' : 'default'}
+            onPress={() => setDocTypeFilter('note')}
+            className="rounded-full"
+          >
+            Notes
+          </Button>
         </div>
 
         <div className="flex flex-col sm:flex-row gap-3 mb-6">
@@ -306,15 +364,6 @@ function DocsPageContent() {
                 <SelectItem key={space.id}>{space.name}</SelectItem>
               ))}
             </>
-          </Select>
-          <Select
-            selectedKeys={[docTypeFilter]}
-            onChange={(e) => setDocTypeFilter(e.target.value)}
-            className="w-full sm:w-48"
-          >
-            <SelectItem key="all">All Types</SelectItem>
-            <SelectItem key="document">Documents</SelectItem>
-            <SelectItem key="note">Notes</SelectItem>
           </Select>
           <Select
             selectedKeys={[statusFilter]}
@@ -352,6 +401,47 @@ function DocsPageContent() {
             ))}
           </div>
         )}
+
+        {/* Quick Note Modal */}
+        <Modal isOpen={isNoteModalOpen} onClose={() => setIsNoteModalOpen(false)} size="md">
+          <ModalContent>
+            <ModalHeader className="flex items-center gap-2">
+              <NotebookPen className="w-5 h-5" />
+              Quick Note
+            </ModalHeader>
+            <ModalBody>
+              <Input
+                label="Title"
+                placeholder="Note title..."
+                value={noteTitle}
+                onChange={(e) => setNoteTitle(e.target.value)}
+                className="mb-4"
+                isRequired
+              />
+              <Textarea
+                label="Content"
+                placeholder="Write your note here..."
+                value={noteContent}
+                onChange={(e) => setNoteContent(e.target.value)}
+                minRows={6}
+                isRequired
+              />
+            </ModalBody>
+            <ModalFooter>
+              <Button variant="flat" onPress={() => setIsNoteModalOpen(false)}>
+                Cancel
+              </Button>
+              <Button
+                color="primary"
+                onPress={handleSaveQuickNote}
+                isLoading={creatingNote}
+                isDisabled={!noteTitle.trim() || !noteContent.trim()}
+              >
+                Save Note
+              </Button>
+            </ModalFooter>
+          </ModalContent>
+        </Modal>
       </main>
     </div>
   )

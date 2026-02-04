@@ -1,7 +1,9 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { MessageCircle, Eye, Download, Trash2, FileText, ClipboardList, Bot, RotateCcw, Paperclip, User, File } from 'lucide-react'
+import { MessageCircle, Eye, Download, Trash2, FileText, ClipboardList, Bot, RotateCcw, Paperclip, User, File, Pencil } from 'lucide-react'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 import {
   Modal,
   ModalContent,
@@ -65,6 +67,14 @@ interface Project {
   space_id?: string | null
   description?: string | null
   status?: string
+  created_at?: string
+  updated_at?: string
+}
+
+interface Space {
+  id: string
+  name: string
+  description?: string | null
   created_at?: string
   updated_at?: string
 }
@@ -156,6 +166,7 @@ export default function TaskDetailModal({
   const [users, setUsers] = useState<UserData[]>([])
   const [agents, setAgents] = useState<AIAgent[]>([])
   const [projects, setProjects] = useState<Project[]>([])
+  const [spaces, setSpaces] = useState<Space[]>([])
   const [saving, setSaving] = useState(false)
   const [loadingFiles, setLoadingFiles] = useState(false)
   const [loadingData, setLoadingData] = useState(false)
@@ -215,9 +226,15 @@ export default function TaskDetailModal({
       
       const { data: projectsData } = await projectQuery
 
+      // Fetch Spaces
+      const { data: spacesData } = await supabase
+        .from('spaces')
+        .select('id, name')
+
       setUsers(usersData || [])
       setAgents(agentsData || [])
       setProjects(projectsData || [])
+      setSpaces(spacesData || [])
     } catch (error) {
       console.error('Error loading dropdown data:', error)
     } finally {
@@ -316,6 +333,7 @@ export default function TaskDetailModal({
       showSuccessToast(`Task assigned to ${userToAssign.name || userToAssign.email}`)
       setAssignToUserId('') // Reset dropdown
       onTaskUpdated()
+      onClose() // Close modal after assignment
     } catch (error) {
       console.error('Assign error:', error)
       showErrorToast(error, 'Failed to assign task')
@@ -542,6 +560,15 @@ export default function TaskDetailModal({
     return 'No project'
   }
 
+  // Helper function to get space name
+  const getSpaceName = () => {
+    if (formData.space_id) {
+      const space = spaces.find(s => s.id === formData.space_id)
+      return space ? space.name : 'Unknown space'
+    }
+    return 'No space'
+  }
+
   if (!task) return null
 
   return (
@@ -568,12 +595,10 @@ export default function TaskDetailModal({
               <Button
                 size="sm"
                 variant="flat"
-                startContent={<svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-                  <path strokeLinecap="round" strokeLinejoin="round" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
-                </svg>}
+                isIconOnly
                 onPress={() => setIsEditing(true)}
               >
-                Edit
+                <Pencil className="w-4 h-4" />
               </Button>
             )}
           </div>
@@ -690,7 +715,9 @@ export default function TaskDetailModal({
                     {formData.description && (
                       <div>
                         <label className="text-sm font-medium text-slate-500 dark:text-slate-400">Description</label>
-                        <p className="text-slate-700 dark:text-slate-300 mt-1 whitespace-pre-wrap">{formData.description}</p>
+                        <div className="text-slate-700 dark:text-slate-300 mt-1 prose prose-slate dark:prose-invert max-w-none">
+                          <ReactMarkdown remarkPlugins={[remarkGfm]}>{formData.description || ''}</ReactMarkdown>
+                        </div>
                       </div>
                     )}
                     
@@ -731,22 +758,64 @@ export default function TaskDetailModal({
                       <div>
                         <label className="text-sm font-medium text-slate-500 dark:text-slate-400">Priority</label>
                         <div className="mt-1">
-                          <Chip
-                            size="lg"
-                            color={getStatusChipColor(formData.priority) as any}
-                            variant="flat"
-                            className="capitalize"
+                          <Select
+                            size="sm"
+                            selectedKeys={[formData.priority]}
+                            onChange={(e) => {
+                              setFormData({ ...formData, priority: e.target.value })
+                              // Auto-save priority change
+                              if (task) {
+                                supabase
+                                  .from('tasks')
+                                  .update({ priority: e.target.value })
+                                  .eq('id', task.id)
+                                  .then(() => {
+                                    showSuccessToast('Priority updated')
+                                    onTaskUpdated()
+                                  })
+                                  .catch(error => {
+                                    console.error('Update priority error:', error)
+                                    showErrorToast(error, 'Failed to update priority')
+                                  })
+                              }
+                            }}
+                            className="w-full"
                           >
-                            {getPriorityLabel(formData.priority)}
-                          </Chip>
+                            {priorityOptions.map(p => (
+                              <SelectItem key={p.key}>{p.label}</SelectItem>
+                            ))}
+                          </Select>
                         </div>
                       </div>
                       
                       <div>
                         <label className="text-sm font-medium text-slate-500 dark:text-slate-400">Due Date</label>
-                        <p className="text-slate-700 dark:text-slate-300 mt-1">
-                          {formData.due_date ? new Date(formData.due_date).toLocaleDateString() : 'No due date'}
-                        </p>
+                        <div className="mt-1">
+                          <Input
+                            type="date"
+                            size="sm"
+                            value={formData.due_date}
+                            onChange={(e) => {
+                              setFormData({ ...formData, due_date: e.target.value })
+                              // Auto-save due date change
+                              if (task) {
+                                supabase
+                                  .from('tasks')
+                                  .update({ due_date: e.target.value || null })
+                                  .eq('id', task.id)
+                                  .then(() => {
+                                    showSuccessToast('Due date updated')
+                                    onTaskUpdated()
+                                  })
+                                  .catch(error => {
+                                    console.error('Update due date error:', error)
+                                    showErrorToast(error, 'Failed to update due date')
+                                  })
+                              }
+                            }}
+                            className="w-full"
+                          />
+                        </div>
                       </div>
                     </div>
 
@@ -764,7 +833,7 @@ export default function TaskDetailModal({
                       <div>
                         <label className="text-sm font-medium text-slate-500 dark:text-slate-400">Space</label>
                         <p className="text-slate-700 dark:text-slate-300 mt-1">
-                          {formData.space_id ? `Space ${formData.space_id.substring(0, 8)}...` : 'No space'}
+                          {getSpaceName()}
                         </p>
                       </div>
                     </div>

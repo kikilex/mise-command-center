@@ -20,10 +20,13 @@ import {
   Avatar,
   Divider,
   ScrollShadow,
+  Tabs,
+  Tab,
 } from "@heroui/react";
 import { useState, useEffect, useMemo } from "react";
 import { createClient } from '@/lib/supabase/client'
 import Navbar from '@/components/Navbar'
+import EditAgentModal from '@/components/EditAgentModal'
 import { showErrorToast, showSuccessToast } from '@/lib/errors'
 import { ErrorFallback } from '@/components/ErrorBoundary'
 import { 
@@ -40,6 +43,7 @@ import {
   Check,
   X,
   Clock,
+  Settings,
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
@@ -97,6 +101,11 @@ interface AIAgent {
   slug: string
   is_active: boolean
   role: string
+  model?: string
+  system_prompt?: string
+  capabilities?: string[]
+  settings?: any
+  avatar_url?: string
   last_action?: string
   last_action_at?: string
 }
@@ -154,8 +163,12 @@ export default function Home() {
   // Agent modal state
   const [selectedAgent, setSelectedAgent] = useState<AIAgent | null>(null);
   const { isOpen: isAgentModalOpen, onOpen: onAgentModalOpen, onClose: onAgentModalClose } = useDisclosure();
+  const { isOpen: isEditAgentOpen, onOpen: onEditAgentOpen, onClose: onEditAgentClose } = useDisclosure();
   const [agentTasks, setAgentTasks] = useState<{upcoming: Task[], completed: Task[]}>({ upcoming: [], completed: [] });
   const [loadingAgentTasks, setLoadingAgentTasks] = useState(false);
+  
+  // What's Next tab state
+  const [whatsNextTab, setWhatsNextTab] = useState<'top3' | 'dueToday'>('top3');
   
   const supabase = createClient();
   const router = useRouter();
@@ -387,13 +400,20 @@ export default function Home() {
     if (inboxItems.length === 0 || !user) return;
     setSubmitting(true);
     try {
+      const now = new Date();
+      const dateStr = now.toLocaleDateString();
+      const timeStr = now.toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' });
+      const timestamp = Date.now();
+      
       const content = `Please organize my brain dump:\n${inboxItems.map(i => `- ${i.content}`).join('\n')}`;
       const { error: msgError } = await supabase.from('inbox').insert({
         user_id: user.id,
         content,
         item_type: 'message',
         to_recipient: 'ax',
-        status: 'pending'
+        status: 'pending',
+        subject: `Brain Dump - ${dateStr} ${timeStr}`,
+        thread_id: `braindump-${timestamp}`
       });
       if (msgError) throw msgError;
 
@@ -545,20 +565,45 @@ export default function Home() {
     }
   };
 
-  // Group tasks by project for What's Next section
-  const groupedTasks = useMemo(() => {
-    const groups: Record<string, Task[]> = {};
+  // Get top 3 highest priority tasks
+  const top3Tasks = useMemo(() => {
+    // Sort by priority (critical > high > medium > low) and then by due date
+    const priorityOrder = { critical: 4, high: 3, medium: 2, low: 1 };
+    return [...todaysTasks]
+      .sort((a, b) => {
+        const priorityDiff = priorityOrder[b.priority as keyof typeof priorityOrder] - priorityOrder[a.priority as keyof typeof priorityOrder];
+        if (priorityDiff !== 0) return priorityDiff;
+        
+        // If same priority, sort by due date (earlier first)
+        if (a.due_date && b.due_date) {
+          return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
+        }
+        if (a.due_date) return -1;
+        if (b.due_date) return 1;
+        return 0;
+      })
+      .slice(0, 3);
+  }, [todaysTasks]);
+
+  // Get tasks due today
+  const dueTodayTasks = useMemo(() => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const tomorrow = new Date(today);
+    tomorrow.setDate(tomorrow.getDate() + 1);
     
-    todaysTasks.slice(0, 7).forEach(task => {
-      const spaceName = spaces.find(s => s.id === task.space_id)?.name || 'General';
-      if (!groups[spaceName]) {
-        groups[spaceName] = [];
-      }
-      groups[spaceName].push(task);
-    });
-    
-    return groups;
-  }, [todaysTasks, spaces]);
+    return todaysTasks.filter(task => {
+      if (!task.due_date) return false;
+      const dueDate = new Date(task.due_date);
+      dueDate.setHours(0, 0, 0, 0);
+      return dueDate.getTime() === today.getTime();
+    }).slice(0, 3);
+  }, [todaysTasks]);
+
+  // Get tasks to display based on active tab
+  const displayedTasks = useMemo(() => {
+    return whatsNextTab === 'top3' ? top3Tasks : dueTodayTasks;
+  }, [whatsNextTab, top3Tasks, dueTodayTasks]);
 
   if (loadError && !loading) {
     return (
@@ -755,62 +800,72 @@ export default function Home() {
                   </div>
                   <div>
                     <h2 className="text-lg font-bold">What's Next</h2>
-                    <p className="text-xs text-slate-500">Top 3 priorities</p>
+                    <p className="text-xs text-slate-500">{whatsNextTab === 'top3' ? 'Top 3 priorities' : 'Due today'}</p>
                   </div>
                 </div>
-                <Button variant="light" color="primary" onPress={() => router.push('/tasks')}>View All</Button>
+                <div className="flex items-center gap-2">
+                  <Tabs 
+                    selectedKey={whatsNextTab} 
+                    onSelectionChange={(key) => setWhatsNextTab(key as 'top3' | 'dueToday')}
+                    size="sm"
+                    classNames={{
+                      tabList: "gap-0 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg",
+                      tab: "px-3 h-7 data-[selected=true]:bg-white dark:data-[selected=true]:bg-slate-900",
+                      cursor: "hidden"
+                    }}
+                  >
+                    <Tab key="top3" title="Top 3" />
+                    <Tab key="dueToday" title="Due Today" />
+                  </Tabs>
+                  <Button variant="light" color="primary" onPress={() => router.push('/tasks')}>View All</Button>
+                </div>
               </CardHeader>
               <CardBody className="p-4">
                 {loading ? (
                   <div className="space-y-2">
                     {[1, 2, 3].map(i => <Skeleton key={i} className="h-16 rounded-xl w-full" />)}
                   </div>
-                ) : Object.keys(groupedTasks).length === 0 && completedTasks.length === 0 ? (
+                ) : displayedTasks.length === 0 && completedTasks.length === 0 ? (
                   <div className="text-center py-12">
                     <CheckCircle2 className="w-12 h-12 text-emerald-500 mx-auto mb-3" />
                     <p className="text-slate-500">The hit list is empty.</p>
                   </div>
                 ) : (
                   <>
-                    {/* Active tasks - grouped by project */}
-                    <div className="space-y-4">
-                      {Object.entries(groupedTasks).map(([projectName, projectTasks]) => (
-                        <div key={projectName} className="space-y-2">
-                          <div className="flex items-center gap-2 px-1">
-                            <div className="w-2 h-2 rounded-full bg-emerald-500" />
-                            <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400">{projectName}</h3>
-                            <div className="flex-1 h-px bg-slate-100 dark:bg-slate-800" />
-                            <span className="text-[10px] text-slate-400">{projectTasks.length} task{projectTasks.length !== 1 ? 's' : ''}</span>
-                          </div>
-                          {projectTasks.map((task) => (
-                            <div 
-                              key={task.id}
-                              onClick={() => handleTaskClick(task)}
-                              className="group flex items-center gap-4 p-4 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer transition-all border border-transparent hover:border-slate-200 dark:hover:border-slate-700"
-                            >
-                              <div className={`w-3 h-3 rounded-full flex-shrink-0 ${getPriorityColor(task.priority)} shadow-lg shadow-current/20`} />
-                              <div className="flex-1 min-w-0">
-                                <p className="font-bold text-slate-800 dark:text-slate-200 truncate">{task.title}</p>
-                                <div className="flex items-center gap-2 mt-1">
-                                  <Chip size="sm" variant="flat" color="default" className="h-5 text-[10px] uppercase font-bold tracking-tight">
-                                    {task.priority}
-                                  </Chip>
-                                  {task.due_date && (
-                                    <div className="flex items-center gap-1 text-[10px] text-slate-400">
-                                      <Clock className="w-3 h-3" />
-                                      {new Date(task.due_date).toLocaleDateString()}
-                                    </div>
-                                  )}
+                    {/* Active tasks - flat list */}
+                    <div className="space-y-2">
+                      {displayedTasks.map((task) => (
+                        <div 
+                          key={task.id}
+                          onClick={() => handleTaskClick(task)}
+                          className="group flex items-center gap-4 p-4 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer transition-all border border-transparent hover:border-slate-200 dark:hover:border-slate-700"
+                        >
+                          <div className={`w-3 h-3 rounded-full flex-shrink-0 ${getPriorityColor(task.priority)} shadow-lg shadow-current/20`} />
+                          <div className="flex-1 min-w-0">
+                            <p className="font-bold text-slate-800 dark:text-slate-200 truncate">{task.title}</p>
+                            <div className="flex items-center gap-2 mt-1">
+                              <Chip size="sm" variant="flat" color="default" className="h-5 text-[10px] uppercase font-bold tracking-tight">
+                                {task.priority}
+                              </Chip>
+                              {task.due_date && (
+                                <div className="flex items-center gap-1 text-[10px] text-slate-400">
+                                  <Clock className="w-3 h-3" />
+                                  {new Date(task.due_date).toLocaleDateString()}
                                 </div>
-                              </div>
-                              <button 
-                                onClick={(e) => { e.stopPropagation(); toggleTaskDone(task.id); }}
-                                className="w-10 h-10 rounded-xl border-2 border-slate-200 dark:border-slate-700 flex items-center justify-center group-hover:border-emerald-500 group-hover:bg-emerald-50 dark:group-hover:bg-emerald-900/20 transition-all"
-                              >
-                                <CheckCircle2 className="w-5 h-5 text-transparent group-hover:text-emerald-500" />
-                              </button>
+                              )}
+                              {task.space_id && (
+                                <Chip size="sm" variant="flat" color="secondary" className="h-5 text-[10px]">
+                                  {spaces.find(s => s.id === task.space_id)?.name || 'General'}
+                                </Chip>
+                              )}
                             </div>
-                          ))}
+                          </div>
+                          <button 
+                            onClick={(e) => { e.stopPropagation(); toggleTaskDone(task.id); }}
+                            className="w-10 h-10 rounded-xl border-2 border-slate-200 dark:border-slate-700 flex items-center justify-center group-hover:border-emerald-500 group-hover:bg-emerald-50 dark:group-hover:bg-emerald-900/20 transition-all"
+                          >
+                            <CheckCircle2 className="w-5 h-5 text-transparent group-hover:text-emerald-500" />
+                          </button>
                         </div>
                       ))}
                     </div>
@@ -1127,11 +1182,37 @@ export default function Home() {
       <Modal isOpen={isAgentModalOpen} onClose={onAgentModalClose} size="lg">
         <ModalContent>
           <ModalHeader className="flex flex-col gap-1">
-            <div className="flex items-center gap-3">
-              <Avatar name={selectedAgent?.name} size="lg" className="bg-gradient-to-br from-violet-500 to-purple-600 text-white font-black" />
-              <div>
-                <h2 className="text-lg font-bold">{selectedAgent?.name}</h2>
-                <p className="text-sm text-slate-400 capitalize">{selectedAgent?.role?.replace(/_/g, ' ')}</p>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <Avatar name={selectedAgent?.name} size="lg" className="bg-gradient-to-br from-violet-500 to-purple-600 text-white font-black" />
+                <div>
+                  <h2 className="text-lg font-bold">{selectedAgent?.name}</h2>
+                  <p className="text-sm text-slate-400 capitalize">{selectedAgent?.role?.replace(/_/g, ' ')}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button 
+                  isIconOnly 
+                  size="sm" 
+                  variant="flat" 
+                  onPress={() => {
+                    if (selectedAgent) {
+                      window.dispatchEvent(new CustomEvent('open-chat-thread', { 
+                        detail: { recipient: selectedAgent.slug } 
+                      }));
+                    }
+                  }}
+                >
+                  <MessageCircle className="w-4 h-4" />
+                </Button>
+                <Button 
+                  isIconOnly 
+                  size="sm" 
+                  variant="flat" 
+                  onPress={onEditAgentOpen}
+                >
+                  <Settings className="w-4 h-4" />
+                </Button>
               </div>
             </div>
           </ModalHeader>
@@ -1222,7 +1303,7 @@ export default function Home() {
                             <p className="text-xs text-slate-400">{task.priority}</p>
                           </div>
                           <span className="text-xs text-slate-400 flex-shrink-0">
-                            {new Date(task.updated_at || task.created_at).toLocaleDateString()}
+                            {(task.updated_at || task.created_at) ? new Date(task.updated_at || task.created_at!).toLocaleDateString() : ''}
                           </span>
                         </div>
                       ))}
@@ -1239,6 +1320,14 @@ export default function Home() {
           </ModalFooter>
         </ModalContent>
       </Modal>
+
+      {/* Edit Agent Modal */}
+      <EditAgentModal 
+        isOpen={isEditAgentOpen}
+        onClose={onEditAgentClose}
+        onSuccess={loadData}
+        agent={selectedAgent}
+      />
     </div>
   );
 }

@@ -444,11 +444,12 @@ export default function CalendarPage() {
               </h1>
               <div className="flex gap-2">
                 <Button
+                  isIconOnly
                   color="primary"
-                  startContent={<Plus className="w-4 h-4" />}
+                  radius="full"
                   onPress={() => openNewEventModal()}
                 >
-                  New Event
+                  <Plus className="w-5 h-5" />
                 </Button>
               </div>
             </div>
@@ -642,29 +643,29 @@ export default function CalendarPage() {
                                 
                                 {/* Delete confirmation */}
                                 {isDeleting && (
-                                  <div className="absolute top-0 left-0 right-0 bottom-0 bg-red-50 dark:bg-red-900/30 rounded flex items-center justify-between px-1 z-10">
-                                    <span className="text-xs font-medium text-red-700 dark:text-red-300">Delete?</span>
-                                    <div className="flex gap-1">
+                                  <div className="absolute top-0 left-0 right-0 bottom-0 bg-red-100 dark:bg-red-900/50 rounded border border-red-300 dark:border-red-700 flex flex-col items-center justify-center px-2 py-1 z-20 shadow-md">
+                                    <span className="text-xs font-bold text-red-800 dark:text-red-200 mb-1">Delete this event?</span>
+                                    <div className="flex gap-2">
                                       <button
                                         onClick={(e) => {
                                           e.stopPropagation()
                                           setShowDeleteConfirm(false)
                                           setEventToDelete(null)
                                         }}
-                                        className="p-0.5 hover:bg-red-100 dark:hover:bg-red-800 rounded"
+                                        className="px-2 py-0.5 text-xs bg-white dark:bg-red-800 text-red-700 dark:text-red-200 rounded border border-red-300 dark:border-red-600 hover:bg-red-50 dark:hover:bg-red-700 transition-colors"
                                         title="Cancel"
                                       >
-                                        <X className="w-3 h-3" />
+                                        Cancel
                                       </button>
                                       <button
                                         onClick={(e) => {
                                           e.stopPropagation()
                                           handleDeleteEvent(event)
                                         }}
-                                        className="p-0.5 hover:bg-red-100 dark:hover:bg-red-800 rounded"
+                                        className="px-2 py-0.5 text-xs bg-red-600 dark:bg-red-700 text-white rounded border border-red-700 dark:border-red-600 hover:bg-red-700 dark:hover:bg-red-600 transition-colors"
                                         title="Confirm delete"
                                       >
-                                        <Check className="w-3 h-3" />
+                                        Delete
                                       </button>
                                     </div>
                                   </div>
@@ -804,12 +805,55 @@ export default function CalendarPage() {
               </div>
             </ModalBody>
             <ModalFooter>
-              <Button variant="flat" onPress={() => { setIsEventModalOpen(false); resetEventForm() }}>
-                Cancel
-              </Button>
-              <Button color="primary" onPress={handleSaveEvent} isLoading={saving}>
-                {selectedEvent ? 'Update' : 'Create'}
-              </Button>
+              <div className="flex justify-between w-full">
+                <div>
+                  {selectedEvent && showDeleteConfirm && eventToDelete?.id === selectedEvent.id ? (
+                    <div className="flex items-center gap-2 bg-red-50 dark:bg-red-900/30 rounded-lg px-3 py-2 border border-red-200 dark:border-red-700">
+                      <span className="text-sm font-medium text-red-700 dark:text-red-300">Delete event?</span>
+                      <div className="flex gap-1">
+                        <Button
+                          size="sm"
+                          variant="flat"
+                          onPress={() => {
+                            setShowDeleteConfirm(false)
+                            setEventToDelete(null)
+                          }}
+                        >
+                          Cancel
+                        </Button>
+                        <Button
+                          size="sm"
+                          color="danger"
+                          onPress={() => handleDeleteEvent(selectedEvent)}
+                          isLoading={saving}
+                        >
+                          Delete
+                        </Button>
+                      </div>
+                    </div>
+                  ) : selectedEvent ? (
+                    <Button
+                      color="danger"
+                      variant="flat"
+                      startContent={<Trash2 className="w-4 h-4" />}
+                      onPress={() => {
+                        setEventToDelete(selectedEvent)
+                        setShowDeleteConfirm(true)
+                      }}
+                    >
+                      Delete
+                    </Button>
+                  ) : null}
+                </div>
+                <div className="flex gap-2">
+                  <Button variant="flat" onPress={() => { setIsEventModalOpen(false); resetEventForm() }}>
+                    Cancel
+                  </Button>
+                  <Button color="primary" onPress={handleSaveEvent} isLoading={saving}>
+                    {selectedEvent ? 'Update' : 'Create'}
+                  </Button>
+                </div>
+              </div>
             </ModalFooter>
           </ModalContent>
         </Modal>

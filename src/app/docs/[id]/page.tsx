@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo, use, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
+import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
@@ -103,6 +103,7 @@ const categoryOptions = [
 
 export default function DocumentReaderPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
+  const searchParams = useSearchParams()
   const [document, setDocument] = useState<Document | null>(null)
   const [user, setUser] = useState<UserData | null>(null)
   const [loading, setLoading] = useState(true)
@@ -669,13 +670,24 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
 
         {/* Top Navigation */}
         <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
-          <Link href="/docs">
-            <Button variant="flat" isIconOnly title="Back to all documents">
-              <ArrowLeft className="w-5 h-5" />
-            </Button>
-          </Link>
+          <Button 
+            variant="flat" 
+            isIconOnly 
+            title={searchParams.get('from') === 'space' ? 'Back to space' : 'Back to all documents'}
+            onPress={() => {
+              if (searchParams.get('from') === 'space') {
+                const spaceId = searchParams.get('spaceId')
+                const tab = searchParams.get('tab') || 'docs'
+                router.push(`/spaces/${spaceId}?tab=${tab}`)
+              } else {
+                router.push('/docs')
+              }
+            }}
+          >
+            <ArrowLeft className="w-5 h-5" />
+          </Button>
           
-          <div className="flex items-center gap-2 flex-wrap">
+          <div className="flex items-center gap-3 flex-wrap gap-y-2">
             {tableOfContents.length > 2 && (
               <Button
                 variant="flat"
@@ -1304,9 +1316,20 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
             <p>Created {formatDate(document.created_at)}</p>
           </div>
           <div className="flex items-center gap-4">
-            <Link href="/docs" className="hover:text-violet-600 dark:hover:text-violet-400">
-              ← Back to Documents
-            </Link>
+            <button 
+              onClick={() => {
+                if (searchParams.get('from') === 'space') {
+                  const spaceId = searchParams.get('spaceId')
+                  const tab = searchParams.get('tab') || 'docs'
+                  router.push(`/spaces/${spaceId}?tab=${tab}`)
+                } else {
+                  router.push('/docs')
+                }
+              }}
+              className="hover:text-violet-600 dark:hover:text-violet-400"
+            >
+              ← {searchParams.get('from') === 'space' ? 'Back to Space' : 'Back to Documents'}
+            </button>
             <Link href={`/docs/${id}/edit`} className="hover:text-violet-600 dark:hover:text-violet-400">
               Edit Document →
             </Link>

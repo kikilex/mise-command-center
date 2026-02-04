@@ -43,6 +43,7 @@ export default function SpaceDetailPage() {
   const [selectedTab, setSelectedTab] = useState<string>('overview')
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null)
   const [removingMemberId, setRemovingMemberId] = useState<string | null>(null)
+  const [confirmingMemberId, setConfirmingMemberId] = useState<string | null>(null)
   
   const { isOpen: isTaskOpen, onOpen: onTaskOpen, onClose: onTaskClose } = useDisclosure()
   const { isOpen: isProjectOpen, onOpen: onProjectOpen, onClose: onProjectClose } = useDisclosure()
@@ -81,7 +82,7 @@ export default function SpaceDetailPage() {
     try {
       const [spaceRes, membersRes, tasksRes, projectsRes, docsRes, threadsRes, userRoleRes] = await Promise.all([
         supabase.from('spaces').select('*').eq('id', id).single(),
-        supabase.from('space_members').select('*, users(*)').eq('space_id', id),
+        supabase.from('space_members').select('*, user:users!space_members_user_id_fkey(*)').eq('space_id', id),
         supabase.from('tasks')
           .select('*, assignee:users(*)')
           .eq('space_id', id)
@@ -101,11 +102,11 @@ export default function SpaceDetailPage() {
           .eq('space_id', id)
           .order('created_at', { ascending: false }),
         // Get current user's role in this space
-        supabase.from('space_members')
+        user?.id ? supabase.from('space_members')
           .select('role')
           .eq('space_id', id)
-          .eq('user_id', user?.id)
-          .single()
+          .eq('user_id', user.id)
+          .single() : Promise.resolve({ data: null, error: null })
       ])
 
       if (spaceRes.error) throw spaceRes.error
@@ -174,10 +175,6 @@ export default function SpaceDetailPage() {
 
   // Remove member function
   async function removeMember(memberId: string) {
-    if (!confirm('Are you sure you want to remove this member?')) {
-      return
-    }
-
     setRemovingMemberId(memberId)
     try {
       const response = await fetch(`/api/spaces/${id}/members?memberId=${memberId}`, {
@@ -480,8 +477,8 @@ export default function SpaceDetailPage() {
                     {members.slice(0, 5).map(m => (
                       <Avatar 
                         key={m.id} 
-                        src={m.users.avatar_url} 
-                        name={m.users.display_name || m.users.name} 
+                        src={m.user?.avatar_url} 
+                        name={m.user?.display_name || m.user?.name} 
                       />
                     ))}
                   </AvatarGroup>
@@ -491,12 +488,12 @@ export default function SpaceDetailPage() {
                   {members.slice(0, 4).map(member => (
                     <div key={member.id} className="flex items-center gap-3 p-3 rounded-lg hover:bg-default-100">
                       <Avatar 
-                        src={member.users.avatar_url} 
-                        name={member.users.display_name || member.users.name} 
+                        src={member.user?.avatar_url} 
+                        name={member.user?.display_name || member.user?.name} 
                         size="sm"
                       />
                       <div>
-                        <p className="font-medium text-foreground">{member.users.display_name || member.users.name}</p>
+                        <p className="font-medium text-foreground">{member.user?.display_name || member.user?.name}</p>
                         <p className="text-xs text-default-400 capitalize">{member.role}</p>
                       </div>
                     </div>
@@ -740,7 +737,7 @@ export default function SpaceDetailPage() {
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {documents.map(doc => (
-                    <Card key={doc.id} isPressable onPress={() => router.push(`/docs/${doc.id}`)}>
+                    <Card key={doc.id} isPressable onPress={() => router.push(`/docs/${doc.id}?from=space&spaceId=${id}&tab=docs`)}>
                       <CardBody className="p-4">
                         <div className="flex items-center justify-between mb-2">
                           <h3 className="font-semibold text-foreground truncate">{doc.title}</h3>
@@ -846,12 +843,12 @@ export default function SpaceDetailPage() {
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-3">
                           <Avatar 
-                            src={member.users.avatar_url} 
-                            name={member.users.display_name || member.users.name} 
+                            src={member.user?.avatar_url} 
+                            name={member.user?.display_name || member.user?.name} 
                             size="md"
                           />
                           <div>
-                            <p className="font-semibold">{member.users.display_name || member.users.name}</p>
+                            <p className="font-semibold">{member.user?.display_name || member.user?.name}</p>
                             <div className="flex items-center gap-2">
                               <p className="text-xs text-default-400 capitalize">{member.role}</p>
                               {member.role === 'owner' && (
@@ -863,17 +860,42 @@ export default function SpaceDetailPage() {
                           </div>
                         </div>
                         {canManageMembers && member.role !== 'owner' && (
-                          <Button
-                            size="sm"
-                            variant="light"
-                            color="danger"
-                            isLoading={removingMemberId === member.id}
-                            isIconOnly
-                            onPress={() => removeMember(member.id)}
-                            title="Remove member"
-                          >
-                            <X className="w-4 h-4" />
-                          </Button>
+                          confirmingMemberId === member.id ? (
+                            <div className="flex items-center gap-1">
+                              <span className="text-xs text-default-500 mr-2">Remove?</span>
+                              <Button
+                                size="sm"
+                                variant="flat"
+                                color="danger"
+                                isIconOnly
+                                onPress={() => removeMember(member.id)}
+                                title="Yes, remove"
+                              >
+                                ✓
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="flat"
+                                isIconOnly
+                                onPress={() => setConfirmingMemberId(null)}
+                                title="Cancel"
+                              >
+                                <X className="w-3 h-3" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <Button
+                              size="sm"
+                              variant="light"
+                              color="danger"
+                              isLoading={removingMemberId === member.id}
+                              isIconOnly
+                              onPress={() => setConfirmingMemberId(member.id)}
+                              title="Remove member"
+                            >
+                              <X className="w-4 h-4" />
+                            </Button>
+                          )
                         )}
                       </div>
                       {member.user_id === user?.id && (

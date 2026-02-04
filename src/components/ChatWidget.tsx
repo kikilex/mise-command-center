@@ -96,6 +96,7 @@ export default function ChatWidget() {
   const [newMessage, setNewMessage] = useState('')
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(false)
+  const [currentUserName, setCurrentUserName] = useState<string>('ax') // Default to 'ax' for Alex
 
   /* ---- mobile ---- */
   const [mobileShowConversation, setMobileShowConversation] = useState(false)
@@ -226,13 +227,18 @@ export default function ChatWidget() {
 
     const channel = supabase
       .channel('chat-widget')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'inbox' }, (payload) => {
+      .on('postgres_changes', { 
+        event: 'INSERT', 
+        schema: 'public', 
+        table: 'inbox',
+        filter: `to_recipient=eq.${currentUserName}` // Messages to current user
+      }, (payload) => {
         handleIncomingMessage(payload.new as any)
       })
       .subscribe()
 
     return () => { supabase.removeChannel(channel) }
-  }, [])
+  }, [currentUserName])
 
   // Listen for open-chat-thread from dashboard
   useEffect(() => {
@@ -299,6 +305,7 @@ export default function ChatWidget() {
       .select('*')
       .eq('item_type', 'message')
       .eq('status', 'pending')
+      .eq('to_recipient', currentUserName) // Only messages to current user
       .order('created_at', { ascending: false })
 
     if (!data) return
@@ -350,9 +357,11 @@ export default function ChatWidget() {
 
   function handleIncomingMessage(msg: any) {
     if (msg.item_type !== 'message') return
+    
     const partner = msg.from_agent || msg.to_recipient
     const threadId = msg.thread_id || `dm-${partner}`
 
+    // Update thread list (all messages from subscription are to current user)
     setThreads(prev => {
       const existing = prev.find(t => t.id === threadId)
       const participants = existing ? [...existing.participants] : []
@@ -373,6 +382,7 @@ export default function ChatWidget() {
       }, ...filtered]
     })
 
+    // Add to active thread if it matches
     if (activeThread?.id === threadId) {
       setMessages(prev => [...prev, msg])
     }
@@ -780,7 +790,7 @@ export default function ChatWidget() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex justify-between items-center">
-                        <span className={`font-semibold text-sm md:text-xs truncate ${active ? 'text-white' : 'text-slate-800 dark:text-slate-100'}`}>
+                        <span className={`font-semibold text-base md:text-sm truncate ${active ? 'text-white' : 'text-slate-800 dark:text-slate-100'}`}>
                           {t.subject || `Chat with ${cap(t.recipient)}`}
                         </span>
                         <div className="flex items-center gap-2 md:gap-1.5 flex-shrink-0 ml-1">
@@ -830,7 +840,7 @@ export default function ChatWidget() {
                       ) : (
                         <>
                           <div className="flex items-center gap-1">
-                            <p className={`text-sm md:text-[11px] truncate ${active ? 'text-blue-100' : 'text-slate-500'}`}>
+                            <p className={`text-[15px] md:text-[13px] truncate ${active ? 'text-blue-100' : 'text-slate-500'}`}>
                               {cap(t.recipient)}: {t.lastMessage}
                             </p>
                           </div>
