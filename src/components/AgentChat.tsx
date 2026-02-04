@@ -141,16 +141,17 @@ export default function AgentChat() {
         },
         (payload) => {
           const newMessage = payload.new as ChatMessage
-          // Only add if not already in chat (avoid duplicates)
-          if (!chat.some(msg => msg.id === newMessage.id)) {
-            setChat(prev => [...prev, {
+          setChat(prev => {
+            // Only add if not already in chat (avoid duplicates)
+            if (prev.some(msg => msg.id === newMessage.id)) return prev
+            return [...prev, {
               id: newMessage.id,
               created_at: newMessage.created_at,
               role: newMessage.from_agent === 'user' ? 'user' : 'agent',
               name: getAgentName(newMessage.from_agent, newMessage.context),
               content: newMessage.message
-            }])
-          }
+            }]
+          })
         }
       )
       .subscribe()
@@ -158,7 +159,7 @@ export default function AgentChat() {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [supabase, chat])
+  }, [supabase])
 
   // Auto-scroll to bottom when new messages arrive
   useEffect(() => {
@@ -239,19 +240,8 @@ export default function AgentChat() {
         throw new Error(error.error || 'Failed to send message')
       }
 
-      // Clear input
+      // Clear input — realtime subscription handles adding the message
       setMessage('')
-      
-      // Optimistically add user message
-      const optimisticMessage: UserMessage = {
-        role: 'user',
-        name: userName,
-        content: message.trim(),
-        id: `temp-${Date.now()}`,
-        created_at: new Date().toISOString()
-      }
-      
-      setChat(prev => [...prev, optimisticMessage])
 
     } catch (error: any) {
       console.error('Error sending message:', error)
