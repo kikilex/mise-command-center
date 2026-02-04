@@ -595,21 +595,21 @@ export default function ChatWidget() {
           {/* ============================================================ */}
           <div className={`w-full md:w-[250px] border-r border-slate-200 dark:border-slate-800 flex flex-col bg-slate-50 dark:bg-slate-950 md:flex-shrink-0 ${mobileShowConversation ? 'hidden md:flex' : 'flex'}`}>
             {/* sidebar header */}
-            <div className="p-3 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-2">
-              <span className="font-bold text-sm text-slate-700 dark:text-slate-200 tracking-tight">Messages</span>
-              <div className="flex items-center gap-1">
+            <div className="px-4 py-3 md:p-3 border-b border-slate-200 dark:border-slate-800 flex items-center justify-between gap-3">
+              <span className="font-bold text-lg md:text-sm text-slate-700 dark:text-slate-200 tracking-tight">Messages</span>
+              <div className="flex items-center gap-3 md:gap-1">
                 <button
                   onClick={() => { setIsComposing(true); setActiveThread(null); setMessages([]); setMobileShowConversation(true) }}
-                  className="w-7 h-7 rounded-lg bg-blue-500 hover:bg-blue-600 text-white flex items-center justify-center transition-colors"
+                  className="w-8 h-8 md:w-7 md:h-7 rounded-lg bg-blue-500 hover:bg-blue-600 text-white flex items-center justify-center transition-colors"
                   title="New Thread"
                 >
-                  <Plus className="w-4 h-4" />
+                  <Plus className="w-5 h-5 md:w-4 md:h-4" />
                 </button>
                 <button
                   onClick={() => setIsOpen(false)}
-                  className="w-7 h-7 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-800 flex items-center justify-center transition-colors text-slate-500"
+                  className="w-8 h-8 md:w-7 md:h-7 rounded-lg hover:bg-slate-200 dark:hover:bg-slate-800 flex items-center justify-center transition-colors text-slate-500"
                 >
-                  <X className="w-4 h-4" />
+                  <X className="w-5 h-5 md:w-4 md:h-4" />
                 </button>
               </div>
             </div>
@@ -641,7 +641,7 @@ export default function ChatWidget() {
                   <div
                     key={t.id}
                     onClick={() => { setActiveThread(t); setIsComposing(false); setMobileShowConversation(true) }}
-                    className={`px-3 py-2.5 cursor-pointer transition-colors flex items-center gap-2.5 ${
+                    className={`px-4 py-3.5 md:px-3 md:py-2.5 cursor-pointer transition-colors flex items-center gap-3 md:gap-2.5 ${
                       active
                         ? 'bg-blue-500 text-white'
                         : 'hover:bg-slate-100 dark:hover:bg-slate-800/60'
@@ -651,7 +651,7 @@ export default function ChatWidget() {
                       <Avatar
                         name={t.recipient}
                         size="sm"
-                        className={`${active ? 'bg-white/20 text-white' : isAI(t.recipient) ? 'bg-gradient-to-br from-violet-500 to-purple-600' : 'bg-gradient-to-br from-blue-500 to-blue-600'} font-bold text-xs w-9 h-9`}
+                        className={`${active ? 'bg-white/20 text-white' : isAI(t.recipient) ? 'bg-gradient-to-br from-violet-500 to-purple-600' : 'bg-gradient-to-br from-blue-500 to-blue-600'} font-bold text-xs w-10 h-10 md:w-9 md:h-9`}
                       />
                       {isAI(t.recipient) && !active && (
                         <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-white dark:bg-slate-950 flex items-center justify-center">
@@ -661,11 +661,11 @@ export default function ChatWidget() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex justify-between items-center">
-                        <span className={`font-semibold text-xs truncate ${active ? 'text-white' : 'text-slate-800 dark:text-slate-100'}`}>
+                        <span className={`font-semibold text-sm md:text-xs truncate ${active ? 'text-white' : 'text-slate-800 dark:text-slate-100'}`}>
                           {t.subject || `Chat with ${cap(t.recipient)}`}
                         </span>
-                        <div className="flex items-center gap-1.5 flex-shrink-0 ml-1">
-                          <span className={`text-[9px] ${active ? 'text-blue-100' : 'text-slate-400'}`}>
+                        <div className="flex items-center gap-2 md:gap-1.5 flex-shrink-0 ml-1">
+                          <span className={`text-xs md:text-[9px] ${active ? 'text-blue-100' : 'text-slate-400'}`}>
                             {new Date(t.timestamp).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
                           </span>
                           <button
@@ -711,7 +711,7 @@ export default function ChatWidget() {
                       ) : (
                         <>
                           <div className="flex items-center gap-1">
-                            <p className={`text-[11px] truncate ${active ? 'text-blue-100' : 'text-slate-500'}`}>
+                            <p className={`text-sm md:text-[11px] truncate ${active ? 'text-blue-100' : 'text-slate-500'}`}>
                               {cap(t.recipient)}: {t.lastMessage}
                             </p>
                           </div>
