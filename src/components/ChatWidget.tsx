@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useMemo } from 'react'
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import {
   Button,
   ScrollShadow,
@@ -124,6 +124,50 @@ export default function ChatWidget() {
   const [showMentions, setShowMentions] = useState(false)
   const [mentionFilter, setMentionFilter] = useState('')
   const inputRef = useRef<HTMLTextAreaElement>(null)
+
+  /* ---- resize ---- */
+  const [size, setSize] = useState(() => {
+    if (typeof window !== 'undefined') {
+      try {
+        const saved = localStorage.getItem('chat-widget-size')
+        if (saved) return JSON.parse(saved)
+      } catch {}
+    }
+    return { w: 750, h: 550 }
+  })
+  const resizing = useRef<{ startX: number; startY: number; startW: number; startH: number } | null>(null)
+
+  const onResizeStart = useCallback((e: React.MouseEvent) => {
+    e.preventDefault()
+    resizing.current = { startX: e.clientX, startY: e.clientY, startW: size.w, startH: size.h }
+
+    const onMove = (ev: MouseEvent) => {
+      if (!resizing.current) return
+      const dw = resizing.current.startX - ev.clientX  // dragging left = bigger
+      const dh = resizing.current.startY - ev.clientY  // dragging up = bigger
+      const w = Math.max(500, Math.min(1200, resizing.current.startW + dw))
+      const h = Math.max(400, Math.min(900, resizing.current.startH + dh))
+      setSize({ w, h })
+    }
+
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove)
+      document.removeEventListener('mouseup', onUp)
+      document.body.style.userSelect = ''
+      document.body.style.cursor = ''
+      // persist
+      setSize((s: { w: number; h: number }) => {
+        try { localStorage.setItem('chat-widget-size', JSON.stringify(s)) } catch {}
+        return s
+      })
+      resizing.current = null
+    }
+
+    document.body.style.userSelect = 'none'
+    document.body.style.cursor = 'nw-resize'
+    document.addEventListener('mousemove', onMove)
+    document.addEventListener('mouseup', onUp)
+  }, [size.w, size.h])
 
   const scrollRef = useRef<HTMLDivElement>(null)
   const menuRef = useRef<HTMLDivElement>(null)
@@ -514,7 +558,18 @@ export default function ChatWidget() {
   return (
     <div className="fixed bottom-6 right-6 z-[100] flex flex-col items-end gap-4">
       {isOpen && (
-        <div className="w-[750px] h-[550px] bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 flex overflow-hidden mb-2 animate-in fade-in slide-in-from-bottom-4 duration-200">
+        <div
+          style={{ width: size.w, height: size.h }}
+          className="bg-white dark:bg-slate-900 rounded-2xl shadow-2xl border border-slate-200 dark:border-slate-800 flex overflow-hidden mb-2 animate-in fade-in slide-in-from-bottom-4 duration-200 relative"
+        >
+          {/* resize handle — top-left corner */}
+          <div
+            onMouseDown={onResizeStart}
+            className="absolute top-0 left-0 w-4 h-4 cursor-nw-resize z-50 group"
+            title="Drag to resize"
+          >
+            <div className="absolute top-1 left-1 w-2 h-2 border-t-2 border-l-2 border-slate-300 dark:border-slate-600 group-hover:border-blue-500 transition-colors rounded-tl" />
+          </div>
 
           {/* ============================================================ */}
           {/*  LEFT SIDEBAR                                                */}
