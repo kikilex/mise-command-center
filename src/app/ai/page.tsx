@@ -16,7 +16,8 @@ import {
   MessageCircle,
   X,
   Target,
-  ShieldCheck
+  ShieldCheck,
+  Edit
 } from 'lucide-react'
 import { 
   Tabs,
@@ -36,6 +37,7 @@ import { showErrorToast } from '@/lib/errors'
 import TaskThread from '@/components/TaskThread'
 import AgentChat from '@/components/AgentChat'
 import AddTaskModal from '@/components/AddTaskModal'
+import EditAgentModal from '@/components/EditAgentModal'
 import Navbar from '@/components/Navbar'
 
 type ViewType = 'dashboard' | 'activity' | 'debriefs'
@@ -51,6 +53,7 @@ interface AIAgent {
   settings: {
     personality?: string
   }
+  avatar_url?: string
   last_action?: string
   last_action_at?: string
 }
@@ -73,8 +76,10 @@ export default function AIWorkspacePage() {
   const [loading, setLoading] = useState(true)
   const [currentView, setCurrentView] = useState<ViewType>('dashboard')
   const [selectedTask, setSelectedTask] = useState<AgentTask | null>(null)
+  const [selectedAgent, setSelectedAgent] = useState<AIAgent | null>(null)
   
   const { isOpen: isTaskOpen, onOpen: onTaskOpen, onClose: onTaskClose } = useDisclosure()
+  const { isOpen: isEditAgentOpen, onOpen: onEditAgentOpen, onClose: onEditAgentClose } = useDisclosure()
   const supabase = createClient()
 
   useEffect(() => {
@@ -163,9 +168,21 @@ export default function AIWorkspacePage() {
             </CardHeader>
             <CardBody className="px-2 py-3 space-y-1">
               {agents.map(a => (
-                <div key={a.id} className="group relative flex items-center gap-3 p-3 rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-all border border-transparent hover:border-slate-100 dark:hover:border-slate-800 cursor-default">
+                <button
+                  key={a.id}
+                  onClick={() => {
+                    setSelectedAgent(a)
+                    onEditAgentOpen()
+                  }}
+                  className="group relative flex items-center gap-3 p-3 rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-all border border-transparent hover:border-slate-100 dark:hover:border-slate-800 w-full text-left"
+                >
                   <div className="relative">
-                    <Avatar name={a.name} size="sm" className="bg-gradient-to-br from-violet-600 to-purple-900 text-white font-black" />
+                    <Avatar 
+                      src={a.avatar_url || undefined}
+                      name={a.name} 
+                      size="sm" 
+                      className="bg-gradient-to-br from-violet-600 to-purple-900 text-white font-black" 
+                    />
                     <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white dark:border-slate-900 ${a.is_active ? 'bg-emerald-500 shadow-[0_0_8px_rgba(16,185,129,0.5)]' : 'bg-slate-400'}`} />
                   </div>
                   <div className="min-w-0 flex-1">
@@ -175,7 +192,8 @@ export default function AIWorkspacePage() {
                   {a.last_action_at && (
                     <span className="text-[8px] font-black text-slate-300 uppercase">{timeAgo(a.last_action_at)}</span>
                   )}
-                </div>
+                  <Edit className="w-3 h-3 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity" />
+                </button>
               ))}
             </CardBody>
           </Card>
@@ -324,6 +342,15 @@ export default function AIWorkspacePage() {
         )}
       </main>
       <AddTaskModal isOpen={isTaskOpen} onClose={onTaskClose} onSuccess={loadData} userId={user?.id} />
+      <EditAgentModal 
+        isOpen={isEditAgentOpen} 
+        onClose={() => {
+          onEditAgentClose()
+          setSelectedAgent(null)
+        }} 
+        onSuccess={loadData}
+        agent={selectedAgent}
+      />
     </div>
   )
 }
