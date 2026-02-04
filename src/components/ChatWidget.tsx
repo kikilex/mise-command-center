@@ -123,6 +123,8 @@ export default function ChatWidget() {
   /* ---- @mention ---- */
   const [showMentions, setShowMentions] = useState(false)
   const [mentionFilter, setMentionFilter] = useState('')
+  const [editingMsgId, setEditingMsgId] = useState<string | null>(null)
+  const [editingMsgText, setEditingMsgText] = useState('')
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
   /* ---- resize ---- */
@@ -892,11 +894,53 @@ export default function ChatWidget() {
                               {cap(msg.from_agent || 'Unknown')}
                             </p>
                           )}
-                          <p className="leading-relaxed break-words">{renderMentions(msg.content)}</p>
+                          {editingMsgId === msg.id ? (
+                            <div className="space-y-1.5">
+                              <textarea
+                                autoFocus
+                                value={editingMsgText}
+                                onChange={(e) => setEditingMsgText(e.target.value)}
+                                onKeyDown={async (e) => {
+                                  if (e.key === 'Enter' && !e.shiftKey) {
+                                    e.preventDefault()
+                                    if (!editingMsgText.trim()) return
+                                    const { error } = await supabase.from('inbox').update({ content: editingMsgText.trim() }).eq('id', msg.id)
+                                    if (error) showErrorToast(error)
+                                    else setMessages(prev => prev.map(m => m.id === msg.id ? { ...m, content: editingMsgText.trim() } : m))
+                                    setEditingMsgId(null)
+                                  }
+                                  if (e.key === 'Escape') setEditingMsgId(null)
+                                }}
+                                className={`w-full text-sm rounded-lg px-2 py-1 resize-none outline-none ${
+                                  isMe ? 'bg-blue-400 text-white placeholder:text-blue-200' : 'bg-slate-100 dark:bg-slate-700 text-slate-800 dark:text-slate-100'
+                                }`}
+                                rows={2}
+                              />
+                              <div className="flex gap-1.5 text-[9px]">
+                                <button onClick={async () => {
+                                  if (!editingMsgText.trim()) return
+                                  const { error } = await supabase.from('inbox').update({ content: editingMsgText.trim() }).eq('id', msg.id)
+                                  if (error) showErrorToast(error)
+                                  else setMessages(prev => prev.map(m => m.id === msg.id ? { ...m, content: editingMsgText.trim() } : m))
+                                  setEditingMsgId(null)
+                                }} className={`font-semibold ${isMe ? 'text-white' : 'text-blue-500'}`}>Save</button>
+                                <button onClick={() => setEditingMsgId(null)} className={`${isMe ? 'text-blue-200' : 'text-slate-400'}`}>Cancel</button>
+                              </div>
+                            </div>
+                          ) : (
+                            <p className="leading-relaxed break-words">{renderMentions(msg.content)}</p>
+                          )}
                           <div className={`flex items-center gap-1.5 mt-1`}>
                             <span className={`text-[9px] ${isMe ? 'text-blue-200' : 'text-slate-400'}`}>
                               {new Date(msg.created_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
                             </span>
+                            <button
+                              onClick={() => { setEditingMsgId(msg.id); setEditingMsgText(msg.content) }}
+                              className={`${isMe ? 'text-blue-200 hover:text-white' : 'text-slate-300 hover:text-blue-500'} transition-colors`}
+                              title="Edit message"
+                            >
+                              <Pencil className="w-3.5 h-3.5" />
+                            </button>
                             <button
                               onClick={async (e) => {
                                 e.stopPropagation()
