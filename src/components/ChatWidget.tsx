@@ -645,9 +645,30 @@ export default function ChatWidget() {
                         <span className={`font-semibold text-xs truncate ${active ? 'text-white' : 'text-slate-800 dark:text-slate-100'}`}>
                           {t.subject || `Chat with ${cap(t.recipient)}`}
                         </span>
-                        <span className={`text-[9px] flex-shrink-0 ml-1 ${active ? 'text-blue-100' : 'text-slate-400'}`}>
-                          {new Date(t.timestamp).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
-                        </span>
+                        <div className="flex items-center gap-1.5 flex-shrink-0 ml-1">
+                          <span className={`text-[9px] ${active ? 'text-blue-100' : 'text-slate-400'}`}>
+                            {new Date(t.timestamp).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                          </span>
+                          <button
+                            onClick={async (e) => {
+                              e.stopPropagation()
+                              if (!confirm('Delete this thread?')) return
+                              const filter = t.id.startsWith('dm-')
+                                ? supabase.from('inbox').delete().eq('item_type', 'message').or(`from_agent.eq.${t.recipient},to_recipient.eq.${t.recipient}`).is('thread_id', null)
+                                : supabase.from('inbox').delete().eq('thread_id', t.id)
+                              const { error } = await filter
+                              if (error) showErrorToast(error)
+                              else {
+                                setThreads(prev => prev.filter(th => th.id !== t.id))
+                                if (activeThread?.id === t.id) { setActiveThread(null); setMessages([]) }
+                              }
+                            }}
+                            className={`${active ? 'text-blue-200 hover:text-white' : 'text-slate-300 hover:text-red-500'} transition-colors`}
+                            title="Delete thread"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </div>
                       <div className="flex items-center gap-1">
                         <p className={`text-[11px] truncate ${active ? 'text-blue-100' : 'text-slate-500'}`}>
@@ -886,7 +907,7 @@ export default function ChatWidget() {
                               className={`${isMe ? 'text-blue-200 hover:text-white' : 'text-slate-300 hover:text-red-500'} transition-colors`}
                               title="Delete message"
                             >
-                              <Trash2 className="w-3 h-3" />
+                              <Trash2 className="w-3.5 h-3.5" />
                             </button>
                           </div>
                         </div>
