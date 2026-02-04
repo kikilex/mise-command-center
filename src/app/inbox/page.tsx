@@ -130,10 +130,13 @@ export default function InboxPage() {
       messages.sort((a, b) => new Date(a.created_at).getTime() - new Date(b.created_at).getTime())
       const lastMsg = messages[messages.length - 1]
       
+      // Find subject from any message in the thread (not just last)
+      const threadSubject = messages.find(m => m.subject)?.subject || null
+      
       threadList.push({
         id: key,
         recipient: lastMsg.to_recipient || lastMsg.from_agent || 'Unknown',
-        subject: lastMsg.subject,
+        subject: threadSubject,
         messages,
         lastMessage: lastMsg,
       })
@@ -818,16 +821,17 @@ export default function InboxPage() {
                   </div>
                 )}
 
-                {/* Subject Field (Optional) */}
+                {/* Subject / Thread Topic */}
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-default-500 w-12">Re:</span>
                   <Input
-                    placeholder="Subject (optional)"
+                    placeholder="Thread topic (e.g., Book Launch, Website Updates)"
                     value={composeSubject}
                     onChange={(e) => setComposeSubject(e.target.value)}
-                    size="sm"
+                    size="md"
                     classNames={{
-                      inputWrapper: "shadow-none bg-default-100",
+                      inputWrapper: "shadow-none bg-default-100 border border-default-200",
+                      input: "font-medium",
                     }}
                   />
                 </div>
@@ -1084,23 +1088,25 @@ export default function InboxPage() {
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center gap-2 mb-1">
-                              <span className="font-medium">{recipient.name}</span>
+                              <span className="font-semibold text-foreground">
+                                {thread.subject || `Conversation with ${recipient.name}`}
+                              </span>
                               {hasMultiple && (
                                 <Chip size="sm" variant="flat" color="default">
                                   {thread.messages.length}
                                 </Chip>
                               )}
                             </div>
-                            {thread.subject && (
-                              <p className="text-xs text-default-500 mb-1">{thread.subject}</p>
-                            )}
+                            <div className="flex items-center gap-1.5 mb-1">
+                              {recipient?.type === 'ai' ? <Bot className="w-3 h-3 text-violet-400" /> : <User className="w-3 h-3 text-pink-400" />}
+                              <span className="text-xs text-default-500">{recipient.name}</span>
+                              <span className="text-xs text-default-400">·</span>
+                              <span className="text-xs text-default-400">{formatTime(thread.lastMessage.created_at)}</span>
+                            </div>
                             <p className="text-foreground text-sm line-clamp-2">
                               {thread.lastMessage.from_agent 
                                 ? `${thread.lastMessage.from_agent}: ${thread.lastMessage.content}`
                                 : thread.lastMessage.content}
-                            </p>
-                            <p className="text-xs text-default-400 mt-1">
-                              {formatTime(thread.lastMessage.created_at)}
                             </p>
                           </div>
                         </div>

@@ -82,6 +82,7 @@ interface InboxItem {
 
 interface MessageThread {
   recipient: string
+  subject: string | null
   lastMessage: InboxItem
   messageCount: number
   threadId: string | null
@@ -288,12 +289,17 @@ export default function Home() {
       }
       threadMap.get(key)!.messages.push(msg);
     });
-    return Array.from(threadMap.entries()).map(([key, val]) => ({
-      recipient: val.recipient,
-      lastMessage: val.messages[0],
-      messageCount: val.messages.length,
-      threadId: val.messages[0].thread_id,
-    })).slice(0, 5);
+    return Array.from(threadMap.entries()).map(([key, val]) => {
+      // Find subject from any message in the thread
+      const subject = val.messages.find(m => m.subject)?.subject || null;
+      return {
+        recipient: val.recipient,
+        subject,
+        lastMessage: val.messages[0],
+        messageCount: val.messages.length,
+        threadId: val.messages[0].thread_id,
+      };
+    }).slice(0, 5);
   }, [messages]);
 
   async function handleDeleteDump(id: string) {
@@ -699,6 +705,7 @@ export default function Home() {
                   <div className="divide-y divide-slate-100 dark:divide-slate-800">
                     {messageThreads.map((thread, idx) => {
                       const isAI = ['ax', 'tony'].includes(thread.recipient.toLowerCase())
+                      const threadName = thread.subject || `Chat with ${thread.recipient.charAt(0).toUpperCase() + thread.recipient.slice(1)}`
                       return (
                         <div 
                           key={idx} 
@@ -719,13 +726,14 @@ export default function Home() {
                           </div>
                           <div className="flex-1 min-w-0">
                             <div className="flex items-center justify-between gap-2">
-                              <span className="font-semibold text-sm text-slate-800 dark:text-slate-100 capitalize">
-                                {thread.recipient}
+                              <span className="font-semibold text-sm text-slate-800 dark:text-slate-100">
+                                {threadName}
                               </span>
                               <span className="text-xs text-slate-400 flex-shrink-0">
                                 {new Date(thread.lastMessage.created_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
                               </span>
                             </div>
+                            <p className="text-xs text-slate-400 capitalize mt-0.5">{thread.recipient}</p>
                             <p className="text-sm text-slate-500 dark:text-slate-400 line-clamp-1 mt-0.5">{thread.lastMessage.content}</p>
                           </div>
                           {thread.messageCount > 1 && (
