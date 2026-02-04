@@ -12,11 +12,10 @@ import {
   Textarea,
   Select,
   SelectItem,
-  Checkbox,
 } from '@heroui/react'
 import { createClient } from '@/lib/supabase/client'
 import { showErrorToast, showSuccessToast } from '@/lib/errors'
-import { Bot, User, ClipboardList } from 'lucide-react'
+import { User, Bot } from 'lucide-react'
 
 interface AddTaskModalProps {
   isOpen: boolean
@@ -39,6 +38,22 @@ const priorityOptions = [
   { key: 'low', label: 'Low' },
 ]
 
+interface UserItem {
+  id: string
+  name: string
+  email: string
+  type: 'human'
+}
+
+interface AgentItem {
+  id: string
+  name: string
+  slug: string
+  type: 'agent'
+}
+
+type AssigneeItem = UserItem | AgentItem
+
 export default function AddTaskModal({ 
   isOpen, 
   onClose, 
@@ -51,16 +66,13 @@ export default function AddTaskModal({
     description: '',
     status: 'todo',
     priority: 'medium',
-    ai_flag: false,
     due_date: '',
-    assignee_id: '',
-    ai_agent: '',
+    assignee_id: '', // Unified assignee field
     project_id: '',
     space_id: '',
   })
   
-  const [users, setUsers] = useState<any[]>([])
-  const [agents, setAgents] = useState<any[]>([])
+  const [assignees, setAssignees] = useState<AssigneeItem[]>([])
   const [projects, setProjects] = useState<any[]>([])
   const [spaces, setSpaces] = useState<any[]>([])
   const [loading, setLoading] = useState(false)
@@ -93,8 +105,22 @@ export default function AddTaskModal({
       }
       const { data: projectsData } = await projectQuery
 
-      setUsers(usersRes.data || [])
-      setAgents(agentsRes.data || [])
+      // Combine users and agents into a single list
+      const userItems: UserItem[] = (usersRes.data || []).map(user => ({
+        id: user.id,
+        name: user.name || user.email,
+        email: user.email,
+        type: 'human' as const
+      }))
+
+      const agentItems: AgentItem[] = (agentsRes.data || []).map(agent => ({
+        id: agent.slug, // Use slug as ID for agents
+        name: agent.name,
+        slug: agent.slug,
+        type: 'agent' as const
+      }))
+
+      setAssignees([...userItems, ...agentItems])
       setSpaces(spacesRes.data || [])
       setProjects(projectsData || [])
     } catch (error) {
@@ -109,21 +135,33 @@ export default function AddTaskModal({
     
     setSubmitting(true)
     try {
+      // Determine if assignee is a human or agent
+      const assignee = assignees.find(a => a.id === formData.assignee_id)
+      const isAgent = assignee?.type === 'agent'
+      
+      const taskData: any = {
+        title: formData.title.trim(),
+        description: formData.description.trim() || null,
+        status: formData.status,
+        priority: formData.priority,
+        due_date: formData.due_date || null,
+        created_by: userId,
+        space_id: formData.space_id || null,
+        project_id: formData.project_id || null,
+      }
+
+      // Set the appropriate assignment field based on type
+      if (isAgent) {
+        taskData.ai_agent = formData.assignee_id
+        taskData.assignee_id = null
+      } else {
+        taskData.assignee_id = formData.assignee_id || null
+        taskData.ai_agent = null
+      }
+
       const { error } = await supabase
         .from('tasks')
-        .insert({
-          title: formData.title.trim(),
-          description: formData.description.trim() || null,
-          status: formData.status,
-          priority: formData.priority,
-          ai_flag: formData.ai_flag,
-          due_date: formData.due_date || null,
-          created_by: userId,
-          space_id: formData.space_id || null,
-          assignee_id: formData.assignee_id || null,
-          ai_agent: formData.ai_agent || null,
-          project_id: formData.project_id || null,
-        })
+        .insert(taskData)
 
       if (error) throw error
       
@@ -144,10 +182,8 @@ export default function AddTaskModal({
       description: '',
       status: 'todo',
       priority: 'medium',
-      ai_flag: false,
       due_date: '',
       assignee_id: '',
-      ai_agent: '',
       project_id: '',
       space_id: '',
     })
@@ -217,37 +253,60 @@ export default function AddTaskModal({
               </Select>
             </div>
 
-            <div className="grid grid-cols-2 gap-4">
-              <Select
-                label="Assign to Human"
-                placeholder="Select user"
-                selectedKeys={formData.assignee_id ? [formData.assignee_id] : []}
-                onChange={(e) => setFormData(f => ({ ...f, assignee_id: e.target.value }))}
-                startContent={<User className="w-4 h-4" />}
-              >
-                {users.map(u => (
-                  <SelectItem key={u.id}>{u.name || u.email}</SelectItem>
-                ))}
-              </Select>
-              <Select
-                label="Assign to Agent"
-                placeholder="Select agent"
-                selectedKeys={formData.ai_agent ? [formData.ai_agent] : []}
-                onChange={(e) => setFormData(f => ({ ...f, ai_agent: e.target.value }))}
-                startContent={<Bot className="w-4 h-4" />}
-              >
-                {agents.map(a => (
-                  <SelectItem key={a.slug}>{a.name}</SelectItem>
-                ))}
-              </Select>
-            </div>
-
-            <Checkbox
-              isSelected={formData.ai_flag}
-              onValueChange={(v) => setFormData(f => ({ ...f, ai_flag: v }))}
+            {/* Unified Assign to dropdown */}
+            <Select
+              label="Assign to"
+              placeholder="Select assignee (human or AI agent)"
+              selectedKeys={formData.assignee_id ? [formData.assignee_id] : []}
+              onChange={(e) => setFormData(f => ({ ...f, assignee_id: e.target.value }))}
+              startContent={<User className="w-4 h-4" />}
             >
-              <span className="text-sm">Allow AI to work on this task</span>
-            </Checkbox>
+              <SelectItem key="" className="text-slate-400">
+                Unassigned
+              </SelectItem>
+              
+              {/* Humans section */}
+              {assignees.filter(a => a.type === 'human').length > 0 && (
+                <SelectItem 
+                  key="humans-header" 
+                  isReadOnly 
+                  className="text-xs font-bold uppercase tracking-wider text-slate-400 bg-slate-50 dark:bg-slate-800"
+                >
+                  Humans
+                </SelectItem>
+              )}
+              {assignees
+                .filter(a => a.type === 'human')
+                .map(user => (
+                  <SelectItem 
+                    key={user.id} 
+                    startContent={<User className="w-4 h-4 text-slate-400" />}
+                  >
+                    {user.name}
+                  </SelectItem>
+                ))}
+              
+              {/* Agents section */}
+              {assignees.filter(a => a.type === 'agent').length > 0 && (
+                <SelectItem 
+                  key="agents-header" 
+                  isReadOnly 
+                  className="text-xs font-bold uppercase tracking-wider text-slate-400 bg-slate-50 dark:bg-slate-800"
+                >
+                  AI Agents
+                </SelectItem>
+              )}
+              {assignees
+                .filter(a => a.type === 'agent')
+                .map(agent => (
+                  <SelectItem 
+                    key={agent.id} 
+                    startContent={<Bot className="w-4 h-4 text-violet-400" />}
+                  >
+                    {agent.name}
+                  </SelectItem>
+                ))}
+            </Select>
           </div>
         </ModalBody>
         <ModalFooter>

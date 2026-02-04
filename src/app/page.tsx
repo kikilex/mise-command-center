@@ -65,6 +65,9 @@ interface Task {
   priority: string
   space_id: string | null
   due_date: string | null
+  assignee_id?: string | null
+  updated_at?: string
+  created_at?: string
 }
 
 interface InboxItem {
@@ -135,6 +138,24 @@ export default function Home() {
     priority: 'medium',
     space_id: '',
   });
+  
+  // Task modal state
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const { isOpen: isTaskModalOpen, onOpen: onTaskModalOpen, onClose: onTaskModalClose } = useDisclosure();
+  const [isEditingTask, setIsEditingTask] = useState(false);
+  const [taskEditData, setTaskEditData] = useState({
+    title: '',
+    description: '',
+    status: '',
+    priority: '',
+    due_date: '',
+  });
+  
+  // Agent modal state
+  const [selectedAgent, setSelectedAgent] = useState<AIAgent | null>(null);
+  const { isOpen: isAgentModalOpen, onOpen: onAgentModalOpen, onClose: onAgentModalClose } = useDisclosure();
+  const [agentTasks, setAgentTasks] = useState<{upcoming: Task[], completed: Task[]}>({ upcoming: [], completed: [] });
+  const [loadingAgentTasks, setLoadingAgentTasks] = useState(false);
   
   const supabase = createClient();
   const router = useRouter();
@@ -409,6 +430,136 @@ export default function Home() {
     }
   };
 
+  // Task modal functions
+  const handleTaskClick = (task: Task) => {
+    setSelectedTask(task);
+    setTaskEditData({
+      title: task.title,
+      description: task.description || '',
+      status: task.status,
+      priority: task.priority,
+      due_date: task.due_date || '',
+    });
+    setIsEditingTask(false);
+    onTaskModalOpen();
+  };
+
+  const handleTaskEdit = () => {
+    setIsEditingTask(true);
+  };
+
+  const handleTaskSave = async () => {
+    if (!selectedTask) return;
+    try {
+      const { error } = await supabase
+        .from('tasks')
+        .update({
+          title: taskEditData.title,
+          description: taskEditData.description,
+          status: taskEditData.status,
+          priority: taskEditData.priority,
+          due_date: taskEditData.due_date || null,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', selectedTask.id);
+      if (error) throw error;
+      
+      // Update local state
+      setTodaysTasks(prev => prev.map(t => 
+        t.id === selectedTask.id ? { ...t, ...taskEditData } : t
+      ));
+      setIsEditingTask(false);
+      showSuccessToast('Task updated');
+    } catch (error) {
+      showErrorToast(error, 'Failed to update task');
+    }
+  };
+
+  const handleTaskStatusChange = async (newStatus: string) => {
+    if (!selectedTask) return;
+    try {
+      const { error } = await supabase
+        .from('tasks')
+        .update({ 
+          status: newStatus,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', selectedTask.id);
+      if (error) throw error;
+      
+      // Update local state
+      setTaskEditData(prev => ({ ...prev, status: newStatus }));
+      setTodaysTasks(prev => prev.map(t => 
+        t.id === selectedTask.id ? { ...t, status: newStatus } : t
+      ));
+      showSuccessToast('Status updated');
+    } catch (error) {
+      showErrorToast(error, 'Failed to update status');
+    }
+  };
+
+  // Agent modal functions
+  const handleAgentClick = async (agent: AIAgent) => {
+    setSelectedAgent(agent);
+    setLoadingAgentTasks(true);
+    
+    try {
+      // Determine agent user ID based on name
+      let agentUserId = '';
+      if (agent.name.toLowerCase() === 'ax') {
+        agentUserId = 'd6c2fbde-5639-4944-b0ed-e13cbbd64c03';
+      } else if (agent.name.toLowerCase() === 'tony') {
+        agentUserId = 'a40862c9-50bf-4c3a-8084-3f750f99febf';
+      }
+      
+      if (agentUserId) {
+        // Fetch upcoming tasks (not done)
+        const { data: upcomingTasks } = await supabase
+          .from('tasks')
+          .select('*')
+          .eq('assignee_id', agentUserId)
+          .neq('status', 'done')
+          .order('priority', { ascending: false })
+          .limit(5);
+        
+        // Fetch completed tasks
+        const { data: completedTasks } = await supabase
+          .from('tasks')
+          .select('*')
+          .eq('assignee_id', agentUserId)
+          .eq('status', 'done')
+          .order('updated_at', { ascending: false })
+          .limit(5);
+        
+        setAgentTasks({
+          upcoming: upcomingTasks || [],
+          completed: completedTasks || [],
+        });
+      }
+    } catch (error) {
+      console.error('Failed to load agent tasks:', error);
+      showErrorToast(error, 'Failed to load agent tasks');
+    } finally {
+      setLoadingAgentTasks(false);
+      onAgentModalOpen();
+    }
+  };
+
+  // Group tasks by project for What's Next section
+  const groupedTasks = useMemo(() => {
+    const groups: Record<string, Task[]> = {};
+    
+    todaysTasks.slice(0, 7).forEach(task => {
+      const spaceName = spaces.find(s => s.id === task.space_id)?.name || 'General';
+      if (!groups[spaceName]) {
+        groups[spaceName] = [];
+      }
+      groups[spaceName].push(task);
+    });
+    
+    return groups;
+  }, [todaysTasks, spaces]);
+
   if (loadError && !loading) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-background p-4">
@@ -614,43 +765,54 @@ export default function Home() {
                   <div className="space-y-2">
                     {[1, 2, 3].map(i => <Skeleton key={i} className="h-16 rounded-xl w-full" />)}
                   </div>
-                ) : todaysTasks.length === 0 && completedTasks.length === 0 ? (
+                ) : Object.keys(groupedTasks).length === 0 && completedTasks.length === 0 ? (
                   <div className="text-center py-12">
                     <CheckCircle2 className="w-12 h-12 text-emerald-500 mx-auto mb-3" />
                     <p className="text-slate-500">The hit list is empty.</p>
                   </div>
                 ) : (
                   <>
-                    {/* Active tasks - max 3 */}
-                    <div className="space-y-2">
-                      {todaysTasks.slice(0, 3).map((task) => (
-                        <div 
-                          key={task.id}
-                          onClick={() => router.push(`/tasks?openTask=${task.id}`)}
-                          className="group flex items-center gap-4 p-4 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer transition-all border border-transparent hover:border-slate-200 dark:hover:border-slate-700"
-                        >
-                          <div className={`w-3 h-3 rounded-full flex-shrink-0 ${getPriorityColor(task.priority)} shadow-lg shadow-current/20`} />
-                          <div className="flex-1 min-w-0">
-                            <p className="font-bold text-slate-800 dark:text-slate-200 truncate">{task.title}</p>
-                            <div className="flex items-center gap-2 mt-1">
-                              <Chip size="sm" variant="flat" color="default" className="h-5 text-[10px] uppercase font-bold tracking-tight">
-                                {spaces.find(s => s.id === task.space_id)?.name || 'General'}
-                              </Chip>
-                            </div>
+                    {/* Active tasks - grouped by project */}
+                    <div className="space-y-4">
+                      {Object.entries(groupedTasks).map(([projectName, projectTasks]) => (
+                        <div key={projectName} className="space-y-2">
+                          <div className="flex items-center gap-2 px-1">
+                            <div className="w-2 h-2 rounded-full bg-emerald-500" />
+                            <h3 className="text-xs font-bold uppercase tracking-widest text-slate-400">{projectName}</h3>
+                            <div className="flex-1 h-px bg-slate-100 dark:bg-slate-800" />
+                            <span className="text-[10px] text-slate-400">{projectTasks.length} task{projectTasks.length !== 1 ? 's' : ''}</span>
                           </div>
-                          <button 
-                            onClick={(e) => { e.stopPropagation(); toggleTaskDone(task.id); }}
-                            className="w-10 h-10 rounded-xl border-2 border-slate-200 dark:border-slate-700 flex items-center justify-center group-hover:border-emerald-500 group-hover:bg-emerald-50 dark:group-hover:bg-emerald-900/20 transition-all"
-                          >
-                            <CheckCircle2 className="w-5 h-5 text-transparent group-hover:text-emerald-500" />
-                          </button>
+                          {projectTasks.map((task) => (
+                            <div 
+                              key={task.id}
+                              onClick={() => handleTaskClick(task)}
+                              className="group flex items-center gap-4 p-4 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer transition-all border border-transparent hover:border-slate-200 dark:hover:border-slate-700"
+                            >
+                              <div className={`w-3 h-3 rounded-full flex-shrink-0 ${getPriorityColor(task.priority)} shadow-lg shadow-current/20`} />
+                              <div className="flex-1 min-w-0">
+                                <p className="font-bold text-slate-800 dark:text-slate-200 truncate">{task.title}</p>
+                                <div className="flex items-center gap-2 mt-1">
+                                  <Chip size="sm" variant="flat" color="default" className="h-5 text-[10px] uppercase font-bold tracking-tight">
+                                    {task.priority}
+                                  </Chip>
+                                  {task.due_date && (
+                                    <div className="flex items-center gap-1 text-[10px] text-slate-400">
+                                      <Clock className="w-3 h-3" />
+                                      {new Date(task.due_date).toLocaleDateString()}
+                                    </div>
+                                  )}
+                                </div>
+                              </div>
+                              <button 
+                                onClick={(e) => { e.stopPropagation(); toggleTaskDone(task.id); }}
+                                className="w-10 h-10 rounded-xl border-2 border-slate-200 dark:border-slate-700 flex items-center justify-center group-hover:border-emerald-500 group-hover:bg-emerald-50 dark:group-hover:bg-emerald-900/20 transition-all"
+                              >
+                                <CheckCircle2 className="w-5 h-5 text-transparent group-hover:text-emerald-500" />
+                              </button>
+                            </div>
+                          ))}
                         </div>
                       ))}
-                      {todaysTasks.length === 0 && (
-                        <div className="text-center py-6">
-                          <p className="text-sm text-slate-400">All caught up 🎉</p>
-                        </div>
-                      )}
                     </div>
 
                     {/* Completed tasks */}
@@ -772,7 +934,7 @@ export default function Home() {
                 {agents.map((agent) => (
                   <div 
                     key={agent.id} 
-                    onClick={() => router.push('/ai')}
+                    onClick={() => handleAgentClick(agent)}
                     className="p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors"
                   >
                     <div className="flex items-center justify-between mb-2">
@@ -808,6 +970,275 @@ export default function Home() {
           </div>
         </div>
       </main>
+
+      {/* Task Detail Modal */}
+      <Modal isOpen={isTaskModalOpen} onClose={onTaskModalClose} size="lg">
+        <ModalContent>
+          <ModalHeader className="flex flex-col gap-1">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <div className={`w-3 h-3 rounded-full ${getPriorityColor(selectedTask?.priority || 'medium')}`} />
+                <h2 className="text-lg font-bold">Task Details</h2>
+              </div>
+              {!isEditingTask && (
+                <Button size="sm" color="primary" variant="flat" onPress={handleTaskEdit}>
+                  <Pencil className="w-4 h-4 mr-1" />
+                  Edit
+                </Button>
+              )}
+            </div>
+          </ModalHeader>
+          <ModalBody className="pb-6">
+            {selectedTask && (
+              <div className="space-y-4">
+                {/* Title */}
+                <div>
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1 block">Title</label>
+                  {isEditingTask ? (
+                    <Input
+                      value={taskEditData.title}
+                      onChange={(e) => setTaskEditData(prev => ({ ...prev, title: e.target.value }))}
+                      size="sm"
+                      className="w-full"
+                    />
+                  ) : (
+                    <p className="text-slate-800 dark:text-slate-200 font-medium">{selectedTask.title}</p>
+                  )}
+                </div>
+
+                {/* Description */}
+                <div>
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1 block">Description</label>
+                  {isEditingTask ? (
+                    <Textarea
+                      value={taskEditData.description}
+                      onChange={(e) => setTaskEditData(prev => ({ ...prev, description: e.target.value }))}
+                      size="sm"
+                      className="w-full"
+                      minRows={3}
+                    />
+                  ) : (
+                    <p className="text-slate-600 dark:text-slate-400 whitespace-pre-wrap">
+                      {selectedTask.description || 'No description'}
+                    </p>
+                  )}
+                </div>
+
+                {/* Status */}
+                <div>
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1 block">Status</label>
+                  {isEditingTask ? (
+                    <Select
+                      selectedKeys={[taskEditData.status]}
+                      onChange={(e) => setTaskEditData(prev => ({ ...prev, status: e.target.value }))}
+                      size="sm"
+                      className="w-full"
+                    >
+                      <SelectItem key="todo">To Do</SelectItem>
+                      <SelectItem key="in_progress">In Progress</SelectItem>
+                      <SelectItem key="review">Review</SelectItem>
+                      <SelectItem key="done">Done</SelectItem>
+                    </Select>
+                  ) : (
+                    <div className="flex items-center gap-2">
+                      <Chip 
+                        size="sm" 
+                        variant="flat" 
+                        color={selectedTask.status === 'done' ? 'success' : 'default'}
+                        className="cursor-pointer"
+                        onClick={() => handleTaskStatusChange(selectedTask.status === 'done' ? 'todo' : 'done')}
+                      >
+                        {selectedTask.status.replace('_', ' ')}
+                      </Chip>
+                      <span className="text-xs text-slate-400">(Click to toggle)</span>
+                    </div>
+                  )}
+                </div>
+
+                {/* Priority */}
+                <div>
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1 block">Priority</label>
+                  {isEditingTask ? (
+                    <Select
+                      selectedKeys={[taskEditData.priority]}
+                      onChange={(e) => setTaskEditData(prev => ({ ...prev, priority: e.target.value }))}
+                      size="sm"
+                      className="w-full"
+                    >
+                      {priorityOptions.map(option => (
+                        <SelectItem key={option.key}>{option.label}</SelectItem>
+                      ))}
+                    </Select>
+                  ) : (
+                    <Chip size="sm" variant="flat" className={`${getPriorityColor(selectedTask.priority)} text-white`}>
+                      {selectedTask.priority}
+                    </Chip>
+                  )}
+                </div>
+
+                {/* Project */}
+                <div>
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1 block">Project</label>
+                  <Chip size="sm" variant="flat" color="default">
+                    {spaces.find(s => s.id === selectedTask.space_id)?.name || 'General'}
+                  </Chip>
+                </div>
+
+                {/* Due Date */}
+                <div>
+                  <label className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1 block">Due Date</label>
+                  {isEditingTask ? (
+                    <Input
+                      type="date"
+                      value={taskEditData.due_date || ''}
+                      onChange={(e) => setTaskEditData(prev => ({ ...prev, due_date: e.target.value }))}
+                      size="sm"
+                      className="w-full"
+                    />
+                  ) : (
+                    <p className="text-slate-600 dark:text-slate-400">
+                      {selectedTask.due_date ? new Date(selectedTask.due_date).toLocaleDateString() : 'No due date'}
+                    </p>
+                  )}
+                </div>
+              </div>
+            )}
+          </ModalBody>
+          <ModalFooter>
+            {isEditingTask ? (
+              <>
+                <Button variant="light" onPress={() => setIsEditingTask(false)}>
+                  Cancel
+                </Button>
+                <Button color="primary" onPress={handleTaskSave}>
+                  Save Changes
+                </Button>
+              </>
+            ) : (
+              <Button color="primary" onPress={onTaskModalClose}>
+                Close
+              </Button>
+            )}
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+
+      {/* Agent Detail Modal */}
+      <Modal isOpen={isAgentModalOpen} onClose={onAgentModalClose} size="lg">
+        <ModalContent>
+          <ModalHeader className="flex flex-col gap-1">
+            <div className="flex items-center gap-3">
+              <Avatar name={selectedAgent?.name} size="lg" className="bg-gradient-to-br from-violet-500 to-purple-600 text-white font-black" />
+              <div>
+                <h2 className="text-lg font-bold">{selectedAgent?.name}</h2>
+                <p className="text-sm text-slate-400 capitalize">{selectedAgent?.role?.replace(/_/g, ' ')}</p>
+              </div>
+            </div>
+          </ModalHeader>
+          <ModalBody className="pb-6">
+            {selectedAgent && (
+              <div className="space-y-6">
+                {/* Status & Stats */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl">
+                    <p className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Status</p>
+                    <Chip size="sm" variant="flat" color={selectedAgent.is_active ? 'success' : 'default'}>
+                      {selectedAgent.is_active ? 'Online' : 'Offline'}
+                    </Chip>
+                  </div>
+                  <div className="bg-slate-50 dark:bg-slate-800/50 p-4 rounded-xl">
+                    <p className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1">Tasks</p>
+                    <p className="text-lg font-bold text-slate-800 dark:text-slate-200">
+                      {agentTasks.upcoming.length + agentTasks.completed.length}
+                    </p>
+                  </div>
+                </div>
+
+                {/* Last Action */}
+                {selectedAgent.last_action && (
+                  <div>
+                    <p className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Last Action</p>
+                    <div className="flex items-center gap-2 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+                      <Activity className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                      <span className="text-sm text-slate-600 dark:text-slate-300">{selectedAgent.last_action}</span>
+                      {selectedAgent.last_action_at && (
+                        <span className="text-xs text-slate-400 ml-auto">{timeAgo(selectedAgent.last_action_at)}</span>
+                      )}
+                    </div>
+                  </div>
+                )}
+
+                {/* Upcoming Tasks */}
+                <div>
+                  <div className="flex items-center justify-between mb-2">
+                    <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Upcoming Tasks ({agentTasks.upcoming.length})</p>
+                  </div>
+                  {loadingAgentTasks ? (
+                    <div className="space-y-2">
+                      {[1, 2, 3].map(i => <Skeleton key={i} className="h-12 rounded-lg w-full" />)}
+                    </div>
+                  ) : agentTasks.upcoming.length === 0 ? (
+                    <p className="text-sm text-slate-400 text-center py-4">No upcoming tasks</p>
+                  ) : (
+                    <div className="space-y-2">
+                      {agentTasks.upcoming.slice(0, 5).map(task => (
+                        <div 
+                          key={task.id}
+                          onClick={() => handleTaskClick(task)}
+                          className="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors"
+                        >
+                          <div className={`w-2 h-2 rounded-full ${getPriorityColor(task.priority)}`} />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-slate-800 dark:text-slate-200 truncate">{task.title}</p>
+                            <p className="text-xs text-slate-400">{task.priority}</p>
+                          </div>
+                          {task.due_date && (
+                            <span className="text-xs text-slate-400 flex-shrink-0">
+                              {new Date(task.due_date).toLocaleDateString()}
+                            </span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+
+                {/* Completed Tasks */}
+                {agentTasks.completed.length > 0 && (
+                  <div>
+                    <div className="flex items-center justify-between mb-2">
+                      <p className="text-xs font-bold uppercase tracking-wider text-slate-400">Completed Tasks ({agentTasks.completed.length})</p>
+                    </div>
+                    <div className="space-y-2">
+                      {agentTasks.completed.slice(0, 5).map(task => (
+                        <div 
+                          key={task.id}
+                          onClick={() => handleTaskClick(task)}
+                          className="flex items-center gap-3 p-3 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors"
+                        >
+                          <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0" />
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium text-slate-400 line-through truncate">{task.title}</p>
+                            <p className="text-xs text-slate-400">{task.priority}</p>
+                          </div>
+                          <span className="text-xs text-slate-400 flex-shrink-0">
+                            {new Date(task.updated_at || task.created_at).toLocaleDateString()}
+                          </span>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            )}
+          </ModalBody>
+          <ModalFooter>
+            <Button color="primary" onPress={onAgentModalClose}>
+              Close
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
     </div>
   );
 }

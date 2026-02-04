@@ -631,8 +631,8 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
         {/* Top Navigation */}
         <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
           <Link href="/docs">
-            <Button variant="flat" startContent={<ArrowLeft className="w-4 h-4" />}>
-              All Documents
+            <Button variant="flat" isIconOnly title="Back to all documents">
+              <ArrowLeft className="w-5 h-5" />
             </Button>
           </Link>
           
@@ -640,11 +640,12 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
             {tableOfContents.length > 2 && (
               <Button
                 variant="flat"
-                startContent={<List className="w-4 h-4" />}
+                isIconOnly
+                title="Table of Contents"
                 onPress={() => setShowTOC(!showTOC)}
                 className="sm:hidden"
               >
-                TOC
+                <List className="w-5 h-5" />
               </Button>
             )}
             
@@ -652,11 +653,12 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
             {(document.status === 'draft' || document.status === 'in_review') && (
               <Button
                 color="success"
-                startContent={approving ? null : <CheckCircle2 className="w-4 h-4" />}
+                isIconOnly
+                title="Approve document"
                 onPress={handleApprove}
                 isLoading={approving}
               >
-                Approve
+                <CheckCircle2 className="w-5 h-5" />
               </Button>
             )}
             
@@ -665,27 +667,30 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
               <Button
                 variant="flat"
                 color="warning"
-                startContent={<RotateCcw className="w-4 h-4" />}
+                isIconOnly
+                title="Request revision"
                 onPress={onRevisionOpen}
               >
-                Request Revision
+                <RotateCcw className="w-5 h-5" />
               </Button>
             )}
             
             <Button
               variant="flat"
-              startContent={copied ? <Check className="w-4 h-4" /> : <Share2 className="w-4 h-4" />}
+              isIconOnly
+              title={copied ? "Link copied!" : "Share document"}
               onPress={handleShare}
             >
-              {copied ? 'Copied!' : 'Share'}
+              {copied ? <Check className="w-5 h-5" /> : <Share2 className="w-5 h-5" />}
             </Button>
             <Popover isOpen={propertiesOpen} onOpenChange={setPropertiesOpen} placement="bottom-end">
               <PopoverTrigger>
                 <Button
                   variant="flat"
-                  startContent={<Settings className="w-4 h-4" />}
+                  isIconOnly
+                  title="Document properties"
                 >
-                  Properties
+                  <Settings className="w-5 h-5" />
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-72 p-4">
@@ -808,17 +813,18 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
               </PopoverContent>
             </Popover>
             <Link href={`/docs/${id}/edit`}>
-              <Button color="primary" startContent={<Edit className="w-4 h-4" />}>
-                Edit
+              <Button color="primary" isIconOnly title="Edit document">
+                <Edit className="w-5 h-5" />
               </Button>
             </Link>
             <Button
               variant="flat"
               color="danger"
-              startContent={<Trash2 className="w-4 h-4" />}
+              isIconOnly
+              title="Delete document"
               onPress={onDeleteOpen}
             >
-              Delete
+              <Trash2 className="w-5 h-5" />
             </Button>
           </div>
         </div>

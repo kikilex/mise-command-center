@@ -1,13 +1,14 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useEffect } from 'react'
 import Link from 'next/link'
-import { Button, Avatar } from "@heroui/react"
+import { Button, Avatar, Spinner } from "@heroui/react"
 import { usePathname } from 'next/navigation'
 import UserMenu from './UserMenu'
 import NotificationBell from './NotificationBell'
 import { useMenuSettings } from '@/lib/menu-settings'
 import { navIcons, Menu, X } from '@/lib/icons'
+import { createClient } from '@/lib/supabase/client'
 
 interface UserData {
   id?: string
@@ -18,15 +19,63 @@ interface UserData {
 }
 
 interface NavbarProps {
-  user: UserData | null
+  user?: UserData | null
   actions?: React.ReactNode
   onOpenTask?: (taskId: string) => void
 }
 
-export default function Navbar({ user, actions, onOpenTask }: NavbarProps) {
+export default function Navbar({ user: propUser, actions, onOpenTask }: NavbarProps) {
   const [isMenuOpen, setIsMenuOpen] = useState(false)
+  const [user, setUser] = useState<UserData | null>(propUser || null)
+  const [loading, setLoading] = useState(!propUser)
   const pathname = usePathname()
   const { getActiveNavItems, loading: menuLoading } = useMenuSettings()
+  const supabase = createClient()
+
+  // Fetch user data if not provided
+  useEffect(() => {
+    async function fetchUser() {
+      if (propUser !== undefined) {
+        // User prop was provided (could be null or user object)
+        setUser(propUser)
+        setLoading(false)
+        return
+      }
+
+      try {
+        setLoading(true)
+        const { data: { user: authUser }, error: authError } = await supabase.auth.getUser()
+        
+        if (authError || !authUser) {
+          setUser(null)
+          setLoading(false)
+          return
+        }
+
+        // Fetch user profile
+        const { data: profile } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', authUser.id)
+          .single()
+
+        setUser({
+          id: authUser.id,
+          email: authUser.email || '',
+          name: profile?.name || authUser.email?.split('@')[0],
+          avatar_url: profile?.avatar_url,
+          role: profile?.role || 'member'
+        })
+      } catch (error) {
+        console.error('Failed to fetch user for navbar:', error)
+        setUser(null)
+      } finally {
+        setLoading(false)
+      }
+    }
+
+    fetchUser()
+  }, [propUser, supabase])
 
   // Get nav items based on current mode from user settings
   const navItems = useMemo(() => {
@@ -106,19 +155,24 @@ export default function Navbar({ user, actions, onOpenTask }: NavbarProps) {
             {/* Page-specific actions */}
             {actions}
             
-            {/* Notifications Bell */}
+            {/* Notifications Bell - Always clickable */}
             <NotificationBell 
               userId={user?.id} 
               onNotificationClick={onOpenTask}
             />
             
-            {user ? (
+            {loading ? (
+              <Spinner size="sm" />
+            ) : user ? (
               <UserMenu user={user} />
             ) : (
-              <Avatar 
-                size="sm"
-                className="ring-2 ring-white shadow-md"
-              />
+              <Link href="/login">
+                <Avatar 
+                  size="sm"
+                  className="ring-2 ring-white shadow-md cursor-pointer"
+                  as="button"
+                />
+              </Link>
             )}
           </div>
         </div>

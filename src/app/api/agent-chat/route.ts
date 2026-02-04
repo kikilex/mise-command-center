@@ -109,10 +109,9 @@ export async function GET(request: NextRequest) {
       return NextResponse.json({ error: 'Failed to fetch messages' }, { status: 500 })
     }
 
-    // Filter messages: show all agent-to-agent, and user's own messages
+    // Filter messages: show only agent-to-agent conversations (both from_agent and to_agent are not 'user')
     const filteredMessages = messages.filter(msg => 
-      msg.from_agent !== 'user' || 
-      (msg.context?.user_id === user.id)
+      msg.from_agent !== 'user' && msg.to_agent !== 'user'
     )
 
     return NextResponse.json({ messages: filteredMessages })

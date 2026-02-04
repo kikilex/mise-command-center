@@ -1,8 +1,19 @@
 'use client'
 
 import { Avatar, Button, Chip, Divider, Card, CardBody } from "@heroui/react"
-import { AIAgent, AgentTask, WorkLog } from "../page"
+import { AIAgent, AgentTask } from "../page"
 import { X, Bot, Zap, Clock, CheckCircle2, AlertCircle } from "lucide-react"
+
+interface WorkLog {
+  id: string
+  agent_name: string
+  action: string
+  task_id: string | null
+  details: Record<string, unknown>
+  tokens_used: number | null
+  duration_ms: number | null
+  created_at: string
+}
 
 interface AgentSlidePanelProps {
   agent: AIAgent | null

@@ -222,7 +222,7 @@ export default function SpaceDetailPage() {
 
   return (
     <div className="min-h-screen bg-default-50">
-      <Navbar user={null} /> {/* User will be handled by providers */}
+      <Navbar /> {/* User will be handled by providers */}
       
       <main className="max-w-7xl mx-auto py-6 px-4 sm:py-8 sm:px-6">
         {/* Space Header - Calm and focused */}

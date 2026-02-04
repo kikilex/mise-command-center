@@ -216,7 +216,7 @@ export default function TeamPage() {
   if (!selectedBusiness) {
     return (
       <div className="min-h-screen bg-background">
-        <Navbar user={null} />
+        <Navbar />
         <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
           <div className="flex flex-col lg:flex-row gap-8">
             {/* Settings Sidebar */}
@@ -247,7 +247,7 @@ export default function TeamPage() {
 
   return (
     <div className="min-h-screen bg-background">
-      <Navbar user={null} />
+      <Navbar />
 
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
         <div className="flex flex-col lg:flex-row gap-8">

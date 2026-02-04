@@ -10,6 +10,7 @@ import {
   Check,
   ChevronDown,
   ChevronUp,
+  ChevronRight,
   Calendar,
   LayoutGrid,
   List,
@@ -65,7 +66,6 @@ interface Task {
   space_id: string | null
   due_date: string | null
   tags: string[]
-  ai_flag: boolean
   ai_agent: string | null
   feedback: string | null
   created_at: string
@@ -139,7 +139,6 @@ function TasksPageContent() {
     description: '',
     status: 'todo',
     priority: 'medium',
-    ai_flag: false,
     due_date: '',
     assignee_id: '',
     ai_agent: '',
@@ -251,7 +250,6 @@ function TasksPageContent() {
             description: formData.description || null,
             status: formData.status,
             priority: formData.priority,
-            ai_flag: formData.ai_flag,
             due_date: formData.due_date || null,
             assignee_id: formData.assignee_id || null,
             ai_agent: formData.ai_agent || null,
@@ -273,7 +271,6 @@ function TasksPageContent() {
             description: formData.description || null,
             status: formData.status,
             priority: formData.priority,
-            ai_flag: formData.ai_flag,
             created_by: user.id,
             due_date: formData.due_date || null,
             space_id: targetSpaceId,
@@ -321,7 +318,6 @@ function TasksPageContent() {
       description: '',
       status: 'todo',
       priority: 'medium',
-      ai_flag: false,
       due_date: '',
       assignee_id: '',
       ai_agent: '',
@@ -338,7 +334,6 @@ function TasksPageContent() {
       description: '',
       status: 'todo',
       priority: 'medium',
-      ai_flag: false,
       due_date: '',
       assignee_id: '',
       ai_agent: '',
@@ -411,6 +406,9 @@ function TasksPageContent() {
   const displayTasks = showAllTasks ? allActiveTasks : focusTasks
   const hiddenCount = allActiveTasks.length - focusTasks.length
 
+  // State for collapsed project sections
+  const [collapsedProjects, setCollapsedProjects] = useState<Record<string, boolean>>({})
+
   // Group tasks by project
   const tasksByProject = useMemo(() => {
     const grouped: Record<string, Task[]> = {}
@@ -422,12 +420,43 @@ function TasksPageContent() {
     return grouped
   }, [displayTasks])
 
+  // Toggle project section collapse
+  const toggleProjectCollapse = (projectId: string) => {
+    setCollapsedProjects(prev => ({
+      ...prev,
+      [projectId]: !prev[projectId]
+    }))
+  }
+
+  // State for delete confirmation
+  const [deletingTaskId, setDeletingTaskId] = useState<string | null>(null)
+
+  // Function to handle task deletion
+  async function handleDeleteTask(taskId: string) {
+    try {
+      const { error } = await supabase
+        .from('tasks')
+        .delete()
+        .eq('id', taskId)
+      
+      if (error) throw error
+      
+      showSuccessToast('Task deleted')
+      loadTasks()
+      setDeletingTaskId(null)
+    } catch (error) {
+      console.error('Delete task error:', error)
+      showErrorToast(error, 'Failed to delete task')
+      setDeletingTaskId(null)
+    }
+  }
+
   // Render a clean task card
   const renderTaskCard = (task: Task) => (
     <div 
       key={task.id} 
-      className={`group flex items-start gap-3 p-4 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 transition-all cursor-pointer ${task.status === 'done' ? 'opacity-60' : ''}`}
-      onClick={() => handleViewDetails(task)}
+      className={`group flex items-start gap-3 p-4 rounded-xl bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 hover:border-slate-300 dark:hover:border-slate-600 transition-all ${task.status === 'done' ? 'opacity-60' : ''}`}
+      onClick={() => !deletingTaskId && handleViewDetails(task)}
     >
       {/* Checkbox */}
       <div 
@@ -455,10 +484,6 @@ function TasksPageContent() {
           <span className={`font-medium text-slate-900 dark:text-slate-100 ${task.status === 'done' ? 'line-through text-slate-500 dark:text-slate-400' : ''}`}>
             {task.title}
           </span>
-          
-          {task.ai_flag && (
-            <Bot className="w-4 h-4 text-violet-500 flex-shrink-0" />
-          )}
         </div>
         
         {/* Subtle metadata */}
@@ -480,6 +505,36 @@ function TasksPageContent() {
             </Chip>
           )}
         </div>
+      </div>
+
+      {/* Delete button with inline confirmation */}
+      <div className="flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+        {deletingTaskId === task.id ? (
+          <div className="flex items-center gap-2 bg-red-50 dark:bg-red-900/20 px-3 py-1.5 rounded-lg border border-red-200 dark:border-red-800">
+            <span className="text-xs text-red-600 dark:text-red-400">Delete?</span>
+            <button
+              onClick={() => handleDeleteTask(task.id)}
+              className="text-xs font-medium text-red-600 dark:text-red-400 hover:text-red-800 dark:hover:text-red-300 px-2 py-0.5 rounded bg-red-100 dark:bg-red-800/30"
+            >
+              Yes
+            </button>
+            <button
+              onClick={() => setDeletingTaskId(null)}
+              className="text-xs font-medium text-slate-600 dark:text-slate-400 hover:text-slate-800 dark:hover:text-slate-300 px-2 py-0.5 rounded bg-slate-100 dark:bg-slate-800"
+            >
+              No
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => setDeletingTaskId(task.id)}
+            className="p-1.5 text-slate-400 hover:text-red-500 dark:text-slate-500 dark:hover:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+            </svg>
+          </button>
+        )}
       </div>
     </div>
   )
@@ -507,6 +562,14 @@ function TasksPageContent() {
                 className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
               >
                 <Settings className="w-5 h-5" />
+              </Button>
+              <Button
+                isIconOnly
+                variant="light"
+                onPress={handleNew}
+                className="text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+              >
+                <Plus className="w-5 h-5" />
               </Button>
             </div>
           </div>
@@ -574,20 +637,36 @@ function TasksPageContent() {
               ) : (
                 Object.entries(tasksByProject).map(([projectId, projectTasks]) => {
                   const project = projects.find(p => p.id === projectId)
+                  const isCollapsed = collapsedProjects[projectId]
+                  const projectName = project ? project.name : 'Unassigned'
+                  
                   return (
                     <div key={projectId} className="space-y-2">
-                      <div className="flex items-center gap-2 px-1 mb-1">
+                      {/* Collapsible project header */}
+                      <button
+                        onClick={() => toggleProjectCollapse(projectId)}
+                        className="flex items-center gap-2 px-1 mb-1 w-full hover:bg-slate-50 dark:hover:bg-slate-800/50 rounded-lg p-2 -mx-2 transition-colors"
+                      >
+                        {isCollapsed ? (
+                          <ChevronRight className="w-3 h-3 text-slate-400" />
+                        ) : (
+                          <ChevronDown className="w-3 h-3 text-slate-400" />
+                        )}
                         <span className="text-xs font-bold uppercase tracking-wider text-slate-400">
-                          {project ? project.name : 'No Project'}
+                          {projectName}
                         </span>
                         <div className="flex-1 h-[1px] bg-slate-100 dark:bg-slate-800" />
                         <span className="text-[10px] text-slate-400 bg-slate-50 dark:bg-slate-800 px-1.5 py-0.5 rounded-full border border-slate-100 dark:border-slate-700">
                           {projectTasks.length}
                         </span>
-                      </div>
-                      <div className="space-y-2">
-                        {projectTasks.map(task => renderTaskCard(task))}
-                      </div>
+                      </button>
+                      
+                      {/* Project tasks (collapsible) */}
+                      {!isCollapsed && (
+                        <div className="space-y-2">
+                          {projectTasks.map(task => renderTaskCard(task))}
+                        </div>
+                      )}
                     </div>
                   )
                 })
@@ -615,19 +694,6 @@ function TasksPageContent() {
               </button>
             )}
 
-            {/* Add task button */}
-            <div className="mt-6">
-              <Button
-                color="primary"
-                variant="flat"
-                onPress={handleNew}
-                className="w-full justify-center"
-                size="lg"
-              >
-                <Plus className="w-4 h-4" />
-                Add to my focus
-              </Button>
-            </div>
 
             {/* Recently completed (subtle) */}
             {recentlyCompleted.length > 0 && !showAllTasks && (

@@ -15,22 +15,6 @@ import {
   Select,
   SelectItem,
   Spinner,
-  Tabs,
-  Tab,
-  Modal,
-  ModalContent,
-  ModalHeader,
-  ModalBody,
-  ModalFooter,
-  Checkbox,
-  Dropdown,
-  DropdownTrigger,
-  DropdownMenu,
-  DropdownItem,
-  Popover,
-  PopoverTrigger,
-  PopoverContent,
-  Switch,
 } from '@heroui/react'
 import { createClient } from '@/lib/supabase/client'
 import { useBusiness } from '@/lib/business-context'
@@ -65,20 +49,19 @@ interface UserData {
   avatar_url?: string
 }
 
+interface Space {
+  id: string
+  name: string
+  color: string
+  icon: string
+}
+
 const statusOptions = [
   { key: 'all', label: 'All Statuses' },
   { key: 'draft', label: 'Draft', color: 'default' },
   { key: 'in_review', label: 'In Review', color: 'warning' },
   { key: 'approved', label: 'Approved', color: 'success' },
   { key: 'needs_revision', label: 'Needs Revision', color: 'danger' },
-]
-
-const categoryOptions = [
-  { key: 'all', label: 'All', icon: Folder },
-  { key: 'research', label: 'Research', icon: Search },
-  { key: 'content', label: 'Content', icon: FileText },
-  { key: 'guides', label: 'Guides', icon: FileText },
-  { key: 'business', label: 'Business', icon: Folder },
 ]
 
 const getStatusColor = (status: string) => {
@@ -125,19 +108,19 @@ export default function DocsPage() {
 
 function DocsPageContent() {
   const [documents, setDocuments] = useState<Document[]>([])
+  const [spaces, setSpaces] = useState<Space[]>([])
   const [user, setUser] = useState<UserData | null>(null)
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [statusFilter, setStatusFilter] = useState('all')
-  const [categoryTab, setCategoryTab] = useState('all')
-  const [docTypeTab, setDocTypeTab] = useState<'document' | 'note'>('document')
+  const [spaceFilter, setSpaceFilter] = useState<string>('all')
+  const [docTypeFilter, setDocTypeFilter] = useState<string>('all')
   const [selectedTags, setSelectedTags] = useState<string[]>([])
   const [showArchived, setShowArchived] = useState(false)
   const [showHidden, setShowHidden] = useState(false)
   
   const [editModalOpen, setEditModalOpen] = useState(false)
   const [editingDoc, setEditingDoc] = useState<Document | null>(null)
-  const [editCategory, setEditCategory] = useState('all')
   const [editTags, setEditTags] = useState('')
   const [editVisibility, setEditVisibility] = useState<'normal' | 'hidden'>('normal')
   const [editArchived, setEditArchived] = useState(false)
@@ -153,6 +136,7 @@ function DocsPageContent() {
 
   useEffect(() => {
     loadDocuments()
+    loadSpaces()
   }, [selectedBusinessId])
 
   async function loadUser() {
@@ -169,6 +153,21 @@ function DocsPageContent() {
       }
     } catch (error) {
       console.error('Load user error:', error)
+    }
+  }
+
+  async function loadSpaces() {
+    try {
+      const { data, error } = await supabase
+        .from('spaces')
+        .select('id, name, color, icon')
+        .is('archived_at', null)
+        .order('name')
+      
+      if (error) throw error
+      setSpaces(data || [])
+    } catch (error) {
+      console.error('Load spaces error:', error)
     }
   }
 
@@ -248,10 +247,10 @@ function DocsPageContent() {
 
   const filteredDocuments = useMemo(() => {
     return documents.filter(doc => {
-      if (doc.doc_type !== docTypeTab) return false
+      if (docTypeFilter !== 'all' && doc.doc_type !== docTypeFilter) return false
       if (!showArchived && doc.archived) return false
       if (!showHidden && doc.visibility === 'hidden') return false
-      if (docTypeTab === 'document' && categoryTab !== 'all' && doc.category !== categoryTab) return false
+      if (spaceFilter !== 'all' && doc.space_id !== spaceFilter) return false
       if (statusFilter !== 'all' && doc.status !== statusFilter) return false
       if (selectedTags.length > 0 && !selectedTags.some(tag => (doc.tags || []).includes(tag))) return false
       
@@ -261,7 +260,7 @@ function DocsPageContent() {
       }
       return true
     })
-  }, [documents, searchQuery, statusFilter, categoryTab, docTypeTab, selectedTags, showArchived, showHidden])
+  }, [documents, searchQuery, statusFilter, spaceFilter, docTypeFilter, selectedTags, showArchived, showHidden])
 
   const getPreview = (content: string) => {
     const stripped = content.replace(/[#*`\[\]]/g, '').replace(/\n+/g, ' ').trim()
@@ -288,29 +287,6 @@ function DocsPageContent() {
           </div>
         </div>
 
-        <div className="mb-6">
-          <Tabs 
-            selectedKey={docTypeTab} 
-            onSelectionChange={(key) => setDocTypeTab(key as 'document' | 'note')}
-            color="primary" variant="solid" size="lg"
-          >
-            <Tab key="document" title="Documents" />
-            <Tab key="note" title="Notes" />
-          </Tabs>
-        </div>
-
-        {docTypeTab === 'document' && (
-          <div className="mb-4 overflow-x-auto flex items-center gap-2">
-            <Tabs 
-              selectedKey={categoryTab} 
-              onSelectionChange={(key) => setCategoryTab(key as string)}
-              color="primary" variant="underlined"
-            >
-              {categoryOptions.map(cat => <Tab key={cat.key} title={cat.label} />)}
-            </Tabs>
-          </div>
-        )}
-
         <div className="flex flex-col sm:flex-row gap-3 mb-6">
           <Input
             placeholder="Search docs..."
@@ -319,6 +295,25 @@ function DocsPageContent() {
             startContent={<Search className="w-4 h-4 text-slate-400" />}
             className="flex-1"
           />
+          <Select
+            selectedKeys={[spaceFilter]}
+            onChange={(e) => setSpaceFilter(e.target.value)}
+            className="w-full sm:w-48"
+          >
+            <SelectItem key="all">All Spaces</SelectItem>
+            {spaces.map(space => (
+              <SelectItem key={space.id}>{space.name}</SelectItem>
+            ))}
+          </Select>
+          <Select
+            selectedKeys={[docTypeFilter]}
+            onChange={(e) => setDocTypeFilter(e.target.value)}
+            className="w-full sm:w-48"
+          >
+            <SelectItem key="all">All Types</SelectItem>
+            <SelectItem key="document">Documents</SelectItem>
+            <SelectItem key="note">Notes</SelectItem>
+          </Select>
           <Select
             selectedKeys={[statusFilter]}
             onChange={(e) => setStatusFilter(e.target.value)}
@@ -344,7 +339,9 @@ function DocsPageContent() {
                   <p className="text-sm text-slate-500 line-clamp-3 mb-3">{getPreview(doc.content)}</p>
                   <div className="flex items-center justify-between text-[10px] text-slate-400">
                     <span>{new Date(doc.updated_at).toLocaleDateString()}</span>
-                    {doc.category !== 'all' && <Chip size="sm" variant="dot" color={getCategoryColor(doc.category) as any}>{doc.category}</Chip>}
+                    <Chip size="sm" variant="dot" color={doc.doc_type === 'note' ? 'secondary' : 'primary'}>
+                      {doc.doc_type === 'note' ? 'Note' : 'Document'}
+                    </Chip>
                   </div>
                 </CardBody>
               </Card>

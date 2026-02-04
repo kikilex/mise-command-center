@@ -35,7 +35,6 @@ interface Task {
   space_id: string | null
   due_date: string | null
   tags: string[]
-  ai_flag: boolean
   ai_agent: string | null
   feedback: string | null
   created_at: string
@@ -124,7 +123,6 @@ export default function TaskDetailModal({
     status: 'todo',
     priority: 'medium',
     due_date: '',
-    ai_flag: false,
     assignee_id: '',
     ai_agent: '',
     project_id: '',
@@ -154,7 +152,6 @@ export default function TaskDetailModal({
         status: task.status || 'todo',
         priority: task.priority || 'medium',
         due_date: task.due_date ? task.due_date.split('T')[0] : '',
-        ai_flag: task.ai_flag || false,
         assignee_id: task.assignee_id || '',
         ai_agent: task.ai_agent || '',
         project_id: task.project_id || '',
@@ -232,7 +229,6 @@ export default function TaskDetailModal({
           status: formData.status,
           priority: formData.priority,
           due_date: formData.due_date || null,
-          ai_flag: formData.ai_flag,
           assignee_id: formData.assignee_id || null,
           ai_agent: formData.ai_agent || null,
           project_id: formData.project_id || null,
@@ -452,11 +448,6 @@ export default function TaskDetailModal({
           <div className="flex items-center gap-2">
             <ClipboardList className="w-5 h-5 text-slate-600 dark:text-slate-400" />
             <span>Task Details</span>
-            {task.ai_flag && (
-              <Chip size="sm" className="bg-violet-100 dark:bg-violet-900/50 text-violet-700 dark:text-violet-300">
-                <Bot className="w-3 h-3 inline mr-1" /> AI Task
-              </Chip>
-            )}
             {task.ai_agent && (
               <Chip size="sm" variant="flat" className="capitalize">
                 Agent: {task.ai_agent}
@@ -561,16 +552,6 @@ export default function TaskDetailModal({
                   ))}
                 </Select>
               </div>
-              
-              <label className="flex items-center gap-2 cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={formData.ai_flag}
-                  onChange={(e) => setFormData({ ...formData, ai_flag: e.target.checked })}
-                  className="w-4 h-4 rounded border-slate-300"
-                />
-                <span className="text-sm text-slate-700 dark:text-slate-300 flex items-center gap-1"><Bot className="w-4 h-4" /> Allow AI to work on this task</span>
-              </label>
             </div>
 
             <Divider />

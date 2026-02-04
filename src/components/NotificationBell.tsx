@@ -200,7 +200,19 @@ export default function NotificationBell({ userId, onNotificationClick }: Notifi
 
   if (!userId) {
     return (
-      <Button isIconOnly variant="light" className="flex text-default-500 min-w-[44px] min-h-[44px]">
+      <Button 
+        isIconOnly 
+        variant="light" 
+        className="flex text-default-500 min-w-[44px] min-h-[44px]"
+        onPress={() => {
+          // Show "Coming soon" toast or navigate to notifications page
+          import('react-hot-toast').then(({ toast }) => {
+            toast('Notifications coming soon!', {
+              icon: '🔔',
+            })
+          })
+        }}
+      >
         <Bell className="w-5 h-5" />
       </Button>
     )

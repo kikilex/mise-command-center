@@ -22,10 +22,12 @@ export default function SpacesPage() {
   const { spaces, loading, refreshSpaces } = useSpace()
   const { isOpen, onOpen, onClose } = useDisclosure()
 
-  const renderSpaceIcon = (iconName: string, fallback: string) => {
-    const Icon = (LucideIcons as any)[iconName]
-    if (Icon) return <Icon className="w-6 h-6" />
-    return fallback || iconName
+  const renderSpaceIcon = (iconName: string | null, fallback: string) => {
+    if (iconName) {
+      const Icon = (LucideIcons as any)[iconName]
+      if (Icon) return <Icon className="w-6 h-6" />
+    }
+    return fallback || '?'
   }
 
   function handleAddSuccess() {
@@ -43,7 +45,7 @@ export default function SpacesPage() {
 
   return (
     <div className="min-h-screen bg-default-50">
-      <Navbar user={null} />
+      <Navbar />
 
       <main className="max-w-5xl mx-auto py-6 px-4 sm:py-8 sm:px-6">
         <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6 sm:mb-8">
@@ -73,32 +75,30 @@ export default function SpacesPage() {
             </CardBody>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
             {spaces.map((space) => (
               <Link key={space.id} href={`/spaces/${space.id}`}>
                 <Card
                   isPressable
-                  className="h-full hover:shadow-lg transition-shadow"
+                  className="h-full hover:shadow-lg transition-shadow flex flex-col"
                 >
-                  <CardBody className="p-5">
-                    <div className="flex items-start justify-between mb-3">
+                  <CardBody className="p-6 flex flex-col flex-1">
+                    <div className="flex items-start justify-between mb-4">
                       <div 
-                        className="w-12 h-12 rounded-xl flex items-center justify-center text-white text-xl font-bold shadow-md"
+                        className="w-14 h-14 rounded-xl flex items-center justify-center text-white text-2xl font-bold shadow-md"
                         style={{ backgroundColor: space.color || '#3b82f6' }}
                       >
                         {renderSpaceIcon(space.icon, space.name.charAt(0))}
                       </div>
-                      {space.is_default && (
-                        <Chip size="sm" variant="flat" color="secondary">Personal</Chip>
-                      )}
+                      {/* Removed Personal chip as requested */}
                     </div>
 
-                    <h3 className="text-lg font-semibold mb-1">{space.name}</h3>
-                    <p className="text-sm text-default-500 line-clamp-2 mb-4">
+                    <h3 className="text-lg font-semibold mb-2">{space.name}</h3>
+                    <p className="text-sm text-default-500 line-clamp-2 mb-6 flex-1">
                       {space.description || 'No description'}
                     </p>
 
-                    <div className="flex items-center justify-between mt-auto pt-3 border-t border-default-100">
+                    <div className="flex items-center justify-between mt-auto pt-4 border-t border-default-100">
                       <span className="text-xs text-default-400 capitalize">
                         {space.role || 'member'}
                       </span>

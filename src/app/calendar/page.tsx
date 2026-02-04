@@ -17,8 +17,11 @@ import {
   Textarea,
   Select,
   SelectItem,
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
 } from "@heroui/react"
-import { Plus, Calendar, MapPin, Clock, AlertCircle } from 'lucide-react'
+import { Plus, Calendar, MapPin, Clock, AlertCircle, Trash2, Edit, X, Check } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import Navbar from '@/components/Navbar'
 import { showErrorToast, getErrorMessage } from '@/lib/errors'
@@ -104,6 +107,10 @@ export default function CalendarPage() {
     calendar_name: 'Mise Family',
   })
   const [saving, setSaving] = useState(false)
+  
+  // Delete confirmation state
+  const [eventToDelete, setEventToDelete] = useState<CalendarEvent | null>(null)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   
   const supabase = createClient()
 
@@ -252,14 +259,13 @@ export default function CalendarPage() {
   }
 
   // Delete event
-  async function handleDeleteEvent() {
-    if (!selectedEvent) return
-    
-    if (!confirm('Delete this event?')) return
+  async function handleDeleteEvent(event?: CalendarEvent) {
+    const eventToDelete = event || selectedEvent
+    if (!eventToDelete) return
     
     setSaving(true)
     try {
-      const response = await fetch(`/api/calendar/events/${selectedEvent.id}`, {
+      const response = await fetch(`/api/calendar/events/${eventToDelete.id}`, {
         method: 'DELETE',
       })
       
@@ -270,6 +276,8 @@ export default function CalendarPage() {
       }
       
       toast.success('Event deleted!')
+      setShowDeleteConfirm(false)
+      setEventToDelete(null)
       setIsEventModalOpen(false)
       resetEventForm()
       await fetchCalendarEvents(currentDate)
@@ -279,6 +287,13 @@ export default function CalendarPage() {
     } finally {
       setSaving(false)
     }
+  }
+  
+  // Show delete confirmation
+  function confirmDeleteEvent(event: CalendarEvent, e: React.MouseEvent) {
+    e.stopPropagation()
+    setEventToDelete(event)
+    setShowDeleteConfirm(true)
   }
 
   function resetEventForm() {
@@ -472,29 +487,41 @@ export default function CalendarPage() {
                   </div>
                   
                   {enabledSources.includes('calendar') && availableCalendars.length > 0 && (
-                    <div className="overflow-x-auto">
+                    <div className="min-w-0 flex-1">
                       <h3 className="text-sm font-medium text-default-700 mb-2">Calendars</h3>
-                      <CheckboxGroup
-                        orientation="horizontal"
-                        value={enabledCalendars}
-                        onValueChange={setEnabledCalendars}
-                        size="sm"
-                        classNames={{
-                          wrapper: "flex-nowrap gap-3",
-                        }}
-                      >
+                      <div className="flex flex-wrap gap-3">
                         {availableCalendars.map(cal => {
                           const colors = getCalendarColor(cal)
+                          const isChecked = enabledCalendars.includes(cal)
                           return (
-                            <Checkbox key={cal} value={cal} className="min-h-[44px]">
-                              <span className="flex items-center gap-1 whitespace-nowrap">
-                                <span className={`w-2 h-2 rounded ${colors.bg}`} />
+                            <label
+                              key={cal}
+                              className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border cursor-pointer transition-colors ${
+                                isChecked
+                                  ? `${colors.bg} ${colors.darkBg} ${colors.border} border`
+                                  : 'bg-default-100 dark:bg-default-900 border-default-200 dark:border-default-700'
+                              }`}
+                            >
+                              <input
+                                type="checkbox"
+                                checked={isChecked}
+                                onChange={(e) => {
+                                  if (e.target.checked) {
+                                    setEnabledCalendars([...enabledCalendars, cal])
+                                  } else {
+                                    setEnabledCalendars(enabledCalendars.filter(c => c !== cal))
+                                  }
+                                }}
+                                className="sr-only"
+                              />
+                              <span className={`w-2 h-2 rounded ${colors.bg}`} />
+                              <span className="text-sm whitespace-nowrap truncate max-w-[120px]">
                                 {cal}
                               </span>
-                            </Checkbox>
+                            </label>
                           )
                         })}
-                      </CheckboxGroup>
+                      </div>
                     </div>
                   )}
                 </div>
@@ -577,19 +604,70 @@ export default function CalendarPage() {
                           
                           {dayEvents.slice(0, 2 - dayTasks.slice(0,1).length - dayContent.slice(0,1).length).map(event => {
                             const colors = getCalendarColor(event.calendar)
+                            const isDeleting = eventToDelete?.id === event.id && showDeleteConfirm
                             return (
                               <div 
                                 key={event.id}
                                 onClick={(e) => {
-                                  e.stopPropagation()
-                                  openEventDetailModal(event)
+                                  if (!isDeleting) {
+                                    e.stopPropagation()
+                                    openEventDetailModal(event)
+                                  }
                                 }}
-                                className={`text-xs p-1 rounded ${colors.bg} ${colors.darkBg} ${colors.text} ${colors.darkText} truncate cursor-pointer hover:opacity-80`}
+                                onContextMenu={(e) => {
+                                  e.preventDefault()
+                                  e.stopPropagation()
+                                  confirmDeleteEvent(event, e as any)
+                                }}
+                                className={`text-xs p-1 rounded ${colors.bg} ${colors.darkBg} ${colors.text} ${colors.darkText} truncate cursor-pointer hover:opacity-80 group relative`}
                                 title={`${event.title} (${event.calendar})${event.time ? ` at ${event.time}` : ''}`}
                               >
-                                {event.time ? `${event.time} ` : '📅 '}{event.title}
-                                {event.sync_status && event.sync_status !== 'synced' && (
-                                  <AlertCircle className="w-3 h-3 inline ml-1 text-warning" />
+                                <div className="flex items-center justify-between">
+                                  <span className="flex-1 truncate">
+                                    {event.time ? `${event.time} ` : '📅 '}{event.title}
+                                    {event.sync_status && event.sync_status !== 'synced' && (
+                                      <AlertCircle className="w-3 h-3 inline ml-1 text-warning" />
+                                    )}
+                                  </span>
+                                  {!isDeleting && (
+                                    <button
+                                      onClick={(e) => confirmDeleteEvent(event, e)}
+                                      className="opacity-0 group-hover:opacity-100 transition-opacity ml-1 p-0.5 hover:bg-white/20 rounded"
+                                      title="Delete event"
+                                    >
+                                      <Trash2 className="w-3 h-3" />
+                                    </button>
+                                  )}
+                                </div>
+                                
+                                {/* Delete confirmation */}
+                                {isDeleting && (
+                                  <div className="absolute top-0 left-0 right-0 bottom-0 bg-red-50 dark:bg-red-900/30 rounded flex items-center justify-between px-1 z-10">
+                                    <span className="text-xs font-medium text-red-700 dark:text-red-300">Delete?</span>
+                                    <div className="flex gap-1">
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          setShowDeleteConfirm(false)
+                                          setEventToDelete(null)
+                                        }}
+                                        className="p-0.5 hover:bg-red-100 dark:hover:bg-red-800 rounded"
+                                        title="Cancel"
+                                      >
+                                        <X className="w-3 h-3" />
+                                      </button>
+                                      <button
+                                        onClick={(e) => {
+                                          e.stopPropagation()
+                                          handleDeleteEvent(event)
+                                        }}
+                                        className="p-0.5 hover:bg-red-100 dark:hover:bg-red-800 rounded"
+                                        title="Confirm delete"
+                                      >
+                                        <Check className="w-3 h-3" />
+                                      </button>
+                                    </div>
+                                  </div>
                                 )}
                               </div>
                             )
@@ -726,16 +804,6 @@ export default function CalendarPage() {
               </div>
             </ModalBody>
             <ModalFooter>
-              {selectedEvent && (
-                <Button
-                  color="danger"
-                  variant="flat"
-                  onPress={handleDeleteEvent}
-                  isLoading={saving}
-                >
-                  Delete
-                </Button>
-              )}
               <Button variant="flat" onPress={() => { setIsEventModalOpen(false); resetEventForm() }}>
                 Cancel
               </Button>
