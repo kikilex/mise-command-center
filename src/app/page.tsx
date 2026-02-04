@@ -690,7 +690,9 @@ export default function Home() {
                     </div>
                     <span className="font-semibold text-slate-800 dark:text-slate-100">Messages</span>
                   </div>
-                  <Button size="sm" variant="light" radius="full" onPress={() => router.push('/inbox')}>
+                  <Button size="sm" variant="light" radius="full" onPress={() => {
+                    window.dispatchEvent(new CustomEvent('open-chat-thread', { detail: {} }))
+                  }}>
                     View All
                   </Button>
                 </div>
@@ -712,10 +714,8 @@ export default function Home() {
                         <div 
                           key={idx} 
                           onClick={() => {
-                            const url = thread.threadId 
-                              ? `/inbox?threadId=${encodeURIComponent(thread.threadId)}`
-                              : `/inbox?recipient=${encodeURIComponent(thread.recipient)}&msgId=${encodeURIComponent(thread.lastMessage.id)}`;
-                            router.push(url);
+                            const threadId = thread.threadId || `dm-${thread.recipient}`
+                            window.dispatchEvent(new CustomEvent('open-chat-thread', { detail: { threadId } }))
                           }}
                           className="flex items-center gap-3 p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors"
                         >
