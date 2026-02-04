@@ -125,6 +125,7 @@ export default function ChatWidget() {
   const [mentionFilter, setMentionFilter] = useState('')
   const [editingMsgId, setEditingMsgId] = useState<string | null>(null)
   const [editingMsgText, setEditingMsgText] = useState('')
+  const [confirmDeleteThreadId, setConfirmDeleteThreadId] = useState<string | null>(null)
   const inputRef = useRef<HTMLTextAreaElement>(null)
 
   /* ---- resize ---- */
@@ -652,9 +653,23 @@ export default function ChatWidget() {
                             {new Date(t.timestamp).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
                           </span>
                           <button
+                            onClick={(e) => {
+                              e.stopPropagation()
+                              setConfirmDeleteThreadId(t.id)
+                            }}
+                            className={`${active ? 'text-blue-200 hover:text-white' : 'text-slate-300 hover:text-red-500'} transition-colors`}
+                            title="Delete thread"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
+                      </div>
+                      {confirmDeleteThreadId === t.id ? (
+                        <div className="flex items-center gap-2 mt-1">
+                          <span className="text-[10px] text-red-500 font-semibold">Delete?</span>
+                          <button
                             onClick={async (e) => {
                               e.stopPropagation()
-                              if (!confirm('Delete this thread?')) return
                               const filter = t.id.startsWith('dm-')
                                 ? supabase.from('inbox').delete().eq('item_type', 'message').or(`from_agent.eq.${t.recipient},to_recipient.eq.${t.recipient}`).is('thread_id', null)
                                 : supabase.from('inbox').delete().eq('thread_id', t.id)
@@ -664,23 +679,32 @@ export default function ChatWidget() {
                                 setThreads(prev => prev.filter(th => th.id !== t.id))
                                 if (activeThread?.id === t.id) { setActiveThread(null); setMessages([]) }
                               }
+                              setConfirmDeleteThreadId(null)
                             }}
-                            className={`${active ? 'text-blue-200 hover:text-white' : 'text-slate-300 hover:text-red-500'} transition-colors`}
-                            title="Delete thread"
+                            className="text-[10px] font-bold text-red-500 hover:text-red-600 bg-red-50 dark:bg-red-900/20 px-2 py-0.5 rounded-md transition-colors"
                           >
-                            <Trash2 className="w-3.5 h-3.5" />
+                            Yes
+                          </button>
+                          <button
+                            onClick={(e) => { e.stopPropagation(); setConfirmDeleteThreadId(null) }}
+                            className="text-[10px] text-slate-400 hover:text-slate-600 px-2 py-0.5 rounded-md transition-colors"
+                          >
+                            No
                           </button>
                         </div>
-                      </div>
-                      <div className="flex items-center gap-1">
-                        <p className={`text-[11px] truncate ${active ? 'text-blue-100' : 'text-slate-500'}`}>
-                          {cap(t.recipient)}: {t.lastMessage}
-                        </p>
-                      </div>
-                      {t.spaceId && (
-                        <span className={`text-[9px] ${active ? 'text-blue-200' : 'text-violet-500'}`}>
-                          📌 {spaces.find(s => s.id === t.spaceId)?.name || 'Space'}
-                        </span>
+                      ) : (
+                        <>
+                          <div className="flex items-center gap-1">
+                            <p className={`text-[11px] truncate ${active ? 'text-blue-100' : 'text-slate-500'}`}>
+                              {cap(t.recipient)}: {t.lastMessage}
+                            </p>
+                          </div>
+                          {t.spaceId && (
+                            <span className={`text-[9px] ${active ? 'text-blue-200' : 'text-violet-500'}`}>
+                              📌 {spaces.find(s => s.id === t.spaceId)?.name || 'Space'}
+                            </span>
+                          )}
+                        </>
                       )}
                     </div>
                     {t.unreadCount > 0 && (
