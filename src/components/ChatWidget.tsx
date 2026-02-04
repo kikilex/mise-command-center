@@ -225,17 +225,28 @@ export default function ChatWidget() {
     loadInitialData()
 
     const channel = supabase
-      .channel('chat-widget')
+      .channel('chat-widget-realtime')
       .on('postgres_changes', { 
         event: 'INSERT', 
         schema: 'public', 
         table: 'inbox'
       }, (payload) => {
+        console.log('[ChatWidget] Realtime message received:', payload)
         handleIncomingMessage(payload.new as any)
       })
-      .subscribe()
+      .subscribe((status) => {
+        console.log('[ChatWidget] Realtime subscription status:', status)
+      })
 
-    return () => { supabase.removeChannel(channel) }
+    // Polling fallback - refresh threads every 15 seconds
+    const pollInterval = setInterval(() => {
+      if (user) loadThreads(user.id)
+    }, 15000)
+
+    return () => { 
+      supabase.removeChannel(channel)
+      clearInterval(pollInterval)
+    }
   }, [])
 
   // Listen for open-chat-thread from dashboard
