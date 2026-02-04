@@ -860,7 +860,7 @@ export default function ChatWidget() {
                   ) : messages.map((msg) => {
                     const isMe = !msg.from_agent
                     return (
-                      <div key={msg.id} className={`flex group/msg ${isMe ? 'justify-end' : 'justify-start'}`}>
+                      <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
                         <div className={`max-w-[80%] px-3 py-2 rounded-2xl text-sm ${
                           isMe
                             ? 'bg-blue-500 text-white rounded-br-md'
@@ -883,7 +883,7 @@ export default function ChatWidget() {
                                 if (error) showErrorToast(error)
                                 else setMessages(prev => prev.filter(m => m.id !== msg.id))
                               }}
-                              className={`opacity-0 group-hover/msg:opacity-100 transition-opacity ${isMe ? 'text-blue-200 hover:text-white' : 'text-slate-400 hover:text-red-500'}`}
+                              className={`${isMe ? 'text-blue-200 hover:text-white' : 'text-slate-300 hover:text-red-500'} transition-colors`}
                               title="Delete message"
                             >
                               <Trash2 className="w-3 h-3" />
