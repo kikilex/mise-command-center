@@ -11,7 +11,7 @@ import {
   Spinner,
   useDisclosure,
 } from '@heroui/react'
-import { PencilIcon, PlusIcon, UserIcon, BriefcaseIcon } from '@heroicons/react/24/outline'
+import { Pencil, Plus, User, Briefcase } from 'lucide-react'
 import { useSpace, Space } from '@/lib/space-context'
 import AddSpaceModal from './AddSpaceModal'
 import EditSpaceModal from './EditSpaceModal'
@@ -69,7 +69,7 @@ export default function SpaceSelector() {
             className="min-w-[140px] justify-between font-medium"
             startContent={
               selectedSpace?.is_default ? (
-                <UserIcon className="w-4 h-4 text-slate-500" />
+                <User className="w-4 h-4 text-slate-500" />
               ) : (
                 <div 
                   className="w-3 h-3 rounded-full" 
@@ -111,7 +111,7 @@ export default function SpaceSelector() {
                 description={space.description || undefined}
                 startContent={
                   space.is_default ? (
-                    <UserIcon className="w-4 h-4 text-slate-400" />
+                    <User className="w-4 h-4 text-slate-400" />
                   ) : (
                     <div 
                       className="w-3 h-3 rounded-full" 
@@ -132,7 +132,7 @@ export default function SpaceSelector() {
                       onEditOpen()
                     }}
                   >
-                    <PencilIcon className="w-3.5 h-3.5 text-default-500" />
+                    <Pencil className="w-3.5 h-3.5 text-default-500" />
                   </Button>
                 }
               >
@@ -144,7 +144,7 @@ export default function SpaceSelector() {
             <DropdownItem
               key="add-new"
               startContent={
-                <PlusIcon className="w-4 h-4 text-primary" />
+                <Plus className="w-4 h-4 text-primary" />
               }
               className="text-primary"
               onPress={onAddOpen}

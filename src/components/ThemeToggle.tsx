@@ -9,7 +9,7 @@ import {
   DropdownItem,
   Button,
 } from "@heroui/react"
-import { SunIcon, MoonIcon, ComputerDesktopIcon } from '@heroicons/react/24/outline'
+import { Sun, Moon, Monitor } from 'lucide-react'
 
 export type ThemeValue = 'light' | 'dark' | 'system'
 
@@ -42,11 +42,11 @@ export default function ThemeToggle({ onThemeChange }: ThemeToggleProps) {
   const getIcon = () => {
     switch (theme) {
       case 'light':
-        return <SunIcon className="w-5 h-5" />
+        return <Sun className="w-5 h-5" />
       case 'dark':
-        return <MoonIcon className="w-5 h-5" />
+        return <Moon className="w-5 h-5" />
       default:
-        return <ComputerDesktopIcon className="w-5 h-5" />
+        return <Monitor className="w-5 h-5" />
     }
   }
 
@@ -68,19 +68,19 @@ export default function ThemeToggle({ onThemeChange }: ThemeToggleProps) {
       >
         <DropdownItem
           key="light"
-          startContent={<SunIcon className="w-4 h-4" />}
+          startContent={<Sun className="w-4 h-4" />}
         >
           Light
         </DropdownItem>
         <DropdownItem
           key="dark"
-          startContent={<MoonIcon className="w-4 h-4" />}
+          startContent={<Moon className="w-4 h-4" />}
         >
           Dark
         </DropdownItem>
         <DropdownItem
           key="system"
-          startContent={<ComputerDesktopIcon className="w-4 h-4" />}
+          startContent={<Monitor className="w-4 h-4" />}
         >
           System
         </DropdownItem>

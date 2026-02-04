@@ -10,7 +10,7 @@ import {
   Button,
   Input,
 } from '@heroui/react'
-import { ExclamationTriangleIcon } from '@heroicons/react/24/outline'
+import { AlertTriangle } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { showErrorToast, showSuccessToast } from '@/lib/errors'
 import { Business } from '@/lib/business-context'
@@ -65,7 +65,7 @@ export default function DeleteBusinessModal({ isOpen, onClose, onSuccess, busine
     <Modal isOpen={isOpen} onClose={handleClose} size="md">
       <ModalContent>
         <ModalHeader className="flex items-center gap-2 text-danger">
-          <ExclamationTriangleIcon className="w-6 h-6" />
+          <AlertTriangle className="w-6 h-6" />
           <span>Delete Business</span>
         </ModalHeader>
         <ModalBody>

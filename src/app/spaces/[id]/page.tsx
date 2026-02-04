@@ -16,7 +16,7 @@ import {
   Link as NextUILink,
   useDisclosure
 } from '@heroui/react'
-import { Plus, Settings, ArrowRight, ListTodo, Calendar, Users, FileText, MessageSquare, ChevronRight, FolderKanban } from 'lucide-react'
+import { Plus, Settings, ArrowRight, ListTodo, Calendar, Users, FileText, MessageSquare, ChevronRight, FolderKanban, X } from 'lucide-react'
 import * as LucideIcons from 'lucide-react'
 import Link from 'next/link'
 import Navbar from '@/components/Navbar'
@@ -24,6 +24,7 @@ import { useSpace } from '@/lib/space-context'
 import { toast } from 'react-hot-toast'
 import AddTaskModal from '@/components/AddTaskModal'
 import AddProjectModal from '@/components/AddProjectModal'
+import InviteMemberModal from '@/components/InviteMemberModal'
 
 export default function SpaceDetailPage() {
   // ... rest
@@ -40,9 +41,12 @@ export default function SpaceDetailPage() {
   const [loading, setLoading] = useState(true)
   const [showAllTasks, setShowAllTasks] = useState(false)
   const [selectedTab, setSelectedTab] = useState<string>('overview')
+  const [currentUserRole, setCurrentUserRole] = useState<string | null>(null)
+  const [removingMemberId, setRemovingMemberId] = useState<string | null>(null)
   
   const { isOpen: isTaskOpen, onOpen: onTaskOpen, onClose: onTaskClose } = useDisclosure()
   const { isOpen: isProjectOpen, onOpen: onProjectOpen, onClose: onProjectClose } = useDisclosure()
+  const { isOpen: isInviteOpen, onOpen: onInviteOpen, onClose: onInviteClose } = useDisclosure()
   
   const supabase = createClient()
 
@@ -75,7 +79,7 @@ export default function SpaceDetailPage() {
   async function loadSpaceData() {
     setLoading(true)
     try {
-      const [spaceRes, membersRes, tasksRes, projectsRes, docsRes, threadsRes] = await Promise.all([
+      const [spaceRes, membersRes, tasksRes, projectsRes, docsRes, threadsRes, userRoleRes] = await Promise.all([
         supabase.from('spaces').select('*').eq('id', id).single(),
         supabase.from('space_members').select('*, users(*)').eq('space_id', id),
         supabase.from('tasks')
@@ -95,7 +99,13 @@ export default function SpaceDetailPage() {
         supabase.from('inbox')
           .select('*')
           .eq('space_id', id)
-          .order('created_at', { ascending: false })
+          .order('created_at', { ascending: false }),
+        // Get current user's role in this space
+        supabase.from('space_members')
+          .select('role')
+          .eq('space_id', id)
+          .eq('user_id', user?.id)
+          .single()
       ])
 
       if (spaceRes.error) throw spaceRes.error
@@ -105,6 +115,13 @@ export default function SpaceDetailPage() {
       setProjects(projectsRes.data || [])
       setDocuments(docsRes.data || [])
       setThreads(threadsRes.data || [])
+      
+      // Set current user's role
+      if (userRoleRes.data) {
+        setCurrentUserRole(userRoleRes.data.role)
+      } else {
+        setCurrentUserRole(null)
+      }
     } catch (error) {
       console.error('Error loading space:', error)
       toast.error('Failed to load space')
@@ -155,6 +172,37 @@ export default function SpaceDetailPage() {
     }
   }
 
+  // Remove member function
+  async function removeMember(memberId: string) {
+    if (!confirm('Are you sure you want to remove this member?')) {
+      return
+    }
+
+    setRemovingMemberId(memberId)
+    try {
+      const response = await fetch(`/api/spaces/${id}/members?memberId=${memberId}`, {
+        method: 'DELETE',
+      })
+
+      const data = await response.json()
+
+      if (!response.ok) {
+        throw new Error(data.error || 'Failed to remove member')
+      }
+
+      toast.success('Member removed successfully')
+      loadSpaceData() // Refresh the data
+    } catch (error) {
+      console.error('Error removing member:', error)
+      toast.error(error instanceof Error ? error.message : 'Failed to remove member')
+    } finally {
+      setRemovingMemberId(null)
+    }
+  }
+
+  // Check if user can manage members (owner or admin)
+  const canManageMembers = currentUserRole === 'owner' || currentUserRole === 'admin'
+
   // Get project status color
   const getProjectStatusColor = (status: string) => {
     switch (status) {
@@ -176,26 +224,28 @@ export default function SpaceDetailPage() {
     <div className="min-h-screen bg-default-50">
       <Navbar user={null} /> {/* User will be handled by providers */}
       
-      <main className="max-w-7xl mx-auto py-8 px-4">
+      <main className="max-w-7xl mx-auto py-6 px-4 sm:py-8 sm:px-6">
         {/* Space Header - Calm and focused */}
-        <div className="mb-8">
-          <div className="flex items-center gap-3 mb-4">
-            <div 
-              className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-lg"
-              style={{ backgroundColor: space.color || '#3b82f6' }}
-            >
-              {renderSpaceIcon(space.icon, space.name.charAt(0))}
-            </div>
-            <div>
-              <h1 className="text-2xl font-bold text-foreground">{space.name}</h1>
-              {space.description && (
-                <p className="text-default-500 mt-1">{space.description}</p>
-              )}
+        <div className="mb-6 sm:mb-8">
+          <div className="flex flex-col sm:flex-row sm:items-center gap-4 mb-4">
+            <div className="flex items-center gap-3">
+              <div 
+                className="w-10 h-10 rounded-xl flex items-center justify-center text-white font-bold text-lg shadow-lg flex-shrink-0"
+                style={{ backgroundColor: space.color || '#3b82f6' }}
+              >
+                {renderSpaceIcon(space.icon, space.name.charAt(0))}
+              </div>
+              <div className="flex-1 min-w-0">
+                <h1 className="text-2xl font-bold text-foreground truncate">{space.name}</h1>
+                {space.description && (
+                  <p className="text-default-500 mt-1 line-clamp-2">{space.description}</p>
+                )}
+              </div>
             </div>
           </div>
           
           {/* Quick stats - minimal */}
-          <div className="flex items-center gap-6 text-sm text-default-500">
+          <div className="flex flex-wrap items-center gap-4 text-sm text-default-500">
             <div className="flex items-center gap-2">
               <ListTodo className="w-4 h-4" />
               <span>{tasks.length} tasks</span>
@@ -222,6 +272,9 @@ export default function SpaceDetailPage() {
           className="mb-6"
           selectedKey={selectedTab}
           onSelectionChange={(key) => setSelectedTab(key as string)}
+          classNames={{
+            tabList: "flex-wrap sm:flex-nowrap overflow-x-auto",
+          }}
         >
           <Tab 
             key="overview" 
@@ -364,7 +417,7 @@ export default function SpaceDetailPage() {
                     </Button>
                   </div>
 
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                     {projects.slice(0, 4).map(project => (
                       <Card
                         key={project.id}
@@ -434,7 +487,7 @@ export default function SpaceDetailPage() {
                   </AvatarGroup>
                 </div>
                 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                   {members.slice(0, 4).map(member => (
                     <div key={member.id} className="flex items-center gap-3 p-3 rounded-lg hover:bg-default-100">
                       <Avatar 
@@ -511,7 +564,7 @@ export default function SpaceDetailPage() {
                   </CardBody>
                 </Card>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                   {projects.map(project => {
                     const taskCount = projectTaskCounts[project.id] || 0
                     const doneTasks = tasks.filter(t => t.project_id === project.id && t.status === 'done').length
@@ -665,7 +718,7 @@ export default function SpaceDetailPage() {
                   </CardBody>
                 </Card>
               ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {documents.map(doc => (
                     <Card key={doc.id} isPressable onPress={() => router.push(`/docs/${doc.id}`)}>
                       <CardBody className="p-4">
@@ -754,23 +807,60 @@ export default function SpaceDetailPage() {
                   <h2 className="text-xl font-semibold text-foreground">Team Members</h2>
                   <p className="text-sm text-default-500 mt-1">Everyone in this space</p>
                 </div>
-                <Button variant="flat" startContent={<Plus className="w-4 h-4" />} size="sm">
-                  Invite Member
-                </Button>
+                {canManageMembers && (
+                  <Button 
+                    variant="flat" 
+                    startContent={<Plus className="w-4 h-4" />} 
+                    size="sm"
+                    onPress={onInviteOpen}
+                  >
+                    Invite Member
+                  </Button>
+                )}
               </div>
               
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
                 {members.map(member => (
                   <Card key={member.id}>
-                    <CardBody className="flex-row items-center gap-4">
-                      <Avatar 
-                        src={member.users.avatar_url} 
-                        name={member.users.display_name || member.users.name} 
-                      />
-                      <div>
-                        <p className="font-semibold">{member.users.display_name || member.users.name}</p>
-                        <p className="text-xs text-default-400 capitalize">{member.role}</p>
+                    <CardBody className="p-4">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-3">
+                          <Avatar 
+                            src={member.users.avatar_url} 
+                            name={member.users.display_name || member.users.name} 
+                            size="md"
+                          />
+                          <div>
+                            <p className="font-semibold">{member.users.display_name || member.users.name}</p>
+                            <div className="flex items-center gap-2">
+                              <p className="text-xs text-default-400 capitalize">{member.role}</p>
+                              {member.role === 'owner' && (
+                                <span className="text-xs bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300 px-2 py-0.5 rounded">
+                                  Owner
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        </div>
+                        {canManageMembers && member.role !== 'owner' && (
+                          <Button
+                            size="sm"
+                            variant="light"
+                            color="danger"
+                            isLoading={removingMemberId === member.id}
+                            isIconOnly
+                            onPress={() => removeMember(member.id)}
+                            title="Remove member"
+                          >
+                            <X className="w-4 h-4" />
+                          </Button>
+                        )}
                       </div>
+                      {member.user_id === user?.id && (
+                        <div className="mt-2 pt-2 border-t border-default-100">
+                          <span className="text-xs text-default-500">That's you!</span>
+                        </div>
+                      )}
                     </CardBody>
                   </Card>
                 ))}
@@ -794,6 +884,14 @@ export default function SpaceDetailPage() {
         onSuccess={loadSpaceData}
         spaceId={id as string}
         userId={user?.id}
+      />
+
+      <InviteMemberModal
+        isOpen={isInviteOpen}
+        onClose={onInviteClose}
+        onSuccess={loadSpaceData}
+        spaceId={id as string}
+        currentUserId={user?.id}
       />
     </div>
   )

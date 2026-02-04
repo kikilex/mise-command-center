@@ -141,19 +141,19 @@ export default function AIWorkspacePage() {
         ].map((s, i) => (
           <Card key={i} className={`bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 ${s.shadow}`}>
             <CardBody className="p-4 flex flex-row items-center gap-4">
-              <div className={`p-3 rounded-2xl bg-slate-50 dark:bg-slate-800 ${s.color}`}><s.icon className="w-6 h-6" /></div>
+              <div className={`p-2 md:p-3 rounded-2xl bg-slate-50 dark:bg-slate-800 ${s.color}`}><s.icon className="w-5 h-5 md:w-6 md:h-6" /></div>
               <div>
                 <p className="text-[10px] font-black uppercase text-slate-400 tracking-[0.1em] leading-none mb-1.5">{s.label}</p>
-                <p className={`text-2xl font-black tracking-tighter ${s.color}`}>{s.value}</p>
+                <p className={`text-xl md:text-2xl font-black tracking-tighter ${s.color}`}>{s.value}</p>
               </div>
             </CardBody>
           </Card>
         ))}
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        {/* Left: Team + Actions */}
-        <div className="lg:col-span-1 space-y-6">
+      <div className="flex flex-col lg:grid lg:grid-cols-4 gap-6">
+        {/* Left: Team + Actions - Mobile: first */}
+        <div className="lg:col-span-1 space-y-6 order-1 lg:order-1">
           <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl shadow-black/5">
             <CardHeader className="px-4 pt-4 pb-0 flex items-center justify-between">
               <h2 className="font-black uppercase text-[10px] text-slate-400 tracking-widest flex items-center gap-2">
@@ -188,13 +188,13 @@ export default function AIWorkspacePage() {
           </Card>
         </div>
 
-        {/* Center: Integrated Chat */}
-        <div className="lg:col-span-2 h-[680px]">
+        {/* Center: Integrated Chat - Mobile: second */}
+        <div className="lg:col-span-2 h-[500px] md:h-[680px] order-2 lg:order-2">
           <AgentChat />
         </div>
 
-        {/* Right: Live Intelligence Feed */}
-        <Card className="lg:col-span-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl shadow-black/5 overflow-hidden">
+        {/* Right: Live Intelligence Feed - Mobile: third */}
+        <Card className="lg:col-span-1 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl shadow-black/5 overflow-hidden order-3 lg:order-3">
           <CardHeader className="px-4 pt-4 pb-3 border-b border-slate-100 dark:border-slate-800 flex items-center justify-between">
             <h2 className="font-black uppercase text-[10px] text-slate-400 tracking-[0.2em] flex items-center gap-2">
               <Activity className="w-3 h-3" /> Live Intel
@@ -206,7 +206,7 @@ export default function AIWorkspacePage() {
             </div>
           </CardHeader>
           <CardBody className="p-0">
-            <ScrollShadow className="h-[600px]">
+            <ScrollShadow className="h-[400px] md:h-[600px]">
               <div className="p-1">
                 {workLogs.map(l => (
                   <div key={l.id} className="group p-3 rounded-2xl hover:bg-slate-50 dark:hover:bg-slate-800/50 transition-colors border border-transparent hover:border-slate-100 dark:hover:border-slate-800">
@@ -226,7 +226,7 @@ export default function AIWorkspacePage() {
   )
 
   const renderActivity = () => (
-    <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-250px)] animate-in slide-in-from-bottom-4 duration-500">
+    <div className="flex flex-col lg:grid lg:grid-cols-3 gap-6 h-[calc(100vh-250px)] animate-in slide-in-from-bottom-4 duration-500">
       <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-xl overflow-hidden">
         <CardHeader className="px-4 pt-4 pb-2 border-b border-slate-200 dark:border-slate-800 font-black uppercase text-[10px] text-slate-400 tracking-widest">Operations Log</CardHeader>
         <ScrollShadow className="h-full">
@@ -245,30 +245,30 @@ export default function AIWorkspacePage() {
       </Card>
       <Card className="lg:col-span-2 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-2xl overflow-hidden">
         {selectedTask ? (
-          <ScrollShadow className="h-full p-8 space-y-8">
-            <div className="flex items-center justify-between">
+          <ScrollShadow className="h-full p-4 md:p-8 space-y-6 md:space-y-8">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center font-black text-xs">OP</div>
+                <div className="w-10 h-10 md:w-12 md:h-12 rounded-2xl bg-slate-100 dark:bg-slate-800 flex items-center justify-center font-black text-xs">OP</div>
                 <div>
-                  <h2 className="text-2xl font-black uppercase tracking-tighter leading-none">{selectedTask.from_agent} → {selectedTask.to_agent}</h2>
+                  <h2 className="text-xl md:text-2xl font-black uppercase tracking-tighter leading-none">{selectedTask.from_agent} → {selectedTask.to_agent}</h2>
                   <p className="text-[10px] text-slate-400 font-black uppercase mt-1 tracking-widest">Operation Details</p>
                 </div>
               </div>
               <Chip color={selectedTask.status === 'done' ? 'success' : 'warning'} variant="flat" className="font-black uppercase text-xs px-4 h-8">{selectedTask.status}</Chip>
             </div>
-            <div className="p-6 rounded-3xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
+            <div className="p-4 md:p-6 rounded-3xl bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800">
               <p className="text-[10px] uppercase font-black text-slate-400 mb-3 tracking-[0.2em]">The Objective</p>
-              <p className="text-lg leading-tight font-bold text-slate-800 dark:text-slate-100">{selectedTask.task}</p>
+              <p className="text-base md:text-lg leading-tight font-bold text-slate-800 dark:text-slate-100">{selectedTask.task}</p>
             </div>
-            <div className="h-[450px]">
+            <div className="h-[300px] md:h-[450px]">
               <p className="text-[10px] uppercase font-black text-slate-400 mb-4 tracking-[0.2em]">Intelligence Thread</p>
               <TaskThread agentTaskId={selectedTask.id} className="h-full rounded-3xl" />
             </div>
           </ScrollShadow>
         ) : (
           <div className="h-full flex flex-col items-center justify-center text-slate-400 opacity-20 pointer-events-none">
-            <Bot className="w-32 h-32 mb-4" />
-            <p className="font-black uppercase tracking-[0.5em] text-xl">Select Operation</p>
+            <Bot className="w-24 h-24 md:w-32 md:h-32 mb-4" />
+            <p className="font-black uppercase tracking-[0.3em] md:tracking-[0.5em] text-lg md:text-xl">Select Operation</p>
           </div>
         )}
       </Card>
@@ -280,13 +280,13 @@ export default function AIWorkspacePage() {
       <Navbar user={user} />
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
         {/* Header - Palace Grade */}
-        <div className="flex items-center justify-between mb-10 mt-4">
+        <div className="flex flex-col md:flex-row md:items-center md:justify-between mb-10 mt-4 gap-4">
           <div className="flex items-center gap-5">
             <div className="p-4 rounded-[2rem] bg-gradient-to-br from-violet-600 to-purple-950 shadow-2xl shadow-violet-900/50 transform rotate-3">
               <Bot className="w-10 h-10 text-white transform -rotate-3" />
             </div>
             <div>
-              <h1 className="text-5xl font-black tracking-[ -0.05em] text-slate-900 dark:text-white uppercase leading-none italic">The Palace</h1>
+              <h1 className="text-3xl md:text-5xl font-black tracking-[ -0.05em] text-slate-900 dark:text-white uppercase leading-none italic">The Palace</h1>
               <div className="flex items-center gap-2 mt-2">
                 <span className="h-[1px] w-8 bg-violet-500" />
                 <p className="text-[10px] text-violet-500 font-black uppercase tracking-[0.3em] leading-none">Command & Intelligence Hub</p>
@@ -297,7 +297,7 @@ export default function AIWorkspacePage() {
             classNames={{ 
               tabList: "bg-slate-200 dark:bg-slate-800 p-1 rounded-2xl shadow-inner", 
               cursor: "bg-violet-600 shadow-xl rounded-xl",
-              tab: "h-12 px-8"
+              tab: "h-12 px-4 md:px-8"
             }}
           >
             <Tab key="dashboard" title={<LayoutDashboard className="w-5 h-5" />} />

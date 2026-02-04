@@ -12,7 +12,7 @@ import {
   AvatarGroup,
   useDisclosure,
 } from '@heroui/react'
-import { PlusIcon, UserIcon } from '@heroicons/react/24/outline'
+import { Plus, User } from 'lucide-react'
 import * as LucideIcons from 'lucide-react'
 import Navbar from '@/components/Navbar'
 import AddSpaceModal from '@/components/AddSpaceModal'
@@ -45,16 +45,17 @@ export default function SpacesPage() {
     <div className="min-h-screen bg-default-50">
       <Navbar user={null} />
 
-      <main className="max-w-5xl mx-auto py-8 px-4">
-        <div className="flex justify-between items-center mb-8">
+      <main className="max-w-5xl mx-auto py-6 px-4 sm:py-8 sm:px-6">
+        <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 mb-6 sm:mb-8">
           <div>
-            <h1 className="text-3xl font-bold">Your Spaces</h1>
+            <h1 className="text-2xl sm:text-3xl font-bold">Your Spaces</h1>
             <p className="text-default-500 mt-1">Organize your work into spaces</p>
           </div>
           <Button
             color="primary"
-            startContent={<PlusIcon className="w-5 h-5" />}
+            startContent={<Plus className="w-5 h-5" />}
             onPress={onOpen}
+            className="sm:self-start"
           >
             New Space
           </Button>
@@ -64,7 +65,7 @@ export default function SpacesPage() {
           <Card>
             <CardBody className="py-16 text-center">
               <div className="w-16 h-16 rounded-full bg-default-100 flex items-center justify-center mx-auto mb-4">
-                <UserIcon className="w-8 h-8 text-default-400" />
+                <User className="w-8 h-8 text-default-400" />
               </div>
               <h2 className="text-xl font-semibold mb-2">No spaces yet</h2>
               <p className="text-default-500 mb-4">Create your first space to get started</p>
@@ -72,7 +73,7 @@ export default function SpacesPage() {
             </CardBody>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {spaces.map((space) => (
               <Link key={space.id} href={`/spaces/${space.id}`}>
                 <Card

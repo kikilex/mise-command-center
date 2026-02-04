@@ -11,7 +11,7 @@ import {
   Spinner,
   useDisclosure,
 } from '@heroui/react'
-import { PencilIcon, PlusIcon } from '@heroicons/react/24/outline'
+import { Pencil, Plus } from 'lucide-react'
 import { useBusiness, Business } from '@/lib/business-context'
 import AddBusinessModal from './AddBusinessModal'
 import EditBusinessModal from './EditBusinessModal'
@@ -146,7 +146,7 @@ export default function BusinessSelector() {
                       onEditOpen()
                     }}
                   >
-                    <PencilIcon className="w-3.5 h-3.5 text-default-500" />
+                    <Pencil className="w-3.5 h-3.5 text-default-500" />
                   </Button>
                 }
               >
@@ -158,7 +158,7 @@ export default function BusinessSelector() {
             <DropdownItem
               key="add-new"
               startContent={
-                <PlusIcon className="w-4 h-4 text-primary" />
+                <Plus className="w-4 h-4 text-primary" />
               }
               className="text-primary"
               onPress={onAddOpen}

@@ -11,7 +11,7 @@ import {
   DropdownSection,
   Avatar,
 } from "@heroui/react"
-import { SunIcon, MoonIcon, ComputerDesktopIcon } from '@heroicons/react/24/outline'
+import { Sun, Moon, Monitor } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { showErrorToast } from '@/lib/errors'
 
@@ -89,11 +89,11 @@ export default function UserMenu({ user }: UserMenuProps) {
     if (!mounted) return null
     switch (theme) {
       case 'light':
-        return <SunIcon className="w-4 h-4" />
+        return <Sun className="w-4 h-4" />
       case 'dark':
-        return <MoonIcon className="w-4 h-4" />
+        return <Moon className="w-4 h-4" />
       default:
-        return <ComputerDesktopIcon className="w-4 h-4" />
+        return <Monitor className="w-4 h-4" />
     }
   }
 
@@ -132,7 +132,7 @@ export default function UserMenu({ user }: UserMenuProps) {
         <DropdownSection title="Theme" showDivider>
           <DropdownItem
             key="theme-light"
-            startContent={<SunIcon className="w-4 h-4" />}
+            startContent={<Sun className="w-4 h-4" />}
             onPress={() => handleThemeChange('light')}
             className={theme === 'light' ? 'text-primary' : ''}
           >
@@ -140,7 +140,7 @@ export default function UserMenu({ user }: UserMenuProps) {
           </DropdownItem>
           <DropdownItem
             key="theme-dark"
-            startContent={<MoonIcon className="w-4 h-4" />}
+            startContent={<Moon className="w-4 h-4" />}
             onPress={() => handleThemeChange('dark')}
             className={theme === 'dark' ? 'text-primary' : ''}
           >
@@ -148,7 +148,7 @@ export default function UserMenu({ user }: UserMenuProps) {
           </DropdownItem>
           <DropdownItem
             key="theme-system"
-            startContent={<ComputerDesktopIcon className="w-4 h-4" />}
+            startContent={<Monitor className="w-4 h-4" />}
             onPress={() => handleThemeChange('system')}
             className={theme === 'system' ? 'text-primary' : ''}
           >

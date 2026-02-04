@@ -14,7 +14,7 @@ import {
   Radio,
   useDisclosure,
 } from "@heroui/react"
-import { SunIcon, MoonIcon, ComputerDesktopIcon, PencilIcon, TrashIcon, PlusIcon } from '@heroicons/react/24/outline'
+import { Sun, Moon, Monitor, Pencil, Trash2, Plus } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import Navbar from '@/components/Navbar'
 import SettingsNav from '@/components/SettingsNav'
@@ -366,7 +366,7 @@ export default function SettingsPage() {
                   }}
                 >
                   <div className="flex items-center gap-2">
-                    <SunIcon className="w-5 h-5" />
+                    <Sun className="w-5 h-5" />
                     <span>Light</span>
                   </div>
                 </Radio>
@@ -380,7 +380,7 @@ export default function SettingsPage() {
                   }}
                 >
                   <div className="flex items-center gap-2">
-                    <MoonIcon className="w-5 h-5" />
+                    <Moon className="w-5 h-5" />
                     <span>Dark</span>
                   </div>
                 </Radio>
@@ -394,7 +394,7 @@ export default function SettingsPage() {
                   }}
                 >
                   <div className="flex items-center gap-2">
-                    <ComputerDesktopIcon className="w-5 h-5" />
+                    <Monitor className="w-5 h-5" />
                     <span>System</span>
                   </div>
                 </Radio>
@@ -596,7 +596,7 @@ export default function SettingsPage() {
             <Button
               color="primary"
               size="sm"
-              startContent={<PlusIcon className="w-4 h-4" />}
+              startContent={<Plus className="w-4 h-4" />}
               onPress={onAddOpen}
             >
               Add Business
@@ -610,7 +610,7 @@ export default function SettingsPage() {
                 <Button
                   color="primary"
                   variant="flat"
-                  startContent={<PlusIcon className="w-4 h-4" />}
+                  startContent={<Plus className="w-4 h-4" />}
                   onPress={onAddOpen}
                 >
                   Create Your First Business
@@ -647,7 +647,7 @@ export default function SettingsPage() {
                           onEditOpen()
                         }}
                       >
-                        <PencilIcon className="w-4 h-4" />
+                        <Pencil className="w-4 h-4" />
                       </Button>
                       <Button
                         isIconOnly
@@ -659,7 +659,7 @@ export default function SettingsPage() {
                           onDeleteOpen()
                         }}
                       >
-                        <TrashIcon className="w-4 h-4" />
+                        <Trash2 className="w-4 h-4" />
                       </Button>
                     </div>
                   </div>

@@ -70,6 +70,7 @@ export default function ProfilePage() {
       const { error } = await supabase
         .from('users')
         .update({
+          name: profile.name,
           display_name: profile.display_name,
           bio: profile.bio,
           timezone: profile.timezone,
@@ -155,7 +156,7 @@ export default function ProfilePage() {
         <h1 className="text-3xl font-bold mb-8">Your Profile</h1>
         
         <Card>
-          <CardBody className="gap-6 p-8">
+          <CardBody className="gap-6 p-4 sm:p-8">
             <div className="flex flex-col items-center gap-4 mb-4">
               <Avatar 
                 src={profile.avatar_url || undefined} 
@@ -182,8 +183,9 @@ export default function ProfilePage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Input 
                 label="Full Name" 
-                value={profile.name} 
-                isDisabled 
+                value={profile.name || ''} 
+                onChange={(e) => setProfile({...profile, name: e.target.value})}
+                placeholder="Your full name"
               />
               <Input 
                 label="Email" 
@@ -218,9 +220,14 @@ export default function ProfilePage() {
                 selectedKeys={[profile.timezone]}
                 onSelectionChange={(keys) => setProfile({...profile, timezone: Array.from(keys)[0] as string})}
               >
-                <SelectItem key="America/New_York">America/New_York</SelectItem>
-                <SelectItem key="UTC">UTC</SelectItem>
-                {/* Add more timezones */}
+                <SelectItem key="America/New_York">America/New_York (EST/EDT)</SelectItem>
+                <SelectItem key="America/Chicago">America/Chicago (CST/CDT)</SelectItem>
+                <SelectItem key="America/Denver">America/Denver (MST/MDT)</SelectItem>
+                <SelectItem key="America/Los_Angeles">America/Los_Angeles (PST/PDT)</SelectItem>
+                <SelectItem key="America/Anchorage">America/Anchorage (AKST/AKDT)</SelectItem>
+                <SelectItem key="Pacific/Honolulu">Pacific/Honolulu (HST)</SelectItem>
+                <SelectItem key="UTC">UTC (GMT)</SelectItem>
+                <SelectItem key="Europe/London">Europe/London (GMT/BST)</SelectItem>
               </Select>
 
               <Select 
