@@ -279,10 +279,12 @@ export default function Home() {
   }
 
   // Group messages into threads
+  // Messages WITH thread_id group together; messages WITHOUT get their own entry
   const messageThreads = useMemo<MessageThread[]>(() => {
     const threadMap = new Map<string, { messages: InboxItem[], recipient: string }>();
     messages.forEach(msg => {
-      const key = msg.thread_id || msg.to_recipient || msg.from_agent || 'unknown';
+      // Use thread_id if available, otherwise each message is its own "thread"
+      const key = msg.thread_id || `standalone-${msg.id}`;
       const recipient = msg.to_recipient || msg.from_agent || 'unknown';
       if (!threadMap.has(key)) {
         threadMap.set(key, { messages: [], recipient });
@@ -709,7 +711,12 @@ export default function Home() {
                       return (
                         <div 
                           key={idx} 
-                          onClick={() => router.push(`/inbox?thread=${thread.recipient}`)}
+                          onClick={() => {
+                            const url = thread.threadId 
+                              ? `/inbox?threadId=${encodeURIComponent(thread.threadId)}`
+                              : `/inbox?recipient=${encodeURIComponent(thread.recipient)}&msgId=${encodeURIComponent(thread.lastMessage.id)}`;
+                            router.push(url);
+                          }}
                           className="flex items-center gap-3 p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors"
                         >
                           <div className="relative">

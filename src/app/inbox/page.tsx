@@ -33,6 +33,7 @@ import {
   Inbox as InboxIcon, MessageCircle, Plus, X, ChevronDown, ChevronRight,
   User, Users, ArrowLeft, MoreVertical, Archive, Briefcase as BriefcaseIcon
 } from 'lucide-react'
+import { useSearchParams } from 'next/navigation'
 
 interface InboxItem {
   id: string
@@ -106,17 +107,18 @@ export default function InboxPage() {
   const chatScrollRef = useRef<HTMLDivElement>(null)
   
   const supabase = createClient()
+  const searchParams = useSearchParams()
 
   // Group items into threads
   const { threads, thoughts } = useMemo(() => {
     const messageItems = items.filter(i => i.item_type === 'message' && (i.to_recipient || i.from_agent))
     const thoughtItems = items.filter(i => i.item_type === 'thought' || (i.item_type === 'message' && !i.to_recipient && !i.from_agent))
     
-    // Group by thread_id or create pseudo-threads by recipient
+    // Group by thread_id; messages without thread_id become standalone entries
     const threadMap = new Map<string, InboxItem[]>()
     
     messageItems.forEach(item => {
-      const threadKey = item.thread_id || item.to_recipient || item.from_agent || 'unknown'
+      const threadKey = item.thread_id || `standalone-${item.id}`
       if (!threadMap.has(threadKey)) {
         threadMap.set(threadKey, [])
       }
@@ -166,6 +168,34 @@ export default function InboxPage() {
       chatScrollRef.current.scrollTop = chatScrollRef.current.scrollHeight
     }
   }, [selectedThread?.messages.length, selectedThread?.id])
+
+  // Auto-open thread from URL params (?threadId=xxx or ?recipient=xxx&msgId=xxx)
+  useEffect(() => {
+    if (loading || threads.length === 0) return
+    const threadIdParam = searchParams.get('threadId')
+    const recipientParam = searchParams.get('recipient')
+    const msgIdParam = searchParams.get('msgId')
+
+    if (threadIdParam) {
+      // Find thread by actual thread_id
+      const thread = threads.find(t => t.id === threadIdParam)
+      if (thread) {
+        setSelectedThread(thread)
+      }
+    } else if (recipientParam && msgIdParam) {
+      // Find the standalone thread for this specific message
+      const thread = threads.find(t => t.id === `standalone-${msgIdParam}`)
+      if (thread) {
+        setSelectedThread(thread)
+      }
+    } else if (recipientParam) {
+      // Legacy: open first thread matching this recipient
+      const thread = threads.find(t => t.recipient.toLowerCase() === recipientParam.toLowerCase())
+      if (thread) {
+        setSelectedThread(thread)
+      }
+    }
+  }, [loading, threads, searchParams])
 
   // Load user and inbox items
   useEffect(() => {
