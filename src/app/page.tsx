@@ -161,7 +161,7 @@ export default function Home() {
       });
 
       const [spacesRes, tasksRes, completedRes, inboxRes, messagesRes, agentsRes, workLogRes] = await Promise.all([
-        supabase.from('spaces').select('id, name, color'),
+        supabase.from('spaces').select('id, name, color, space_members!inner(user_id)').eq('space_members.user_id', authUser.id),
         supabase.from('tasks')
           .select('*')
           .neq('status', 'done')

@@ -67,9 +67,13 @@ export function SpaceProvider({ children }: { children: ReactNode }) {
     setError(null)
     
     try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) { setLoading(false); return }
+
       const { data, error: fetchError } = await supabase
         .from('spaces')
-        .select('*, space_members!inner(role)')
+        .select('*, space_members!inner(role, user_id)')
+        .eq('space_members.user_id', user.id)
         .is('archived_at', null)
         .order('is_default', { ascending: false })
         .order('name')
