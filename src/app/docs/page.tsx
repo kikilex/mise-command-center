@@ -301,9 +301,11 @@ function DocsPageContent() {
             className="w-full sm:w-48"
           >
             <SelectItem key="all">All Spaces</SelectItem>
-            {spaces.map(space => (
-              <SelectItem key={space.id}>{space.name}</SelectItem>
-            ))}
+            <>
+              {spaces.map(space => (
+                <SelectItem key={space.id}>{space.name}</SelectItem>
+              ))}
+            </>
           </Select>
           <Select
             selectedKeys={[docTypeFilter]}
@@ -319,7 +321,9 @@ function DocsPageContent() {
             onChange={(e) => setStatusFilter(e.target.value)}
             className="w-full sm:w-48"
           >
-            {statusOptions.map(s => <SelectItem key={s.key}>{s.label}</SelectItem>)}
+            <>
+              {statusOptions.map(s => <SelectItem key={s.key}>{s.label}</SelectItem>)}
+            </>
           </Select>
         </div>
 

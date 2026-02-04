@@ -266,46 +266,50 @@ export default function AddTaskModal({
               </SelectItem>
               
               {/* Humans section */}
-              {assignees.filter(a => a.type === 'human').length > 0 && (
-                <SelectItem 
-                  key="humans-header" 
-                  isReadOnly 
-                  className="text-xs font-bold uppercase tracking-wider text-slate-400 bg-slate-50 dark:bg-slate-800"
-                >
-                  Humans
-                </SelectItem>
-              )}
-              {assignees
-                .filter(a => a.type === 'human')
-                .map(user => (
+              {assignees.filter(a => a.type === 'human').length > 0 ? (
+                <>
                   <SelectItem 
-                    key={user.id} 
-                    startContent={<User className="w-4 h-4 text-slate-400" />}
+                    key="humans-header" 
+                    isReadOnly 
+                    className="text-xs font-bold uppercase tracking-wider text-slate-400 bg-slate-50 dark:bg-slate-800"
                   >
-                    {user.name}
+                    Humans
                   </SelectItem>
-                ))}
+                  {assignees
+                    .filter(a => a.type === 'human')
+                    .map(user => (
+                      <SelectItem 
+                        key={user.id} 
+                        startContent={<User className="w-4 h-4 text-slate-400" />}
+                      >
+                        {user.name}
+                      </SelectItem>
+                    ))}
+                </>
+              ) : null}
               
               {/* Agents section */}
-              {assignees.filter(a => a.type === 'agent').length > 0 && (
-                <SelectItem 
-                  key="agents-header" 
-                  isReadOnly 
-                  className="text-xs font-bold uppercase tracking-wider text-slate-400 bg-slate-50 dark:bg-slate-800"
-                >
-                  AI Agents
-                </SelectItem>
-              )}
-              {assignees
-                .filter(a => a.type === 'agent')
-                .map(agent => (
+              {assignees.filter(a => a.type === 'agent').length > 0 ? (
+                <>
                   <SelectItem 
-                    key={agent.id} 
-                    startContent={<Bot className="w-4 h-4 text-violet-400" />}
+                    key="agents-header" 
+                    isReadOnly 
+                    className="text-xs font-bold uppercase tracking-wider text-slate-400 bg-slate-50 dark:bg-slate-800"
                   >
-                    {agent.name}
+                    AI Agents
                   </SelectItem>
-                ))}
+                  {assignees
+                    .filter(a => a.type === 'agent')
+                    .map(agent => (
+                      <SelectItem 
+                        key={agent.id} 
+                        startContent={<Bot className="w-4 h-4 text-violet-400" />}
+                      >
+                        {agent.name}
+                      </SelectItem>
+                    ))}
+                </>
+              ) : null}
             </Select>
           </div>
         </ModalBody>

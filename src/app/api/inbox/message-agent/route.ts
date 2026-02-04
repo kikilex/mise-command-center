@@ -1,8 +1,8 @@
 import { NextResponse } from 'next/server'
 
 const AGENT_CONFIG: Record<string, { url: string; token: string }> = {
-  ax: { url: 'http://localhost:18789/hooks/agent', token: 'ax-tony-secret-2026' },
-  tony: { url: 'http://localhost:19789/hooks/agent', token: 'tony-ax-secret-2026' }
+  ax: { url: 'http://localhost:18789/hooks/wake', token: 'ax-tony-secret-2026' },
+  tony: { url: 'http://localhost:19789/hooks/wake', token: 'tony-ax-secret-2026' }
 }
 
 export async function POST(request: Request) {
@@ -28,10 +28,7 @@ export async function POST(request: Request) {
           'Authorization': `Bearer ${config.token}`
         },
         body: JSON.stringify({
-          message: `[Inbox Message from ${sender}] ${message}`,
-          name: 'Inbox',
-          deliver: true,
-          channel: 'telegram'
+          text: `📨 Inbox Message from ${sender}: ${message}`
         })
       })
 

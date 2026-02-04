@@ -78,12 +78,26 @@ interface AIAgent {
   slug: string
   role: string
   is_active: boolean
+  model?: string
+  system_prompt?: string
+  capabilities?: string[]
+  settings?: {
+    personality?: string
+  }
+  avatar_url?: string
+  last_action?: string
+  last_action_at?: string
 }
 
 interface Project {
   id: string
   name: string
   business_id: string | null
+  space_id?: string | null
+  description?: string | null
+  status?: string
+  created_at?: string
+  updated_at?: string
 }
 
 interface UserData {

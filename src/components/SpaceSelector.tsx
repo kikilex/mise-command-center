@@ -126,8 +126,7 @@ export default function SpaceSelector() {
                     size="sm"
                     variant="light"
                     className="min-w-6 w-6 h-6"
-                    onPress={(e) => {
-                      e.stopPropagation()
+                    onPress={() => {
                       setEditingSpace(space)
                       onEditOpen()
                     }}
