@@ -43,6 +43,7 @@ interface ChatMessage {
   subject: string | null
   space_id: string | null
   project_id: string | null
+  status: string
   created_at: string
 }
 
@@ -266,13 +267,22 @@ export default function ChatWidget() {
   useEffect(() => {
     function handleOpenThread(e: Event) {
       const detail = (e as CustomEvent).detail
-      if (!detail?.threadId) { setIsOpen(true); return }
-      const thread = threads.find(t => t.id === detail.threadId)
-      if (thread) {
-        setActiveThread(thread)
-        setIsComposing(false)
+      
+      if (detail?.threadId) {
+        const thread = threads.find(t => t.id === detail.threadId)
+        if (thread) {
+          setActiveThread(thread)
+          setIsComposing(false)
+          setMobileShowConversation(true)
+        }
+      } else if (detail?.recipient) {
+        // Open new conversation with recipient pre-selected
+        setIsComposing(true)
+        setActiveThread(null)
+        setNewRecipient(detail.recipient)
         setMobileShowConversation(true)
       }
+      
       setIsOpen(true)
     }
 
@@ -385,6 +395,19 @@ export default function ChatWidget() {
 
     const { data } = await query.order('created_at', { ascending: true })
     setMessages(data || [])
+    
+    // Mark messages as read (processed) if they are pending and for the current user
+    const currentUserName = userNameRef.current?.toLowerCase()
+    const pendingIds = (data || [])
+      .filter(msg => msg.status === 'pending' && msg.to_recipient?.toLowerCase() === currentUserName)
+      .map(msg => msg.id)
+    
+    if (pendingIds.length > 0) {
+      await supabase.from('inbox').update({ status: 'processed' }).in('id', pendingIds)
+      // Update thread unread count locally
+      setThreads(prev => prev.map(t => t.id === threadId ? { ...t, unreadCount: 0 } : t))
+    }
+
     setLoading(false)
   }
 
@@ -395,6 +418,12 @@ export default function ChatWidget() {
     const threadId = msg.thread_id || `dm-${partner}`
     const currentUserName = userNameRef.current?.toLowerCase()
     const isForMe = msg.to_recipient?.toLowerCase() === currentUserName
+    const isActive = isOpenRef.current && activeThreadRef.current?.id === threadId
+
+    // If active and for me, mark as read immediately in DB
+    if (isActive && isForMe && msg.status === 'pending') {
+      supabase.from('inbox').update({ status: 'processed' }).eq('id', msg.id).then()
+    }
 
     // Update thread list
     setThreads(prev => {
@@ -407,11 +436,8 @@ export default function ChatWidget() {
       
       // Calculate new unread count
       let unreadCount = existing?.unreadCount || 0
-      if (isForMe && msg.status === 'pending') {
-        const isActive = isOpenRef.current && activeThreadRef.current?.id === threadId
-        if (!isActive) {
-          unreadCount++
-        }
+      if (isForMe && msg.status === 'pending' && !isActive) {
+        unreadCount++
       }
 
       return [{
