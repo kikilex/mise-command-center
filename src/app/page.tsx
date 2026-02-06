@@ -212,7 +212,7 @@ export default function Home() {
         supabase.from('inbox')
           .select('*')
           .eq('item_type', 'thought')
-          .eq('status', 'pending')
+          .in('status', ['pending', 'processing', 'processed'])
           .order('created_at', { ascending: false })
           .limit(20),
         supabase.from('inbox')
