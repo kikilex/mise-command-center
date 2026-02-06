@@ -134,7 +134,9 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
   const [isAtBottom, setIsAtBottom] = useState(false)
   
   // Permissions editing state
+  const [spaces, setSpaces] = useState<{id: string, name: string}[]>([])
   const [projects, setProjects] = useState<Project[]>([])
+  const [editSpaceId, setEditSpaceId] = useState<string>('')
   const [editProjectId, setEditProjectId] = useState<string>('space')
   const [savingMeta, setSavingMeta] = useState(false)
   
@@ -245,8 +247,10 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
       if (error) throw error
       setDocument(data)
       // Initialize edit state with document data
+      setEditSpaceId(data.space_id || '')
       setEditProjectId(data.project_id || 'space')
-      // Load projects for this space
+      // Load user's spaces and projects for this space
+      loadSpaces()
       if (data.space_id) {
         loadProjects(data.space_id)
       }
@@ -256,6 +260,27 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
       router.push('/docs')
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function loadSpaces() {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      
+      const { data, error } = await supabase
+        .from('space_members')
+        .select('spaces:space_id (id, name)')
+        .eq('user_id', user.id)
+      
+      if (error) throw error
+      const spaceList = (data || [])
+        .map((sm: any) => sm.spaces)
+        .filter(Boolean)
+        .sort((a: any, b: any) => a.name.localeCompare(b.name))
+      setSpaces(spaceList)
+    } catch (error) {
+      console.error('Load spaces error:', error)
     }
   }
 
@@ -330,10 +355,13 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
     setSavingMeta(true)
     try {
       const newProjectId = editProjectId === 'space' ? null : editProjectId
+      const spaceChanged = editSpaceId !== document.space_id
+      
       const { error } = await supabase
         .from('documents')
         .update({
-          project_id: newProjectId,
+          space_id: editSpaceId || null,
+          project_id: spaceChanged ? null : newProjectId, // Reset project if space changed
         })
         .eq('id', document.id)
       
@@ -342,13 +370,24 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
       // Update local document state
       setDocument(prev => prev ? {
         ...prev,
-        project_id: newProjectId,
+        space_id: editSpaceId || null,
+        project_id: spaceChanged ? null : newProjectId,
       } : null)
       
-      showSuccessToast('Permissions updated')
+      // If space changed, reload projects for new space and reset project selection
+      if (spaceChanged) {
+        setEditProjectId('space')
+        if (editSpaceId) {
+          loadProjects(editSpaceId)
+        } else {
+          setProjects([])
+        }
+      }
+      
+      showSuccessToast('Document updated')
     } catch (error) {
       console.error('Save document error:', error)
-      showErrorToast(error, 'Failed to save permissions')
+      showErrorToast(error, 'Failed to save document')
     } finally {
       setSavingMeta(false)
     }
@@ -755,40 +794,63 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
                   <Settings className="w-4 h-4" />
                 </Button>
               </PopoverTrigger>
-              <PopoverContent className="w-72 p-4">
+              <PopoverContent className="w-80 p-4">
                 <div className="space-y-4">
                   <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-2">
                     <Settings className="w-4 h-4" />
-                    Document Permissions
+                    Document Settings
                   </h4>
                   
-                  {/* Visibility / Permissions */}
+                  {/* Space Selection */}
                   <div>
                     <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">
-                      Who can view this document?
+                      Space
                     </label>
                     <Select
                       size="sm"
-                      selectedKeys={[editProjectId]}
-                      onChange={(e) => setEditProjectId(e.target.value)}
+                      selectedKeys={editSpaceId ? [editSpaceId] : []}
+                      onChange={(e) => {
+                        setEditSpaceId(e.target.value)
+                        setEditProjectId('space') // Reset project when space changes
+                        if (e.target.value) {
+                          loadProjects(e.target.value)
+                        } else {
+                          setProjects([])
+                        }
+                      }}
                       className="w-full"
-                      startContent={editProjectId === 'space' ? <Folder className="w-4 h-4 text-slate-400" /> : <Folder className="w-4 h-4 text-violet-500" />}
+                      placeholder="Select a space"
                     >
-                      <SelectItem key="space" startContent={<Folder className="w-4 h-4" />}>
-                        Everyone in Space
-                      </SelectItem>
-                      {projects.map(p => (
-                        <SelectItem key={p.id} startContent={<Folder className="w-4 h-4" />}>
-                          {p.name} only
-                        </SelectItem>
+                      {spaces.map(s => (
+                        <SelectItem key={s.id}>{s.name}</SelectItem>
                       ))}
                     </Select>
-                    <p className="text-xs text-slate-400 mt-2">
-                      {editProjectId === 'space' 
-                        ? 'All members of this space can view and edit.'
-                        : 'Only project members can view and edit.'}
-                    </p>
                   </div>
+                  
+                  {/* Project / Visibility */}
+                  {editSpaceId && (
+                    <div>
+                      <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">
+                        Visibility
+                      </label>
+                      <Select
+                        size="sm"
+                        selectedKeys={[editProjectId]}
+                        onChange={(e) => setEditProjectId(e.target.value)}
+                        className="w-full"
+                      >
+                        <SelectItem key="space">Everyone in Space</SelectItem>
+                        {projects.map(p => (
+                          <SelectItem key={p.id}>{p.name} only</SelectItem>
+                        ))}
+                      </Select>
+                      <p className="text-xs text-slate-400 mt-1">
+                        {editProjectId === 'space' 
+                          ? 'All space members can access.'
+                          : 'Only project members can access.'}
+                      </p>
+                    </div>
+                  )}
                   
                   {/* Save Button */}
                   <Button
@@ -800,7 +862,10 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
                       setPropertiesOpen(false)
                     }}
                     isLoading={savingMeta}
-                    isDisabled={savingMeta || editProjectId === (document?.project_id || 'space')}
+                    isDisabled={savingMeta || (
+                      editSpaceId === (document?.space_id || '') &&
+                      editProjectId === (document?.project_id || 'space')
+                    )}
                   >
                     {savingMeta ? 'Saving...' : 'Save'}
                   </Button>

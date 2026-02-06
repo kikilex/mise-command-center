@@ -157,19 +157,18 @@ export default function SpacesPage() {
             </CardBody>
           </Card>
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6" style={{ gridAutoRows: '180px' }}>
             {spaces.map((space) => (
-              <Link key={space.id} href={`/spaces/${space.id}`}>
+              <Link key={space.id} href={`/spaces/${space.id}`} className="block h-full">
                 <Card
                   isPressable
-                  className="hover:shadow-lg transition-shadow"
-                  style={{ height: '180px' }}
+                  className="hover:shadow-lg transition-shadow h-full"
                 >
-                  <CardBody className="p-5 grid grid-rows-[auto_1fr_auto] h-full gap-2">
+                  <CardBody className="p-5 flex flex-col h-full">
                     {/* Header row: icon + kebab menu */}
-                    <div className="flex items-start justify-between">
+                    <div className="flex items-start justify-between flex-shrink-0">
                       <div 
-                        className="w-11 h-11 rounded-xl flex items-center justify-center text-white text-lg font-bold shadow-md flex-shrink-0"
+                        className="w-11 h-11 rounded-xl flex items-center justify-center text-white text-lg font-bold shadow-md"
                         style={{ backgroundColor: space.color || '#3b82f6' }}
                       >
                         {renderSpaceIcon(space.icon, space.name.charAt(0))}
@@ -219,16 +218,16 @@ export default function SpacesPage() {
                       </Dropdown>
                     </div>
 
-                    {/* Content area - takes remaining space */}
-                    <div className="overflow-hidden">
+                    {/* Content area - grows to fill */}
+                    <div className="flex-1 mt-3 overflow-hidden">
                       <h3 className="text-base font-semibold text-default-800 line-clamp-1">{space.name}</h3>
-                      <p className="text-sm text-default-500 line-clamp-2 mt-1 min-h-[2.5rem]">
+                      <p className="text-sm text-default-500 line-clamp-2 mt-1">
                         {space.description || '\u00A0'}
                       </p>
                     </div>
 
-                    {/* Footer: role - always at bottom */}
-                    <div className="flex items-center pt-2 border-t border-default-100">
+                    {/* Footer: role - pinned to bottom */}
+                    <div className="flex items-center pt-2 mt-auto border-t border-default-100 flex-shrink-0">
                       <span className="text-xs text-default-400 capitalize">
                         {space.role || 'member'}
                       </span>
