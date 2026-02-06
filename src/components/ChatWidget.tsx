@@ -45,6 +45,8 @@ interface ChatMessage {
   project_id: string | null
   status: string
   created_at: string
+  user_id: string
+  user?: { name: string; slug: string } | null
 }
 
 interface ChatThread {
@@ -386,7 +388,7 @@ export default function ChatWidget() {
 
   async function loadMessages(threadId: string) {
     setLoading(true)
-    let query = supabase.from('inbox').select('*').eq('item_type', 'message')
+    let query = supabase.from('inbox').select('*, user:users!inbox_user_id_fkey(name, slug)').eq('item_type', 'message')
 
     if (threadId.startsWith('dm-')) {
       const partner = threadId.replace('dm-', '')
@@ -1163,7 +1165,8 @@ export default function ChatWidget() {
                       <span className="text-xs text-slate-400">No messages yet. Start the conversation.</span>
                     </div>
                   ) : messages.map((msg) => {
-                    const isMe = !msg.from_agent
+                    // isMe = sent by current user (not an AI reply)
+                    const isMe = msg.user_id === user?.id && !msg.from_agent
                     return (
                       <div key={msg.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
                         <div className={`max-w-[80%] px-3 py-2 rounded-2xl text-sm ${
@@ -1172,8 +1175,8 @@ export default function ChatWidget() {
                             : 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 rounded-bl-md border border-slate-100 dark:border-slate-700'
                         }`}>
                           {!isMe && (
-                            <p className={`text-[10px] font-semibold mb-0.5 ${isMe ? 'text-blue-100' : 'text-violet-500'}`}>
-                              {cap(msg.from_agent || 'Unknown')}
+                            <p className={`text-[10px] font-semibold mb-0.5 ${msg.from_agent ? 'text-violet-500' : 'text-blue-500'}`}>
+                              {cap(msg.from_agent || msg.user?.name || msg.user?.slug || 'Unknown')}
                             </p>
                           )}
                           {editingMsgId === msg.id ? (
