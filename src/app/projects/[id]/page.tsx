@@ -38,7 +38,7 @@ import {
   CheckCircle2, Circle, MessageSquare, GripVertical,
   User, Calendar, ChevronDown, ChevronUp, Users,
   Bold, Italic, Highlighter, RotateCcw, Save,
-  Upload, File, Image as ImageIcon, Search
+  Upload, File, Image as ImageIcon, Search, StickyNote
 } from 'lucide-react'
 import * as LucideIcons from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
@@ -117,6 +117,7 @@ interface ProjectPin {
   title: string
   pin_type: string
   url: string | null
+  notes?: string | null
 }
 
 interface Project {
@@ -204,6 +205,12 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   // Update editing
   const [editingUpdateId, setEditingUpdateId] = useState<string | null>(null)
   const [editUpdateContent, setEditUpdateContent] = useState('')
+
+  // Resource notes modal
+  const { isOpen: isNotesOpen, onOpen: onNotesOpen, onClose: onNotesClose } = useDisclosure()
+  const [notesPinId, setNotesPinId] = useState<string | null>(null)
+  const [notesContent, setNotesContent] = useState('')
+  const [savingNotes, setSavingNotes] = useState(false)
 
   // Phase assignment modal
   const { isOpen: isAssignPhaseOpen, onOpen: onAssignPhaseOpen, onClose: onAssignPhaseClose } = useDisclosure()
@@ -657,6 +664,36 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
       setPins(prev => prev.filter(p => p.id !== pinId))
     } catch (error) {
       showErrorToast(error, 'Failed to delete pin')
+    }
+  }
+
+  // Open notes for a resource
+  function openNotesModal(pin: ProjectPin) {
+    setNotesPinId(pin.id)
+    setNotesContent(pin.notes || '')
+    onNotesOpen()
+  }
+
+  // Save notes for a resource
+  async function handleSaveNotes() {
+    if (!notesPinId) return
+    setSavingNotes(true)
+    try {
+      const { error } = await supabase
+        .from('project_pins')
+        .update({ notes: notesContent || null })
+        .eq('id', notesPinId)
+      if (error) throw error
+      
+      setPins(prev => prev.map(p => 
+        p.id === notesPinId ? { ...p, notes: notesContent || null } : p
+      ))
+      onNotesClose()
+      showSuccessToast('Notes saved')
+    } catch (error) {
+      showErrorToast(error, 'Failed to save notes')
+    } finally {
+      setSavingNotes(false)
     }
   }
 
@@ -1311,19 +1348,37 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                         {!isDoc && !isImage && pin.url && (
                           <ExternalLink className="inline-block w-3 h-3 text-default-400 ml-1" />
                         )}
+                        {pin.notes && (
+                          <StickyNote className="inline-block w-3 h-3 text-warning ml-1" />
+                        )}
                       </div>
-                      <Button 
-                        isIconOnly 
-                        size="sm" 
-                        variant="light" 
-                        className="opacity-0 group-hover:opacity-100 min-w-7 w-7 h-7" 
-                        onPress={(e) => {
-                          e.stopPropagation()
-                          handleDeletePin(pin.id)
-                        }}
-                      >
-                        <Trash2 className="w-3.5 h-3.5 text-danger" />
-                      </Button>
+                      <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Button 
+                          isIconOnly 
+                          size="sm" 
+                          variant="light" 
+                          className="min-w-7 w-7 h-7" 
+                          onPress={(e) => {
+                            e.stopPropagation()
+                            openNotesModal(pin)
+                          }}
+                          title="Add note"
+                        >
+                          <StickyNote className={`w-3.5 h-3.5 ${pin.notes ? 'text-warning' : 'text-default-400'}`} />
+                        </Button>
+                        <Button 
+                          isIconOnly 
+                          size="sm" 
+                          variant="light" 
+                          className="min-w-7 w-7 h-7" 
+                          onPress={(e) => {
+                            e.stopPropagation()
+                            handleDeletePin(pin.id)
+                          }}
+                        >
+                          <Trash2 className="w-3.5 h-3.5 text-danger" />
+                        </Button>
+                      </div>
                     </div>
                   )
                 })}
@@ -1753,6 +1808,42 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
           </DrawerFooter>
         </DrawerContent>
       </Drawer>
+
+      {/* Resource Notes Modal - Post-it style */}
+      <Modal isOpen={isNotesOpen} onClose={onNotesClose} size="md">
+        <ModalContent className="bg-amber-50 dark:bg-amber-900/20">
+          <ModalHeader className="flex items-center gap-2 pb-2">
+            <StickyNote className="w-5 h-5 text-amber-600" />
+            <span className="text-amber-900 dark:text-amber-100">Note</span>
+          </ModalHeader>
+          <ModalBody className="pt-0">
+            <Textarea
+              placeholder="Add a note about this resource..."
+              value={notesContent}
+              onValueChange={setNotesContent}
+              minRows={4}
+              maxRows={10}
+              variant="flat"
+              classNames={{
+                inputWrapper: 'bg-amber-100/50 dark:bg-amber-800/20 border-amber-200 dark:border-amber-700',
+                input: 'text-amber-900 dark:text-amber-100 placeholder:text-amber-400'
+              }}
+            />
+          </ModalBody>
+          <ModalFooter className="pt-2">
+            <Button variant="flat" onPress={onNotesClose} className="text-amber-700">
+              Cancel
+            </Button>
+            <Button 
+              color="warning" 
+              onPress={handleSaveNotes}
+              isLoading={savingNotes}
+            >
+              Save Note
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
 
       {/* Image Preview Modal */}
       <Modal isOpen={isImageOpen} onClose={onImageClose} size="4xl">
