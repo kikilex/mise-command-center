@@ -496,6 +496,71 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
     }
   }
 
+  // Toggle sub-item completion (immediate save)
+  async function handleToggleSubItem(phaseId: string, itemId: string, subId: string) {
+    const phase = phases.find(p => p.id === phaseId)
+    const item = phase?.items?.find(i => i.id === itemId)
+    if (!item) return
+
+    // Parse existing sub-items
+    const subItems: SubItem[] = (item.sub_items || []).map((sub, idx) => {
+      try {
+        const parsed = JSON.parse(sub)
+        return { id: parsed.id || `sub-${idx}`, text: parsed.text || sub, completed: parsed.completed || false }
+      } catch {
+        return { id: `sub-${idx}`, text: sub, completed: false }
+      }
+    })
+
+    // Toggle the specific sub-item
+    const updatedSubItems = subItems.map(sub => 
+      sub.id === subId ? { ...sub, completed: !sub.completed } : sub
+    )
+
+    // Serialize back to JSON strings
+    const serialized = updatedSubItems.map(sub => JSON.stringify(sub))
+
+    try {
+      const { error } = await supabase
+        .from('phase_items')
+        .update({ sub_items: serialized })
+        .eq('id', itemId)
+      if (error) throw error
+
+      // Update local state
+      setPhases(prev => prev.map(p => 
+        p.id === phaseId 
+          ? { 
+              ...p, 
+              items: p.items?.map(i => 
+                i.id === itemId ? { ...i, sub_items: serialized } : i
+              )
+            }
+          : p
+      ))
+    } catch (error) {
+      showErrorToast(error, 'Failed to update sub-item')
+    }
+  }
+
+  // Update phase title
+  async function handleUpdatePhaseTitle(phaseId: string, newTitle: string) {
+    if (!newTitle.trim()) return
+    try {
+      const { error } = await supabase
+        .from('project_phases')
+        .update({ title: newTitle.trim() })
+        .eq('id', phaseId)
+      if (error) throw error
+
+      setPhases(prev => prev.map(p => 
+        p.id === phaseId ? { ...p, title: newTitle.trim() } : p
+      ))
+    } catch (error) {
+      showErrorToast(error, 'Failed to update phase title')
+    }
+  }
+
   // Assign phase
   async function handleAssignPhase(phaseId: string, userId: string | null) {
     try {
@@ -797,10 +862,16 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
       <main className="max-w-5xl mx-auto py-6 px-4 sm:py-8 sm:px-6">
         {/* Header */}
         <div className="mb-6">
-          <Link href={`/spaces/${project.space_id}`} className="inline-flex items-center gap-2 text-default-500 hover:text-default-700 mb-4">
-            <ArrowLeft className="w-4 h-4" />
+          <Button
+            as={Link}
+            href={`/spaces/${project.space_id}`}
+            variant="flat"
+            size="sm"
+            startContent={<ArrowLeft className="w-4 h-4" />}
+            className="mb-4"
+          >
             Back to Space
-          </Link>
+          </Button>
 
           <div>
             <h1 className="text-2xl font-bold text-foreground">{project.name}</h1>
@@ -846,11 +917,13 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                       members={members}
                       sensors={sensors}
                       onToggleItem={(itemId, completed) => handleToggleItem(phase.id, itemId, completed)}
+                      onToggleSubItem={(itemId, subId) => handleToggleSubItem(phase.id, itemId, subId)}
                       onOpenItem={(item) => openItemDrawer(item)}
                       onOpenAssignModal={() => openAssignPhaseModal(phase)}
                       onDeletePhase={() => handleDeletePhase(phase.id)}
                       onAddItem={(title) => handleAddItem(phase.id, title)}
                       onItemDragEnd={(e) => handleItemDragEnd(phase.id, e)}
+                      onUpdateTitle={(title) => handleUpdatePhaseTitle(phase.id, title)}
                     />
                   ))}
                 </div>
@@ -903,58 +976,87 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
         </div>
 
         {/* Pinned Resources */}
-        <div className="mb-6">
-          <div className="flex items-center justify-between mb-3">
-            <div className="flex items-center gap-2 text-default-600">
-              <Pin className="w-4 h-4" />
-              <span className="text-sm font-medium">Pinned Resources</span>
-            </div>
-            <Button size="sm" variant="light" startContent={<Plus className="w-4 h-4" />} onPress={onPinOpen}>
-              Add
-            </Button>
-          </div>
-          {pins.length === 0 ? (
-            <p className="text-sm text-default-400">No pinned resources yet.</p>
-          ) : (
-            <div className="flex flex-wrap gap-2">
-              {pins.map(pin => (
-                <Card key={pin.id} className="group">
-                  <CardBody className="p-2 px-3 flex-row items-center gap-2">
-                    <LinkIcon className="w-4 h-4 text-default-400" />
-                    {pin.url ? (
-                      <a href={pin.url} target="_blank" rel="noopener noreferrer" className="text-sm hover:text-primary flex items-center gap-1">
-                        {pin.title} <ExternalLink className="w-3 h-3" />
-                      </a>
-                    ) : (
-                      <span className="text-sm">{pin.title}</span>
-                    )}
-                    <Button isIconOnly size="sm" variant="light" className="opacity-0 group-hover:opacity-100 ml-1 min-w-6 w-6 h-6" onPress={() => handleDeletePin(pin.id)}>
-                      <X className="w-3 h-3" />
-                    </Button>
-                  </CardBody>
-                </Card>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* Update Composer */}
         <Card className="mb-6">
           <CardBody className="p-4">
-            <Textarea
-              placeholder="Write an update..."
-              value={newUpdate}
-              onValueChange={setNewUpdate}
-              minRows={2}
-              variant="bordered"
-            />
-            <div className="flex justify-end mt-2">
-              <Button size="sm" color="primary" isDisabled={!newUpdate.trim()} isLoading={posting} onPress={handlePostManualUpdate} endContent={<Send className="w-4 h-4" />}>
-                Post
-              </Button>
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2 text-default-700">
+                <Pin className="w-4 h-4" />
+                <span className="text-sm font-semibold">Resources</span>
+              </div>
+              <div className="flex gap-1">
+                <Button size="sm" variant="flat" startContent={<LinkIcon className="w-4 h-4" />} onPress={onPinOpen}>
+                  Add Link
+                </Button>
+              </div>
             </div>
+            {pins.length === 0 ? (
+              <p className="text-sm text-default-400 text-center py-4">No resources pinned yet. Add links, files, or docs.</p>
+            ) : (
+              <div className="space-y-2">
+                {pins.map(pin => (
+                  <div 
+                    key={pin.id} 
+                    className="group flex items-center gap-3 p-2 rounded-lg hover:bg-default-100 transition-colors"
+                  >
+                    <div className="w-8 h-8 rounded-lg bg-default-100 flex items-center justify-center flex-shrink-0">
+                      <LinkIcon className="w-4 h-4 text-default-500" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      {pin.url ? (
+                        <a href={pin.url} target="_blank" rel="noopener noreferrer" className="text-sm font-medium hover:text-primary flex items-center gap-1">
+                          {pin.title} <ExternalLink className="w-3 h-3 text-default-400" />
+                        </a>
+                      ) : (
+                        <span className="text-sm font-medium">{pin.title}</span>
+                      )}
+                    </div>
+                    <Button 
+                      isIconOnly 
+                      size="sm" 
+                      variant="light" 
+                      className="opacity-0 group-hover:opacity-100 min-w-7 w-7 h-7" 
+                      onPress={() => handleDeletePin(pin.id)}
+                    >
+                      <Trash2 className="w-3.5 h-3.5 text-danger" />
+                    </Button>
+                  </div>
+                ))}
+              </div>
+            )}
           </CardBody>
         </Card>
+
+        {/* Update Composer */}
+        <div className="mb-6 relative">
+          <Textarea
+            placeholder="Write an update... (Enter to post, Shift+Enter for new line)"
+            value={newUpdate}
+            onValueChange={setNewUpdate}
+            minRows={2}
+            variant="bordered"
+            classNames={{
+              inputWrapper: 'pr-12'
+            }}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault()
+                if (newUpdate.trim()) handlePostManualUpdate()
+              }
+            }}
+          />
+          <Button 
+            isIconOnly 
+            size="sm" 
+            color="primary" 
+            variant="flat"
+            className="absolute right-3 bottom-3"
+            isDisabled={!newUpdate.trim()} 
+            isLoading={posting} 
+            onPress={handlePostManualUpdate}
+          >
+            <Send className="w-4 h-4" />
+          </Button>
+        </div>
 
         {/* Timeline */}
         <div>
@@ -1065,7 +1167,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
       </Modal>
 
       {/* Item Detail Drawer */}
-      <Drawer isOpen={isDrawerOpen} onClose={onDrawerClose} placement="right" size="md">
+      <Drawer isOpen={isDrawerOpen} onClose={onDrawerClose} placement="right" size="md" classNames={{ wrapper: 'z-[200]', base: 'z-[200]' }}>
         <DrawerContent>
           <DrawerHeader className="flex flex-col gap-1">
             <span className="text-lg font-semibold">Item Details</span>
@@ -1268,21 +1370,25 @@ function SortablePhaseCard({
   members,
   sensors,
   onToggleItem,
+  onToggleSubItem,
   onOpenItem,
   onOpenAssignModal,
   onDeletePhase,
   onAddItem,
   onItemDragEnd,
+  onUpdateTitle,
 }: {
   phase: Phase
   members: SpaceMember[]
   sensors: ReturnType<typeof useSensors>
   onToggleItem: (itemId: string, completed: boolean) => void
+  onToggleSubItem: (itemId: string, subId: string) => void
   onOpenItem: (item: PhaseItem) => void
   onOpenAssignModal: () => void
   onDeletePhase: () => void
   onAddItem: (title: string) => Promise<boolean | undefined>
   onItemDragEnd: (event: DragEndEvent) => void
+  onUpdateTitle: (title: string) => void
 }) {
   const {
     attributes,
@@ -1307,11 +1413,13 @@ function SortablePhaseCard({
         sensors={sensors}
         dragHandleProps={{ ...attributes, ...listeners }}
         onToggleItem={onToggleItem}
+        onToggleSubItem={onToggleSubItem}
         onOpenItem={onOpenItem}
         onOpenAssignModal={onOpenAssignModal}
         onDeletePhase={onDeletePhase}
         onAddItem={onAddItem}
         onItemDragEnd={onItemDragEnd}
+        onUpdateTitle={onUpdateTitle}
       />
     </div>
   )
@@ -1324,12 +1432,14 @@ function PhaseCardContent({
   sensors,
   dragHandleProps,
   onToggleItem,
+  onToggleSubItem,
   onOpenItem,
   onOpenAssignModal,
   onDeletePhase,
   onRestorePhase,
   onAddItem,
   onItemDragEnd,
+  onUpdateTitle,
   completed = false,
   isDragging = false,
 }: {
@@ -1338,12 +1448,14 @@ function PhaseCardContent({
   sensors?: ReturnType<typeof useSensors>
   dragHandleProps?: any
   onToggleItem?: (itemId: string, completed: boolean) => void
+  onToggleSubItem?: (itemId: string, subId: string) => void
   onOpenItem?: (item: PhaseItem) => void
   onOpenAssignModal?: () => void
   onDeletePhase?: () => void
   onRestorePhase?: () => void
   onAddItem?: (title: string) => Promise<boolean | undefined>
   onItemDragEnd?: (event: DragEndEvent) => void
+  onUpdateTitle?: (title: string) => void
   completed?: boolean
   isDragging?: boolean
 }) {
@@ -1351,6 +1463,11 @@ function PhaseCardContent({
   const [isAddingItem, setIsAddingItem] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
   const [activeItemId, setActiveItemId] = useState<string | null>(null)
+  
+  // Inline title editing
+  const [isEditingTitle, setIsEditingTitle] = useState(false)
+  const [editTitle, setEditTitle] = useState(phase.title)
+  const titleInputRef = useRef<HTMLInputElement>(null)
   
   const items = phase.items || []
   const completedCount = items.filter(i => i.completed).length
@@ -1369,6 +1486,20 @@ function PhaseCardContent({
     }
   }
 
+  function handleTitleClick() {
+    if (completed || !onUpdateTitle) return
+    setEditTitle(phase.title)
+    setIsEditingTitle(true)
+    setTimeout(() => titleInputRef.current?.focus(), 0)
+  }
+
+  function handleTitleSave() {
+    if (editTitle.trim() && editTitle.trim() !== phase.title) {
+      onUpdateTitle?.(editTitle.trim())
+    }
+    setIsEditingTitle(false)
+  }
+
   return (
     <Card className={`${completed ? 'bg-success-50 dark:bg-success-900/10' : ''} ${isDragging ? 'shadow-lg' : ''}`}>
       <CardBody className="p-4">
@@ -1381,7 +1512,28 @@ function PhaseCardContent({
               </div>
             )}
             <div className="flex-1">
-              <h3 className="font-semibold text-foreground">{phase.title}</h3>
+              {isEditingTitle ? (
+                <Input
+                  ref={titleInputRef}
+                  value={editTitle}
+                  onValueChange={setEditTitle}
+                  size="sm"
+                  variant="bordered"
+                  classNames={{ input: 'font-semibold' }}
+                  onBlur={handleTitleSave}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleTitleSave()
+                    if (e.key === 'Escape') setIsEditingTitle(false)
+                  }}
+                />
+              ) : (
+                <h3 
+                  className={`font-semibold text-foreground ${!completed && onUpdateTitle ? 'cursor-pointer hover:text-primary' : ''}`}
+                  onClick={handleTitleClick}
+                >
+                  {phase.title}
+                </h3>
+              )}
               <div className="flex items-center gap-2 mt-1">
                 <span className="text-xs text-default-400">{completedCount}/{totalCount}</span>
                 {phase.assignee && (
@@ -1450,6 +1602,7 @@ function PhaseCardContent({
                     item={item}
                     onToggle={() => onToggleItem?.(item.id, item.completed)}
                     onClick={() => onOpenItem?.(item)}
+                    onToggleSubItem={onToggleSubItem ? (subId) => onToggleSubItem(item.id, subId) : undefined}
                   />
                 ))}
               </div>
@@ -1471,6 +1624,7 @@ function PhaseCardContent({
                 item={item}
                 onToggle={() => onToggleItem?.(item.id, item.completed)}
                 onClick={() => onOpenItem?.(item)}
+                onToggleSubItem={onToggleSubItem ? (subId) => onToggleSubItem(item.id, subId) : undefined}
               />
             ))}
           </div>
@@ -1512,10 +1666,12 @@ function SortableItemRow({
   item,
   onToggle,
   onClick,
+  onToggleSubItem,
 }: {
   item: PhaseItem
   onToggle: () => void
   onClick: () => void
+  onToggleSubItem?: (subId: string) => void
 }) {
   const {
     attributes,
@@ -1538,6 +1694,7 @@ function SortableItemRow({
         item={item}
         onToggle={onToggle}
         onClick={onClick}
+        onToggleSubItem={onToggleSubItem}
         dragHandleProps={{ ...attributes, ...listeners }}
       />
     </div>
@@ -1549,12 +1706,14 @@ function ItemRowContent({
   item,
   onToggle,
   onClick,
+  onToggleSubItem,
   dragHandleProps,
   isDragging = false,
 }: {
   item: PhaseItem
   onToggle?: () => void
   onClick?: () => void
+  onToggleSubItem?: (subId: string) => void
   dragHandleProps?: any
   isDragging?: boolean
 }) {
@@ -1567,50 +1726,66 @@ function ItemRowContent({
       return { id: `sub-${idx}`, text: sub, completed: false }
     }
   })
-  
-  const completedSubCount = subItems.filter(s => s.completed).length
 
   return (
     <div 
       className={`rounded-lg p-2 ${item.completed ? 'bg-success-50 dark:bg-success-900/10' : 'bg-default-50 dark:bg-default-100'} ${isDragging ? 'shadow-md' : ''} ${onClick ? 'cursor-pointer hover:bg-default-100 dark:hover:bg-default-200/50' : ''}`}
       onClick={(e) => {
-        // Don't trigger onClick if clicking checkbox or drag handle
+        // Don't trigger onClick if clicking checkbox, sub-item checkbox, or drag handle
         if ((e.target as HTMLElement).closest('[data-slot="wrapper"]') || 
-            (e.target as HTMLElement).closest('[data-drag-handle]')) return
+            (e.target as HTMLElement).closest('[data-drag-handle]') ||
+            (e.target as HTMLElement).closest('[data-sub-item]')) return
         onClick?.()
       }}
     >
-      <div className="flex items-start gap-2">
+      <div className="flex items-center gap-2">
         {dragHandleProps && (
-          <div {...dragHandleProps} data-drag-handle className="cursor-grab active:cursor-grabbing p-0.5 -ml-1 hover:bg-default-200 rounded mt-0.5">
+          <div {...dragHandleProps} data-drag-handle className="cursor-grab active:cursor-grabbing p-0.5 -ml-1 hover:bg-default-200 rounded">
             <GripVertical className="w-3 h-3 text-default-400" />
           </div>
         )}
         <Checkbox
           isSelected={item.completed}
           onValueChange={() => onToggle?.()}
-          className="mt-0.5"
           size="sm"
         />
         <div className="flex-1 min-w-0">
-          <span className={`text-sm ${item.completed ? 'line-through text-default-400' : ''}`}>{item.title}</span>
-          
-          {/* Sub-items summary */}
-          {subItems.length > 0 && (
-            <div className="mt-1 text-xs text-default-400">
-              {completedSubCount}/{subItems.length} sub-items
-            </div>
-          )}
-
-          {/* Assignee & Due */}
-          <div className="flex items-center gap-2 mt-1">
+          <div className="flex items-center gap-2">
+            <span className={`text-sm ${item.completed ? 'line-through text-default-400' : ''}`}>{item.title}</span>
             {item.assignee && (
-              <Avatar src={item.assignee.avatar_url} name={item.assignee.display_name || item.assignee.name} size="sm" className="w-5 h-5" />
+              <Avatar src={item.assignee.avatar_url} name={item.assignee.display_name || item.assignee.name} size="sm" className="w-4 h-4" />
             )}
             {item.due_date && (
               <span className="text-xs text-default-400">{format(new Date(item.due_date), 'MMM d')}</span>
             )}
           </div>
+          
+          {/* Sub-items with mini checkboxes */}
+          {subItems.length > 0 && (
+            <div className="mt-1.5 ml-1 space-y-1">
+              {subItems.map(sub => (
+                <div 
+                  key={sub.id} 
+                  data-sub-item
+                  className="flex items-center gap-1.5 text-xs"
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    onToggleSubItem?.(sub.id)
+                  }}
+                >
+                  <Checkbox
+                    isSelected={sub.completed}
+                    size="sm"
+                    classNames={{ wrapper: 'w-3 h-3', icon: 'w-2 h-2' }}
+                    isReadOnly={!onToggleSubItem}
+                  />
+                  <span className={sub.completed ? 'line-through text-default-400' : 'text-default-600'}>
+                    {sub.text}
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
         </div>
       </div>
     </div>
