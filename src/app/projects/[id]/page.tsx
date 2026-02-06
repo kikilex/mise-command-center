@@ -47,6 +47,7 @@ import { showErrorToast, showSuccessToast } from '@/lib/errors'
 import { formatDistanceToNow, format } from 'date-fns'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+import confetti from 'canvas-confetti'
 
 // DnD Kit imports
 import {
@@ -193,10 +194,16 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   const { isOpen: isImageOpen, onOpen: onImageOpen, onClose: onImageClose } = useDisclosure()
   const [previewImage, setPreviewImage] = useState<string | null>(null)
   
-  // Doc preview modal (iframe)
+  // Doc preview modal
   const { isOpen: isDocPreviewOpen, onOpen: onDocPreviewOpen, onClose: onDocPreviewClose } = useDisclosure()
   const [previewDocUrl, setPreviewDocUrl] = useState<string | null>(null)
   const [previewDocTitle, setPreviewDocTitle] = useState('')
+  const [previewDocContent, setPreviewDocContent] = useState('')
+  const [loadingDocContent, setLoadingDocContent] = useState(false)
+  
+  // Update editing
+  const [editingUpdateId, setEditingUpdateId] = useState<string | null>(null)
+  const [editUpdateContent, setEditUpdateContent] = useState('')
 
   // Phase assignment modal
   const { isOpen: isAssignPhaseOpen, onOpen: onAssignPhaseOpen, onClose: onAssignPhaseClose } = useDisclosure()
@@ -494,6 +501,13 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
           
           await postUpdate(`Completed phase: "${phase?.title}" 🎉`, 'phase_completed')
           showSuccessToast(`Phase "${phase?.title}" completed!`)
+          
+          // Celebrate with confetti! 🎉
+          confetti({
+            particleCount: 100,
+            spread: 70,
+            origin: { y: 0.6 }
+          })
         }
       }
     } catch (error) {
@@ -833,6 +847,66 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
       showErrorToast(error, 'Failed to post update')
     } finally {
       setPosting(false)
+    }
+  }
+
+  // Edit update
+  async function handleEditUpdate(updateId: string) {
+    if (!editUpdateContent.trim()) return
+    try {
+      const { error } = await supabase
+        .from('project_updates')
+        .update({ content: editUpdateContent.trim() })
+        .eq('id', updateId)
+      if (error) throw error
+      
+      setUpdates(prev => prev.map(u => 
+        u.id === updateId ? { ...u, content: editUpdateContent.trim() } : u
+      ))
+      setEditingUpdateId(null)
+      showSuccessToast('Update edited')
+    } catch (error) {
+      showErrorToast(error, 'Failed to edit update')
+    }
+  }
+
+  // Delete update
+  async function handleDeleteUpdate(updateId: string) {
+    try {
+      const { error } = await supabase
+        .from('project_updates')
+        .delete()
+        .eq('id', updateId)
+      if (error) throw error
+      
+      setUpdates(prev => prev.filter(u => u.id !== updateId))
+      showSuccessToast('Update deleted')
+    } catch (error) {
+      showErrorToast(error, 'Failed to delete update')
+    }
+  }
+
+  // Load doc content for preview
+  async function loadDocForPreview(docId: string, title: string) {
+    setPreviewDocTitle(title)
+    setPreviewDocUrl(`/docs/${docId}`)
+    setLoadingDocContent(true)
+    onDocPreviewOpen()
+    
+    try {
+      const { data, error } = await supabase
+        .from('documents')
+        .select('content')
+        .eq('id', docId)
+        .single()
+      
+      if (error) throw error
+      setPreviewDocContent(data?.content || '')
+    } catch (error) {
+      console.error('Failed to load doc:', error)
+      setPreviewDocContent('Failed to load document content.')
+    } finally {
+      setLoadingDocContent(false)
     }
   }
 
@@ -1216,9 +1290,9 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                           setPreviewImage(pin.url)
                           onImageOpen()
                         } else if (isDoc && pin.url) {
-                          setPreviewDocUrl(pin.url)
-                          setPreviewDocTitle(pin.title)
-                          onDocPreviewOpen()
+                          // Extract doc ID from URL like /docs/{id}
+                          const docId = pin.url.split('/docs/')[1]
+                          if (docId) loadDocForPreview(docId, pin.title)
                         } else if (pin.url) {
                           window.open(pin.url, '_blank')
                         }
@@ -1309,8 +1383,11 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
               <p className="text-sm text-default-400 text-center py-6">No activity yet.</p>
             ) : (
               <div className="space-y-4">
-                {updates.map(update => {
+                {updates.map((update, idx) => {
                   const isManualPost = update.update_type === 'post'
+                  const isOwner = update.author?.id === user?.id
+                  const isLast = idx === updates.length - 1
+                  
                   return (
                     <div key={update.id} className="flex items-start gap-3">
                       <div className="relative">
@@ -1318,19 +1395,67 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                           src={update.author?.avatar_url} 
                           name={update.author?.display_name || update.author?.name} 
                           size="sm" 
-                          className="flex-shrink-0" 
+                          className={`flex-shrink-0 ${isManualPost ? 'ring-2 ring-primary ring-offset-2' : ''}`}
                         />
                         {/* Timeline line */}
-                        <div className="absolute top-8 left-1/2 -translate-x-1/2 w-px h-[calc(100%+0.5rem)] bg-default-200" />
+                        {!isLast && (
+                          <div className="absolute top-8 left-1/2 -translate-x-1/2 w-px h-[calc(100%+0.5rem)] bg-default-200" />
+                        )}
                       </div>
-                      <div className={`flex-1 min-w-0 pb-4 ${isManualPost ? 'bg-primary-50 dark:bg-primary-900/10 rounded-lg p-3 -mt-1' : ''}`}>
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-sm font-medium">{update.author?.display_name || update.author?.name}</span>
-                          <span className="text-xs text-default-400">{formatDistanceToNow(new Date(update.created_at), { addSuffix: true })}</span>
+                      <div className={`flex-1 min-w-0 pb-4 group ${isManualPost ? 'bg-primary/10 rounded-lg p-3 -mt-1 border border-primary/20' : ''}`}>
+                        <div className="flex items-center justify-between mb-1">
+                          <div className="flex items-center gap-2">
+                            <span className="text-sm font-medium">{update.author?.display_name || update.author?.name}</span>
+                            <span className="text-xs text-default-400">{formatDistanceToNow(new Date(update.created_at), { addSuffix: true })}</span>
+                          </div>
+                          {isManualPost && isOwner && editingUpdateId !== update.id && (
+                            <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                              <Button 
+                                isIconOnly 
+                                size="sm" 
+                                variant="light"
+                                className="min-w-6 w-6 h-6"
+                                onPress={() => {
+                                  setEditingUpdateId(update.id)
+                                  setEditUpdateContent(update.content)
+                                }}
+                              >
+                                <LucideIcons.Pencil className="w-3 h-3" />
+                              </Button>
+                              <Button 
+                                isIconOnly 
+                                size="sm" 
+                                variant="light"
+                                className="min-w-6 w-6 h-6 text-danger"
+                                onPress={() => handleDeleteUpdate(update.id)}
+                              >
+                                <Trash2 className="w-3 h-3" />
+                              </Button>
+                            </div>
+                          )}
                         </div>
-                        <p className={`text-sm ${isManualPost ? 'text-foreground' : 'text-default-500'}`}>
-                          {update.content}
-                        </p>
+                        {editingUpdateId === update.id ? (
+                          <div className="flex gap-2">
+                            <Input
+                              size="sm"
+                              value={editUpdateContent}
+                              onValueChange={setEditUpdateContent}
+                              variant="bordered"
+                              className="flex-1"
+                              autoFocus
+                              onKeyDown={(e) => {
+                                if (e.key === 'Enter') handleEditUpdate(update.id)
+                                if (e.key === 'Escape') setEditingUpdateId(null)
+                              }}
+                            />
+                            <Button size="sm" color="primary" onPress={() => handleEditUpdate(update.id)}>Save</Button>
+                            <Button size="sm" variant="flat" onPress={() => setEditingUpdateId(null)}>Cancel</Button>
+                          </div>
+                        ) : (
+                          <p className={`text-sm ${isManualPost ? 'text-foreground font-medium' : 'text-default-500'}`}>
+                            {update.content}
+                          </p>
+                        )}
                       </div>
                     </div>
                   )
@@ -1645,16 +1770,23 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
       </Modal>
 
       {/* Doc Preview Modal */}
-      <Modal isOpen={isDocPreviewOpen} onClose={onDocPreviewClose} size="5xl">
+      <Modal isOpen={isDocPreviewOpen} onClose={onDocPreviewClose} size="3xl" scrollBehavior="inside">
         <ModalContent>
-          <ModalHeader>{previewDocTitle}</ModalHeader>
-          <ModalBody className="p-0">
-            {previewDocUrl && (
-              <iframe 
-                src={previewDocUrl}
-                className="w-full h-[70vh] border-0"
-                title={previewDocTitle}
-              />
+          <ModalHeader className="flex items-center gap-2">
+            <FileText className="w-5 h-5 text-primary" />
+            {previewDocTitle}
+          </ModalHeader>
+          <ModalBody className="py-4">
+            {loadingDocContent ? (
+              <div className="flex justify-center py-8">
+                <Spinner size="lg" />
+              </div>
+            ) : (
+              <div className="prose prose-sm dark:prose-invert max-w-none">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  {previewDocContent || '*No content yet*'}
+                </ReactMarkdown>
+              </div>
             )}
           </ModalBody>
           <ModalFooter>
@@ -2040,16 +2172,16 @@ function ItemRowContent({
     <div 
       className={`rounded-lg p-2 ${item.completed ? 'bg-success-50 dark:bg-success-900/10' : 'bg-default-50 dark:bg-default-100'} ${isDragging ? 'shadow-md' : ''} ${onClick ? 'cursor-pointer hover:bg-default-100 dark:hover:bg-default-200/50' : ''}`}
       onClick={(e) => {
-        // Don't trigger onClick if clicking checkbox, sub-item checkbox, or drag handle
+        // Don't trigger onClick if clicking checkbox, sub-item, or drag handle
         if ((e.target as HTMLElement).closest('[data-slot="wrapper"]') || 
             (e.target as HTMLElement).closest('[data-drag-handle]') ||
             (e.target as HTMLElement).closest('[data-sub-item]')) return
         onClick?.()
       }}
     >
-      <div className="flex items-center gap-2">
+      <div className="flex items-start gap-2">
         {dragHandleProps && (
-          <div {...dragHandleProps} data-drag-handle className="cursor-grab active:cursor-grabbing p-0.5 -ml-1 hover:bg-default-200 rounded">
+          <div {...dragHandleProps} data-drag-handle className="cursor-grab active:cursor-grabbing p-0.5 -ml-1 hover:bg-default-200 rounded mt-0.5">
             <GripVertical className="w-3 h-3 text-default-400" />
           </div>
         )}
@@ -2057,6 +2189,7 @@ function ItemRowContent({
           isSelected={item.completed}
           onValueChange={() => onToggle?.()}
           size="sm"
+          className="mt-0.5"
         />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
@@ -2071,22 +2204,22 @@ function ItemRowContent({
           
           {/* Sub-items with mini checkboxes */}
           {subItems.length > 0 && (
-            <div className="mt-1.5 ml-1 space-y-1">
+            <div className="mt-1.5 space-y-1">
               {subItems.map(sub => (
                 <div 
                   key={sub.id} 
                   data-sub-item
-                  className="flex items-center gap-1.5 text-xs"
+                  className={`flex items-center gap-1.5 text-xs py-0.5 px-1 -ml-1 rounded hover:bg-default-200/50 ${onToggleSubItem ? 'cursor-pointer' : ''}`}
                   onClick={(e) => {
                     e.stopPropagation()
-                    onToggleSubItem?.(sub.id)
+                    if (onToggleSubItem) onToggleSubItem(sub.id)
                   }}
                 >
                   <Checkbox
                     isSelected={sub.completed}
                     size="sm"
-                    classNames={{ wrapper: 'w-3 h-3', icon: 'w-2 h-2' }}
-                    isReadOnly={!onToggleSubItem}
+                    classNames={{ wrapper: 'w-3.5 h-3.5', icon: 'w-2 h-2' }}
+                    onValueChange={() => onToggleSubItem?.(sub.id)}
                   />
                   <span className={sub.completed ? 'line-through text-default-400' : 'text-default-600'}>
                     {sub.text}
