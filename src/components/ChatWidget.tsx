@@ -100,6 +100,19 @@ export default function ChatWidget() {
   /* ---- mobile ---- */
   const [mobileShowConversation, setMobileShowConversation] = useState(false)
 
+  /* ---- refs for callbacks ---- */
+  const activeThreadRef = useRef<ChatThread | null>(null)
+  const userNameRef = useRef<string>('')
+  const isOpenRef = useRef(false)
+
+  useEffect(() => {
+    activeThreadRef.current = activeThread
+  }, [activeThread])
+
+  useEffect(() => {
+    isOpenRef.current = isOpen
+  }, [isOpen])
+
   /* ---- search ---- */
   const [search, setSearch] = useState('')
 
@@ -240,7 +253,7 @@ export default function ChatWidget() {
 
     // Polling fallback - refresh threads every 15 seconds
     const pollInterval = setInterval(() => {
-      if (user) loadThreads(user.id)
+      if (user) loadThreads(user.id, userNameRef.current)
     }, 15000)
 
     return () => { 
@@ -300,6 +313,7 @@ export default function ChatWidget() {
     // Fetch profile to get user name/slug for recipient checks
     const { data: profile } = await supabase.from('users').select('name').eq('id', user.id).single()
     const userName = profile?.name || user.email?.split('@')[0] || ''
+    userNameRef.current = userName
     
     await Promise.all([loadThreads(user.id, userName), loadSpacesAndProjects()])
   }
@@ -379,8 +393,10 @@ export default function ChatWidget() {
     
     const partner = msg.from_agent || msg.to_recipient
     const threadId = msg.thread_id || `dm-${partner}`
+    const currentUserName = userNameRef.current?.toLowerCase()
+    const isForMe = msg.to_recipient?.toLowerCase() === currentUserName
 
-    // Update thread list (all messages from subscription are to current user)
+    // Update thread list
     setThreads(prev => {
       const existing = prev.find(t => t.id === threadId)
       const participants = existing ? [...existing.participants] : []
@@ -388,13 +404,23 @@ export default function ChatWidget() {
       if (msg.to_recipient && !participants.includes(msg.to_recipient)) participants.push(msg.to_recipient)
 
       const filtered = prev.filter(t => t.id !== threadId)
+      
+      // Calculate new unread count
+      let unreadCount = existing?.unreadCount || 0
+      if (isForMe && msg.status === 'pending') {
+        const isActive = isOpenRef.current && activeThreadRef.current?.id === threadId
+        if (!isActive) {
+          unreadCount++
+        }
+      }
+
       return [{
         id: threadId,
         recipient: partner,
         subject: msg.subject || existing?.subject || null,
         lastMessage: msg.content,
         timestamp: msg.created_at,
-        unreadCount: (isOpen && activeThread?.id === threadId) ? 0 : (existing ? existing.unreadCount + 1 : 1),
+        unreadCount,
         spaceId: msg.space_id || existing?.spaceId || null,
         projectId: msg.project_id || existing?.projectId || null,
         participants,
@@ -402,7 +428,7 @@ export default function ChatWidget() {
     })
 
     // Add to active thread if it matches
-    if (activeThread?.id === threadId) {
+    if (activeThreadRef.current?.id === threadId) {
       setMessages(prev => [...prev, msg])
     }
   }

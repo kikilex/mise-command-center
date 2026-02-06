@@ -639,72 +639,50 @@ export default function CalendarPage() {
                           
                           {dayEvents.slice(0, 2 - dayTasks.slice(0,1).length - dayContent.slice(0,1).length).map(event => {
                             const colors = getCalendarColor(event.calendar)
-                            const isDeleting = eventToDelete?.id === event.id && showDeleteConfirm
                             return (
-                              <div 
-                                key={event.id}
-                                onClick={(e) => {
-                                  if (!isDeleting) {
-                                    e.stopPropagation()
-                                    openEventDetailModal(event)
-                                  }
-                                }}
-                                onContextMenu={(e) => {
-                                  e.preventDefault()
-                                  e.stopPropagation()
-                                  confirmDeleteEvent(event, e as any)
-                                }}
-                                className={`text-xs p-1 rounded ${colors.bg} ${colors.darkBg} ${colors.text} ${colors.darkText} truncate cursor-pointer hover:opacity-80 group relative`}
-                                title={`${event.title} (${event.calendar})${event.time ? ` at ${event.time}` : ''}`}
-                              >
-                                <div className="flex items-center justify-between">
-                                  <span className="flex-1 truncate">
-                                    {event.time ? `${event.time} ` : '📅 '}{event.title}
-                                    {event.sync_status && event.sync_status !== 'synced' && (
-                                      <AlertCircle className="w-3 h-3 inline ml-1 text-warning" />
-                                    )}
-                                  </span>
-                                  {!isDeleting && (
-                                    <button
-                                      onClick={(e) => confirmDeleteEvent(event, e)}
-                                      className="opacity-0 group-hover:opacity-100 transition-opacity ml-1 p-0.5 hover:bg-white/20 rounded"
-                                      title="Delete event"
-                                    >
-                                      <Trash2 className="w-3 h-3" />
-                                    </button>
-                                  )}
-                                </div>
-                                
-                                {/* Delete confirmation */}
-                                {isDeleting && (
-                                  <div className="absolute top-0 left-0 right-0 bottom-0 bg-red-100 dark:bg-red-900/50 rounded border border-red-300 dark:border-red-700 flex flex-col items-center justify-center px-2 py-1 z-20 shadow-md">
-                                    <span className="text-xs font-bold text-red-800 dark:text-red-200 mb-1">Delete this event?</span>
-                                    <div className="flex gap-2">
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation()
-                                          setShowDeleteConfirm(false)
-                                          setEventToDelete(null)
-                                        }}
-                                        className="px-2 py-0.5 text-xs bg-white dark:bg-red-800 text-red-700 dark:text-red-200 rounded border border-red-300 dark:border-red-600 hover:bg-red-50 dark:hover:bg-red-700 transition-colors"
-                                        title="Cancel"
+                              <Popover key={event.id} placement="top">
+                                <PopoverTrigger>
+                                  <div 
+                                    className={`text-xs p-1 rounded ${colors.bg} ${colors.darkBg} ${colors.text} ${colors.darkText} truncate cursor-pointer hover:opacity-80 group relative`}
+                                    title={`${event.title} (${event.calendar})${event.time ? ` at ${event.time}` : ''}`}
+                                  >
+                                    <div className="flex items-center justify-between">
+                                      <span className="flex-1 truncate">
+                                        {event.time ? `${event.time} ` : '📅 '}{event.title}
+                                        {event.sync_status && event.sync_status !== 'synced' && (
+                                          <AlertCircle className="w-3 h-3 inline ml-1 text-warning" />
+                                        )}
+                                      </span>
+                                      <div
+                                        className="opacity-0 group-hover:opacity-100 transition-opacity ml-1 p-0.5 hover:bg-white/20 rounded"
+                                        title="Options"
                                       >
-                                        Cancel
-                                      </button>
-                                      <button
-                                        onClick={(e) => {
-                                          e.stopPropagation()
-                                          handleDeleteEvent(event)
-                                        }}
-                                        className="px-2 py-0.5 text-xs bg-red-600 dark:bg-red-700 text-white rounded border border-red-700 dark:border-red-600 hover:bg-red-700 dark:hover:bg-red-600 transition-colors"
-                                        title="Confirm delete"
-                                      >
-                                        Delete
-                                      </button>
+                                        <Trash2 className="w-3 h-3" />
+                                      </div>
                                     </div>
                                   </div>
-                                )}
-                              </div>
+                                </PopoverTrigger>
+                                <PopoverContent className="p-3">
+                                  <div className="space-y-3">
+                                    <div className="space-y-1">
+                                      <p className="font-bold text-sm">{event.title}</p>
+                                      <p className="text-xs text-default-500">{event.calendar}</p>
+                                    </div>
+                                    <div className="flex gap-2">
+                                      <Button size="sm" variant="flat" onPress={() => openEventDetailModal(event)}>Edit</Button>
+                                      <Button 
+                                        size="sm" 
+                                        color="danger" 
+                                        variant="flat" 
+                                        onPress={() => handleDeleteEvent(event)}
+                                        isLoading={saving && eventToDelete?.id === event.id}
+                                      >
+                                        Delete
+                                      </Button>
+                                    </div>
+                                  </div>
+                                </PopoverContent>
+                              </Popover>
                             )
                           })}
                           
