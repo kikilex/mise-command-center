@@ -2459,7 +2459,7 @@ function ItemRowContent({
     >
       <div className="flex items-start gap-2">
         {dragHandleProps && (
-          <div {...dragHandleProps} data-drag-handle className="cursor-grab active:cursor-grabbing p-0.5 -ml-1 hover:bg-default-200 rounded mt-0.5">
+          <div {...dragHandleProps} data-drag-handle className="cursor-grab active:cursor-grabbing p-0.5 -ml-1 hover:bg-default-200 rounded">
             <GripVertical className="w-3 h-3 text-default-400" />
           </div>
         )}
@@ -2467,11 +2467,10 @@ function ItemRowContent({
           isSelected={item.completed}
           onValueChange={() => onToggle?.()}
           size="sm"
-          className="mt-0.5"
         />
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <span className={`text-sm ${item.completed ? 'line-through text-default-400' : ''}`}>{item.title}</span>
+          <div className="flex items-center gap-2 min-h-[20px]">
+            <span className={`text-sm leading-5 ${item.completed ? 'line-through text-default-400' : ''}`}>{item.title}</span>
             {item.due_date && (
               <span className="text-xs text-default-400">{format(new Date(item.due_date), 'MMM d')}</span>
             )}
