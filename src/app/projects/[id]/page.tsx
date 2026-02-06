@@ -38,6 +38,8 @@ import { createClient } from '@/lib/supabase/client'
 import Navbar from '@/components/Navbar'
 import { showErrorToast, showSuccessToast } from '@/lib/errors'
 import { formatDistanceToNow, format } from 'date-fns'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 
 interface Phase {
   id: string
@@ -511,19 +513,15 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
             Back to Space
           </Link>
 
-          <div className="flex items-start gap-4">
-            <div 
-              className="w-14 h-14 rounded-xl flex items-center justify-center text-white text-xl font-bold shadow-lg flex-shrink-0"
-              style={{ backgroundColor: project.color || '#3b82f6' }}
-            >
-              {renderProjectIcon(project.icon, project.name.charAt(0))}
-            </div>
-            <div className="flex-1">
-              <h1 className="text-2xl font-bold text-foreground">{project.name}</h1>
-              {project.description && (
-                <p className="text-default-500 mt-1">{project.description}</p>
-              )}
-            </div>
+          <div>
+            <h1 className="text-2xl font-bold text-foreground">{project.name}</h1>
+            {project.description && (
+              <div className="prose prose-sm dark:prose-invert max-w-none mt-2 text-default-600">
+                <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                  {project.description}
+                </ReactMarkdown>
+              </div>
+            )}
           </div>
         </div>
 
