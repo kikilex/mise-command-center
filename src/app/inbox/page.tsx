@@ -70,6 +70,8 @@ interface UserData {
 const RECIPIENTS = [
   { id: 'ax', name: 'Ax', type: 'ai', icon: 'bot', color: 'violet' },
   { id: 'tony', name: 'Tony', type: 'ai', icon: 'bot', color: 'blue' },
+  { id: 'neo', name: 'Neo', type: 'ai', icon: 'bot', color: 'green' },
+  { id: 'alex', name: 'Alex', type: 'family', icon: 'user', color: 'amber' },
   { id: 'mom', name: 'Mom', type: 'family', icon: 'user', color: 'pink' },
 ]
 
