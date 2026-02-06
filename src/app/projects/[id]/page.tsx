@@ -2332,7 +2332,10 @@ function PhaseCardContent({
                     item={item}
                     onToggle={() => onToggleItem?.(item.id, item.completed)}
                     onClick={() => onOpenItem?.(item)}
-                    onToggleSubItem={onToggleSubItem ? (subId) => onToggleSubItem(item.id, subId) : undefined}
+                    onToggleSubItem={onToggleSubItem ? (subId) => {
+                      console.log('SortableItemRow wrapper - calling parent onToggleSubItem:', item.id, subId)
+                      onToggleSubItem(item.id, subId)
+                    } : undefined}
                     onDelete={onDeleteItem ? () => onDeleteItem(item.id) : undefined}
                   />
                 ))}
@@ -2355,7 +2358,10 @@ function PhaseCardContent({
                 item={item}
                 onToggle={() => onToggleItem?.(item.id, item.completed)}
                 onClick={() => onOpenItem?.(item)}
-                onToggleSubItem={onToggleSubItem ? (subId) => onToggleSubItem(item.id, subId) : undefined}
+                onToggleSubItem={onToggleSubItem ? (subId) => {
+                  console.log('ItemRowContent wrapper - calling parent onToggleSubItem:', item.id, subId)
+                  onToggleSubItem(item.id, subId)
+                } : undefined}
                 onDelete={onDeleteItem ? () => onDeleteItem(item.id) : undefined}
               />
             ))}
