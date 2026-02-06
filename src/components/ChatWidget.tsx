@@ -109,6 +109,7 @@ export default function ChatWidget() {
   const userRef = useRef<any>(null)
   const userNameRef = useRef<string>('')
   const isOpenRef = useRef(false)
+  const channelRef = useRef<any>(null)
 
   useEffect(() => {
     activeThreadRef.current = activeThread
@@ -246,31 +247,32 @@ export default function ChatWidget() {
   useEffect(() => {
     loadInitialData()
 
+    // Use broadcast channel for instant messaging (bypasses RLS issues)
     const channel = supabase
-      .channel('chat-widget-realtime')
-      .on('postgres_changes', { 
-        event: 'INSERT', 
-        schema: 'public', 
-        table: 'inbox'
-      }, (payload) => {
-        console.log('[ChatWidget] Realtime message received:', payload)
-        handleIncomingMessage(payload.new as any)
+      .channel('chat-messages')
+      .on('broadcast', { event: 'new-message' }, (payload) => {
+        console.log('[ChatWidget] Broadcast received:', payload)
+        if (payload.payload) {
+          handleIncomingMessage(payload.payload)
+        }
       })
       .subscribe((status) => {
-        console.log('[ChatWidget] Realtime subscription status:', status)
+        console.log('[ChatWidget] Broadcast subscription status:', status)
       })
 
-    // Poll frequently for new messages (realtime blocked by RLS)
+    // Store channel ref for sending broadcasts
+    channelRef.current = channel
+
+    // Backup polling every 10s in case broadcast fails
     const pollInterval = setInterval(() => {
       const currentUser = userRef.current
       if (currentUser) {
         loadThreads(currentUser.id, userNameRef.current)
-        // Also refresh active thread messages
         if (activeThreadRef.current) {
           loadMessages(activeThreadRef.current.id)
         }
       }
-    }, 2000)
+    }, 10000)
 
     return () => { 
       supabase.removeChannel(channel)
@@ -533,6 +535,15 @@ export default function ChatWidget() {
     }
 
     setMessages(prev => [...prev, data])
+    
+    // Broadcast to other users for instant delivery
+    if (channelRef.current) {
+      channelRef.current.send({
+        type: 'broadcast',
+        event: 'new-message',
+        payload: data
+      })
+    }
 
     // Add mentioned users to the thread if they're not already participants
     if (threadId && mentions.length > 0) {
@@ -601,6 +612,15 @@ export default function ChatWidget() {
       .select().single()
 
     if (error) { showErrorToast(error); return }
+
+    // Broadcast to other users for instant delivery
+    if (channelRef.current) {
+      channelRef.current.send({
+        type: 'broadcast',
+        event: 'new-message',
+        payload: data
+      })
+    }
 
     // Start with the primary recipient as participant
     const participants = [newRecipient]
