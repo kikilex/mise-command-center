@@ -38,7 +38,7 @@ import {
   CheckCircle2, Circle, MessageSquare, GripVertical,
   User, Calendar, ChevronDown, ChevronUp, Users,
   Bold, Italic, Highlighter, RotateCcw, Save,
-  Upload, File, Image as ImageIcon
+  Upload, File, Image as ImageIcon, Search
 } from 'lucide-react'
 import * as LucideIcons from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
@@ -187,6 +187,16 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   const [loadingDocs, setLoadingDocs] = useState(false)
   const [newDocTitle, setNewDocTitle] = useState('')
   const [creatingDoc, setCreatingDoc] = useState(false)
+  const [docSearch, setDocSearch] = useState('')
+  
+  // Image preview modal
+  const { isOpen: isImageOpen, onOpen: onImageOpen, onClose: onImageClose } = useDisclosure()
+  const [previewImage, setPreviewImage] = useState<string | null>(null)
+  
+  // Doc preview modal (iframe)
+  const { isOpen: isDocPreviewOpen, onOpen: onDocPreviewOpen, onClose: onDocPreviewClose } = useDisclosure()
+  const [previewDocUrl, setPreviewDocUrl] = useState<string | null>(null)
+  const [previewDocTitle, setPreviewDocTitle] = useState('')
 
   // Phase assignment modal
   const { isOpen: isAssignPhaseOpen, onOpen: onAssignPhaseOpen, onClose: onAssignPhaseClose } = useDisclosure()
@@ -755,7 +765,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
           content: '',
           space_id: project.space_id,
           project_id: id,
-          author_id: user?.id,
+          created_by: user?.id,
         })
         .select()
         .single()
@@ -1187,7 +1197,19 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                   return (
                     <div 
                       key={pin.id} 
-                      className="group flex items-center gap-3 p-2 rounded-lg hover:bg-default-100 transition-colors"
+                      className="group flex items-center gap-3 p-2 rounded-lg hover:bg-default-100 transition-colors cursor-pointer"
+                      onClick={() => {
+                        if (isImage && pin.url) {
+                          setPreviewImage(pin.url)
+                          onImageOpen()
+                        } else if (isDoc && pin.url) {
+                          setPreviewDocUrl(pin.url)
+                          setPreviewDocTitle(pin.title)
+                          onDocPreviewOpen()
+                        } else if (pin.url) {
+                          window.open(pin.url, '_blank')
+                        }
+                      }}
                     >
                       <div className="w-8 h-8 rounded-lg bg-default-100 flex items-center justify-center flex-shrink-0">
                         {isImage ? <ImageIcon className="w-4 h-4 text-default-500" /> :
@@ -1196,16 +1218,11 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                          <LinkIcon className="w-4 h-4 text-default-500" />}
                       </div>
                       <div className="flex-1 min-w-0">
-                        {isDoc && pin.url ? (
-                          <a href={pin.url} className="text-sm font-medium hover:text-primary">
-                            {pin.title}
-                          </a>
-                        ) : pin.url ? (
-                          <a href={pin.url} target="_blank" rel="noopener noreferrer" className="text-sm font-medium hover:text-primary flex items-center gap-1">
-                            {pin.title} <ExternalLink className="w-3 h-3 text-default-400" />
-                          </a>
-                        ) : (
-                          <span className="text-sm font-medium">{pin.title}</span>
+                        <span className="text-sm font-medium hover:text-primary">
+                          {pin.title}
+                        </span>
+                        {!isDoc && !isImage && pin.url && (
+                          <ExternalLink className="inline-block w-3 h-3 text-default-400 ml-1" />
                         )}
                       </div>
                       <Button 
@@ -1213,7 +1230,10 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                         size="sm" 
                         variant="light" 
                         className="opacity-0 group-hover:opacity-100 min-w-7 w-7 h-7" 
-                        onPress={() => handleDeletePin(pin.id)}
+                        onPress={(e) => {
+                          e.stopPropagation()
+                          handleDeletePin(pin.id)
+                        }}
                       >
                         <Trash2 className="w-3.5 h-3.5 text-danger" />
                       </Button>
@@ -1226,59 +1246,86 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
         </Card>
 
         {/* Update Composer */}
-        <div className="mb-6 relative">
-          <Textarea
-            placeholder="Write an update... (Enter to post, Shift+Enter for new line)"
-            value={newUpdate}
-            onValueChange={setNewUpdate}
-            minRows={2}
-            variant="bordered"
-            classNames={{
-              inputWrapper: 'pr-12'
-            }}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault()
-                if (newUpdate.trim()) handlePostManualUpdate()
-              }
-            }}
-          />
-          <Button 
-            isIconOnly 
-            size="sm" 
-            color="primary" 
-            variant="flat"
-            className="absolute right-3 bottom-3"
-            isDisabled={!newUpdate.trim()} 
-            isLoading={posting} 
-            onPress={handlePostManualUpdate}
-          >
-            <Send className="w-4 h-4" />
-          </Button>
-        </div>
+        <Card className="mb-6">
+          <CardBody className="p-3">
+            <div className="flex items-start gap-3">
+              <Avatar src={user?.avatar_url} name={user?.display_name || user?.name} size="sm" className="flex-shrink-0 mt-1" />
+              <div className="flex-1 relative">
+                <Textarea
+                  placeholder="Write an update... (Enter to post)"
+                  value={newUpdate}
+                  onValueChange={setNewUpdate}
+                  minRows={1}
+                  maxRows={6}
+                  variant="bordered"
+                  classNames={{
+                    inputWrapper: 'pr-10 bg-default-50'
+                  }}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey) {
+                      e.preventDefault()
+                      if (newUpdate.trim()) handlePostManualUpdate()
+                    }
+                  }}
+                />
+                <Button 
+                  isIconOnly 
+                  size="sm" 
+                  color="primary" 
+                  variant="solid"
+                  className="absolute right-2 bottom-2 min-w-7 w-7 h-7"
+                  isDisabled={!newUpdate.trim()} 
+                  isLoading={posting} 
+                  onPress={handlePostManualUpdate}
+                >
+                  <Send className="w-3.5 h-3.5" />
+                </Button>
+              </div>
+            </div>
+          </CardBody>
+        </Card>
 
         {/* Timeline */}
-        <div>
-          <h3 className="text-sm font-medium text-default-600 mb-3">Timeline</h3>
-          {updates.length === 0 ? (
-            <p className="text-sm text-default-400">No updates yet.</p>
-          ) : (
-            <div className="space-y-3">
-              {updates.map(update => (
-                <div key={update.id} className="flex items-start gap-3">
-                  <Avatar src={update.author?.avatar_url} name={update.author?.display_name || update.author?.name} size="sm" className="flex-shrink-0" />
-                  <div className="flex-1 min-w-0">
-                    <div className="flex items-center gap-2">
-                      <span className="text-sm font-medium">{update.author?.display_name || update.author?.name}</span>
-                      <span className="text-xs text-default-400">{formatDistanceToNow(new Date(update.created_at), { addSuffix: true })}</span>
+        <Card>
+          <CardBody className="p-4">
+            <h3 className="text-sm font-semibold text-default-700 mb-4 flex items-center gap-2">
+              <MessageSquare className="w-4 h-4" />
+              Activity
+            </h3>
+            {updates.length === 0 ? (
+              <p className="text-sm text-default-400 text-center py-6">No activity yet.</p>
+            ) : (
+              <div className="space-y-4">
+                {updates.map(update => {
+                  const isManualPost = update.update_type === 'post'
+                  return (
+                    <div key={update.id} className="flex items-start gap-3">
+                      <div className="relative">
+                        <Avatar 
+                          src={update.author?.avatar_url} 
+                          name={update.author?.display_name || update.author?.name} 
+                          size="sm" 
+                          className="flex-shrink-0" 
+                        />
+                        {/* Timeline line */}
+                        <div className="absolute top-8 left-1/2 -translate-x-1/2 w-px h-[calc(100%+0.5rem)] bg-default-200" />
+                      </div>
+                      <div className={`flex-1 min-w-0 pb-4 ${isManualPost ? 'bg-primary-50 dark:bg-primary-900/10 rounded-lg p-3 -mt-1' : ''}`}>
+                        <div className="flex items-center gap-2 mb-1">
+                          <span className="text-sm font-medium">{update.author?.display_name || update.author?.name}</span>
+                          <span className="text-xs text-default-400">{formatDistanceToNow(new Date(update.created_at), { addSuffix: true })}</span>
+                        </div>
+                        <p className={`text-sm ${isManualPost ? 'text-foreground' : 'text-default-500'}`}>
+                          {update.content}
+                        </p>
+                      </div>
                     </div>
-                    <p className="text-sm text-default-600">{update.content}</p>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+                  )
+                })}
+              </div>
+            )}
+          </CardBody>
+        </Card>
       </main>
 
       {/* Add Phase Modal */}
@@ -1395,6 +1442,15 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
             {/* Or link existing */}
             <div>
               <label className="text-sm font-medium text-default-600 mb-2 block">Or Link Existing Document</label>
+              <Input
+                placeholder="Search documents..."
+                value={docSearch}
+                onValueChange={setDocSearch}
+                startContent={<Search className="w-4 h-4 text-default-400" />}
+                variant="bordered"
+                size="sm"
+                className="mb-2"
+              />
               {loadingDocs ? (
                 <div className="flex justify-center py-4">
                   <Spinner size="sm" />
@@ -1403,7 +1459,9 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                 <p className="text-sm text-default-400 text-center py-4">No documents in this space yet.</p>
               ) : (
                 <div className="max-h-60 overflow-y-auto space-y-1">
-                  {spaceDocs.map(doc => (
+                  {spaceDocs
+                    .filter(doc => !docSearch || doc.title.toLowerCase().includes(docSearch.toLowerCase()))
+                    .map(doc => (
                     <div 
                       key={doc.id}
                       className="flex items-center gap-3 p-2 rounded-lg hover:bg-default-100 cursor-pointer transition-colors"
@@ -1435,38 +1493,9 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
           <DrawerBody className="gap-4">
             {selectedItem && (
               <>
-                {/* Title with formatting */}
+                {/* Title */}
                 <div>
                   <label className="text-sm font-medium text-default-600 mb-2 block">Title</label>
-                  <div className="flex gap-1 mb-2">
-                    <Button 
-                      size="sm" 
-                      variant="flat" 
-                      isIconOnly 
-                      onPress={() => applyFormatting(titleInputRef, drawerTitle, setDrawerTitle, '**', '**')}
-                      title="Bold"
-                    >
-                      <Bold className="w-4 h-4" />
-                    </Button>
-                    <Button 
-                      size="sm" 
-                      variant="flat" 
-                      isIconOnly 
-                      onPress={() => applyFormatting(titleInputRef, drawerTitle, setDrawerTitle, '*', '*')}
-                      title="Italic"
-                    >
-                      <Italic className="w-4 h-4" />
-                    </Button>
-                    <Button 
-                      size="sm" 
-                      variant="flat" 
-                      isIconOnly 
-                      onPress={() => applyFormatting(titleInputRef, drawerTitle, setDrawerTitle, '==', '==')}
-                      title="Highlight"
-                    >
-                      <Highlighter className="w-4 h-4" />
-                    </Button>
-                  </div>
                   <Input
                     ref={titleInputRef}
                     value={drawerTitle}
@@ -1514,35 +1543,6 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                 {/* Notes */}
                 <div>
                   <label className="text-sm font-medium text-default-600 mb-2 block">Notes</label>
-                  <div className="flex gap-1 mb-2">
-                    <Button 
-                      size="sm" 
-                      variant="flat" 
-                      isIconOnly 
-                      onPress={() => applyFormatting(notesTextareaRef, drawerNotes, setDrawerNotes, '**', '**')}
-                      title="Bold"
-                    >
-                      <Bold className="w-4 h-4" />
-                    </Button>
-                    <Button 
-                      size="sm" 
-                      variant="flat" 
-                      isIconOnly 
-                      onPress={() => applyFormatting(notesTextareaRef, drawerNotes, setDrawerNotes, '*', '*')}
-                      title="Italic"
-                    >
-                      <Italic className="w-4 h-4" />
-                    </Button>
-                    <Button 
-                      size="sm" 
-                      variant="flat" 
-                      isIconOnly 
-                      onPress={() => applyFormatting(notesTextareaRef, drawerNotes, setDrawerNotes, '==', '==')}
-                      title="Highlight"
-                    >
-                      <Highlighter className="w-4 h-4" />
-                    </Button>
-                  </div>
                   <Textarea
                     ref={notesTextareaRef}
                     value={drawerNotes}
@@ -1620,6 +1620,43 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
           </DrawerFooter>
         </DrawerContent>
       </Drawer>
+
+      {/* Image Preview Modal */}
+      <Modal isOpen={isImageOpen} onClose={onImageClose} size="4xl">
+        <ModalContent>
+          <ModalBody className="p-2">
+            {previewImage && (
+              <img 
+                src={previewImage} 
+                alt="Preview" 
+                className="max-w-full max-h-[80vh] object-contain mx-auto rounded-lg"
+              />
+            )}
+          </ModalBody>
+        </ModalContent>
+      </Modal>
+
+      {/* Doc Preview Modal */}
+      <Modal isOpen={isDocPreviewOpen} onClose={onDocPreviewClose} size="5xl">
+        <ModalContent>
+          <ModalHeader>{previewDocTitle}</ModalHeader>
+          <ModalBody className="p-0">
+            {previewDocUrl && (
+              <iframe 
+                src={previewDocUrl}
+                className="w-full h-[70vh] border-0"
+                title={previewDocTitle}
+              />
+            )}
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="flat" onPress={onDocPreviewClose}>Close</Button>
+            <Button color="primary" as={Link} href={previewDocUrl ? `${previewDocUrl}/edit` : '#'}>
+              Edit Document
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
     </div>
   )
 }
@@ -1797,9 +1834,13 @@ function PhaseCardContent({
               <div className="flex items-center gap-2 mt-1">
                 <span className="text-xs text-default-400">{completedCount}/{totalCount}</span>
                 {phase.assignee && (
-                  <Chip size="sm" variant="flat" avatar={<Avatar src={phase.assignee.avatar_url} name={phase.assignee.display_name || phase.assignee.name} />}>
-                    {phase.assignee.display_name || phase.assignee.name}
-                  </Chip>
+                  <Avatar 
+                    src={phase.assignee.avatar_url} 
+                    name={phase.assignee.display_name || phase.assignee.name} 
+                    size="sm" 
+                    className="w-5 h-5"
+                    title={phase.assignee.display_name || phase.assignee.name}
+                  />
                 )}
               </div>
             </div>
