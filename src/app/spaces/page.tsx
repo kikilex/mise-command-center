@@ -162,11 +162,12 @@ export default function SpacesPage() {
               <Link key={space.id} href={`/spaces/${space.id}`}>
                 <Card
                   isPressable
-                  className="h-[180px] hover:shadow-lg transition-shadow"
+                  className="hover:shadow-lg transition-shadow"
+                  style={{ height: '180px' }}
                 >
-                  <CardBody className="p-5 h-full flex flex-col">
+                  <CardBody className="p-5 grid grid-rows-[auto_1fr_auto] h-full gap-2">
                     {/* Header row: icon + kebab menu */}
-                    <div className="flex items-start justify-between mb-3">
+                    <div className="flex items-start justify-between">
                       <div 
                         className="w-11 h-11 rounded-xl flex items-center justify-center text-white text-lg font-bold shadow-md flex-shrink-0"
                         style={{ backgroundColor: space.color || '#3b82f6' }}
@@ -218,14 +219,12 @@ export default function SpacesPage() {
                       </Dropdown>
                     </div>
 
-                    {/* Content area - flex grow */}
-                    <div className="flex-1 min-h-0">
+                    {/* Content area - takes remaining space */}
+                    <div className="overflow-hidden">
                       <h3 className="text-base font-semibold text-default-800 line-clamp-1">{space.name}</h3>
-                      {space.description && (
-                        <p className="text-sm text-default-500 line-clamp-2 mt-1">
-                          {space.description}
-                        </p>
-                      )}
+                      <p className="text-sm text-default-500 line-clamp-2 mt-1 min-h-[2.5rem]">
+                        {space.description || '\u00A0'}
+                      </p>
                     </div>
 
                     {/* Footer: role - always at bottom */}
