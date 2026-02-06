@@ -1408,19 +1408,6 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                           className="min-w-7 w-7 h-7" 
                           onPress={(e) => {
                             e.stopPropagation()
-                            openNotesModal(pin)
-                          }}
-                          title="Add note"
-                        >
-                          <StickyNote className={`w-3.5 h-3.5 ${pin.notes ? 'text-warning' : 'text-default-400'}`} />
-                        </Button>
-                        <Button 
-                          isIconOnly 
-                          size="sm" 
-                          variant="light" 
-                          className="min-w-7 w-7 h-7" 
-                          onPress={(e) => {
-                            e.stopPropagation()
                             handleDeletePin(pin.id)
                           }}
                         >
@@ -2388,9 +2375,9 @@ function ItemRowContent({
         onClick?.()
       }}
     >
-      <div className="flex items-center gap-2">
+      <div className="flex items-start gap-2">
         {dragHandleProps && (
-          <div {...dragHandleProps} data-drag-handle className="cursor-grab active:cursor-grabbing p-0.5 -ml-1 hover:bg-default-200 rounded">
+          <div {...dragHandleProps} data-drag-handle className="cursor-grab active:cursor-grabbing p-0.5 -ml-1 hover:bg-default-200 rounded mt-0.5">
             <GripVertical className="w-3 h-3 text-default-400" />
           </div>
         )}
@@ -2398,6 +2385,7 @@ function ItemRowContent({
           isSelected={item.completed}
           onValueChange={() => onToggle?.()}
           size="sm"
+          className="mt-0.5"
         />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
