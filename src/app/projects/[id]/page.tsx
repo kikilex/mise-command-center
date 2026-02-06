@@ -579,9 +579,14 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
 
   // Toggle sub-item completion (immediate save)
   async function handleToggleSubItem(phaseId: string, itemId: string, subId: string) {
+    console.log('handleToggleSubItem called:', { phaseId, itemId, subId })
     const phase = phases.find(p => p.id === phaseId)
     const item = phase?.items?.find(i => i.id === itemId)
-    if (!item) return
+    if (!item) {
+      console.log('Item not found!', { phase, itemId })
+      return
+    }
+    console.log('Found item:', item.title, 'sub_items:', item.sub_items)
 
     // Parse existing sub-items
     const subItems: SubItem[] = (item.sub_items || []).map((sub, idx) => {
@@ -2527,22 +2532,28 @@ function ItemRowContent({
       {subItems.length > 0 && (
         <div className="mt-2 ml-7 space-y-1">
           {subItems.map(sub => (
-            <label 
+            <div 
               key={sub.id} 
               data-sub-item
               className="flex items-center gap-2 cursor-pointer hover:bg-default-200/50 rounded px-1 py-0.5 -mx-1"
-              onClick={(e) => e.stopPropagation()}
+              onClick={(e) => {
+                e.stopPropagation()
+                console.log('Sub-item row clicked:', sub.id, 'onToggleSubItem exists:', !!onToggleSubItem)
+                onToggleSubItem?.(sub.id)
+              }}
             >
-              <input
-                type="checkbox"
-                checked={sub.completed}
-                onChange={() => onToggleSubItem?.(sub.id)}
-                className="w-4 h-4 rounded border-default-300 text-primary focus:ring-primary"
+              <Checkbox
+                isSelected={sub.completed}
+                size="sm"
+                onValueChange={() => {
+                  console.log('Checkbox onValueChange:', sub.id)
+                  onToggleSubItem?.(sub.id)
+                }}
               />
               <span className={`text-sm ${sub.completed ? 'line-through text-default-400' : ''}`}>
                 {sub.text}
               </span>
-            </label>
+            </div>
           ))}
         </div>
       )}
