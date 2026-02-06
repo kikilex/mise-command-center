@@ -171,10 +171,70 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   const [drawerSubItems, setDrawerSubItems] = useState<SubItem[]>([])
   const [newSubItemText, setNewSubItemText] = useState('')
   const [savingDrawer, setSavingDrawer] = useState(false)
+  
+  // Refs for selection-based formatting
+  const titleInputRef = useRef<HTMLInputElement>(null)
+  const notesTextareaRef = useRef<HTMLTextAreaElement>(null)
+
+  // Phase assignment modal
+  const { isOpen: isAssignPhaseOpen, onOpen: onAssignPhaseOpen, onClose: onAssignPhaseClose } = useDisclosure()
+  const [phaseToAssign, setPhaseToAssign] = useState<Phase | null>(null)
+  const [selectedPhaseAssignee, setSelectedPhaseAssignee] = useState<string | null>(null)
 
   // DnD state
   const [activePhaseId, setActivePhaseId] = useState<string | null>(null)
   const [activeItemId, setActiveItemId] = useState<string | null>(null)
+
+  // Selection-based text formatting helper
+  function applyFormatting(
+    inputRef: React.RefObject<HTMLInputElement | HTMLTextAreaElement>,
+    value: string,
+    setValue: (v: string) => void,
+    prefix: string,
+    suffix: string
+  ) {
+    const input = inputRef.current
+    if (!input) return
+    
+    const start = input.selectionStart || 0
+    const end = input.selectionEnd || 0
+    
+    if (start === end) {
+      // No selection - insert placeholder
+      const newValue = value.slice(0, start) + prefix + 'text' + suffix + value.slice(end)
+      setValue(newValue)
+      // Set cursor position after a tick
+      setTimeout(() => {
+        input.focus()
+        input.setSelectionRange(start + prefix.length, start + prefix.length + 4)
+      }, 0)
+    } else {
+      // Wrap selection
+      const selectedText = value.slice(start, end)
+      const newValue = value.slice(0, start) + prefix + selectedText + suffix + value.slice(end)
+      setValue(newValue)
+      // Keep selection on the wrapped text
+      setTimeout(() => {
+        input.focus()
+        input.setSelectionRange(start + prefix.length, end + prefix.length)
+      }, 0)
+    }
+  }
+
+  // Open phase assignment modal
+  function openAssignPhaseModal(phase: Phase) {
+    setPhaseToAssign(phase)
+    setSelectedPhaseAssignee(phase.assigned_to)
+    onAssignPhaseOpen()
+  }
+
+  // Save phase assignment
+  async function handleSavePhaseAssignment() {
+    if (!phaseToAssign) return
+    await handleAssignPhase(phaseToAssign.id, selectedPhaseAssignee)
+    onAssignPhaseClose()
+    setPhaseToAssign(null)
+  }
 
   // DnD sensors with touch support
   const sensors = useSensors(
@@ -787,7 +847,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                       sensors={sensors}
                       onToggleItem={(itemId, completed) => handleToggleItem(phase.id, itemId, completed)}
                       onOpenItem={(item) => openItemDrawer(item)}
-                      onAssignPhase={(userId) => handleAssignPhase(phase.id, userId)}
+                      onOpenAssignModal={() => openAssignPhaseModal(phase)}
                       onDeletePhase={() => handleDeletePhase(phase.id)}
                       onAddItem={(title) => handleAddItem(phase.id, title)}
                       onItemDragEnd={(e) => handleItemDragEnd(phase.id, e)}
@@ -959,6 +1019,51 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
         </ModalContent>
       </Modal>
 
+      {/* Assign Phase Modal */}
+      <Modal isOpen={isAssignPhaseOpen} onClose={onAssignPhaseClose}>
+        <ModalContent>
+          <ModalHeader>Assign Phase: {phaseToAssign?.title}</ModalHeader>
+          <ModalBody>
+            <Select
+              label="Assign to"
+              selectedKeys={selectedPhaseAssignee ? [selectedPhaseAssignee] : []}
+              onSelectionChange={(keys) => {
+                const selected = Array.from(keys)[0] as string
+                setSelectedPhaseAssignee(selected || null)
+              }}
+              variant="bordered"
+              placeholder="Select team member..."
+            >
+              {members.map(m => (
+                <SelectItem key={m.id} textValue={m.display_name || m.name}>
+                  <div className="flex items-center gap-2">
+                    <Avatar src={m.avatar_url} name={m.display_name || m.name} size="sm" className="w-6 h-6" />
+                    <span>{m.display_name || m.name}</span>
+                  </div>
+                </SelectItem>
+              ))}
+            </Select>
+            {selectedPhaseAssignee && (
+              <Button 
+                variant="light" 
+                color="danger" 
+                size="sm" 
+                className="mt-2"
+                onPress={() => setSelectedPhaseAssignee(null)}
+              >
+                Clear Assignment
+              </Button>
+            )}
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="flat" onPress={onAssignPhaseClose}>Cancel</Button>
+            <Button color="primary" onPress={handleSavePhaseAssignment}>
+              Save
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+
       {/* Item Detail Drawer */}
       <Drawer isOpen={isDrawerOpen} onClose={onDrawerClose} placement="right" size="md">
         <DrawerContent>
@@ -976,7 +1081,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                       size="sm" 
                       variant="flat" 
                       isIconOnly 
-                      onPress={() => setDrawerTitle(prev => `**${prev}**`)}
+                      onPress={() => applyFormatting(titleInputRef, drawerTitle, setDrawerTitle, '**', '**')}
                       title="Bold"
                     >
                       <Bold className="w-4 h-4" />
@@ -985,7 +1090,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                       size="sm" 
                       variant="flat" 
                       isIconOnly 
-                      onPress={() => setDrawerTitle(prev => `*${prev}*`)}
+                      onPress={() => applyFormatting(titleInputRef, drawerTitle, setDrawerTitle, '*', '*')}
                       title="Italic"
                     >
                       <Italic className="w-4 h-4" />
@@ -994,13 +1099,14 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                       size="sm" 
                       variant="flat" 
                       isIconOnly 
-                      onPress={() => setDrawerTitle(prev => `==${prev}==`)}
+                      onPress={() => applyFormatting(titleInputRef, drawerTitle, setDrawerTitle, '==', '==')}
                       title="Highlight"
                     >
                       <Highlighter className="w-4 h-4" />
                     </Button>
                   </div>
                   <Input
+                    ref={titleInputRef}
                     value={drawerTitle}
                     onValueChange={setDrawerTitle}
                     variant="bordered"
@@ -1051,7 +1157,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                       size="sm" 
                       variant="flat" 
                       isIconOnly 
-                      onPress={() => setDrawerNotes(prev => `${prev}**bold**`)}
+                      onPress={() => applyFormatting(notesTextareaRef, drawerNotes, setDrawerNotes, '**', '**')}
                       title="Bold"
                     >
                       <Bold className="w-4 h-4" />
@@ -1060,7 +1166,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                       size="sm" 
                       variant="flat" 
                       isIconOnly 
-                      onPress={() => setDrawerNotes(prev => `${prev}*italic*`)}
+                      onPress={() => applyFormatting(notesTextareaRef, drawerNotes, setDrawerNotes, '*', '*')}
                       title="Italic"
                     >
                       <Italic className="w-4 h-4" />
@@ -1069,13 +1175,14 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                       size="sm" 
                       variant="flat" 
                       isIconOnly 
-                      onPress={() => setDrawerNotes(prev => `${prev}==highlight==`)}
+                      onPress={() => applyFormatting(notesTextareaRef, drawerNotes, setDrawerNotes, '==', '==')}
                       title="Highlight"
                     >
                       <Highlighter className="w-4 h-4" />
                     </Button>
                   </div>
                   <Textarea
+                    ref={notesTextareaRef}
                     value={drawerNotes}
                     onValueChange={setDrawerNotes}
                     variant="bordered"
@@ -1162,7 +1269,7 @@ function SortablePhaseCard({
   sensors,
   onToggleItem,
   onOpenItem,
-  onAssignPhase,
+  onOpenAssignModal,
   onDeletePhase,
   onAddItem,
   onItemDragEnd,
@@ -1172,7 +1279,7 @@ function SortablePhaseCard({
   sensors: ReturnType<typeof useSensors>
   onToggleItem: (itemId: string, completed: boolean) => void
   onOpenItem: (item: PhaseItem) => void
-  onAssignPhase: (userId: string | null) => void
+  onOpenAssignModal: () => void
   onDeletePhase: () => void
   onAddItem: (title: string) => Promise<boolean | undefined>
   onItemDragEnd: (event: DragEndEvent) => void
@@ -1201,7 +1308,7 @@ function SortablePhaseCard({
         dragHandleProps={{ ...attributes, ...listeners }}
         onToggleItem={onToggleItem}
         onOpenItem={onOpenItem}
-        onAssignPhase={onAssignPhase}
+        onOpenAssignModal={onOpenAssignModal}
         onDeletePhase={onDeletePhase}
         onAddItem={onAddItem}
         onItemDragEnd={onItemDragEnd}
@@ -1218,7 +1325,7 @@ function PhaseCardContent({
   dragHandleProps,
   onToggleItem,
   onOpenItem,
-  onAssignPhase,
+  onOpenAssignModal,
   onDeletePhase,
   onRestorePhase,
   onAddItem,
@@ -1232,7 +1339,7 @@ function PhaseCardContent({
   dragHandleProps?: any
   onToggleItem?: (itemId: string, completed: boolean) => void
   onOpenItem?: (item: PhaseItem) => void
-  onAssignPhase?: (userId: string | null) => void
+  onOpenAssignModal?: () => void
   onDeletePhase?: () => void
   onRestorePhase?: () => void
   onAddItem?: (title: string) => Promise<boolean | undefined>
@@ -1286,24 +1393,21 @@ function PhaseCardContent({
             </div>
           </div>
           
-          {!completed && onDeletePhase && onAssignPhase && (
+          {!completed && onDeletePhase && (
             <Dropdown>
               <DropdownTrigger>
                 <Button isIconOnly size="sm" variant="light"><MoreVertical className="w-4 h-4" /></Button>
               </DropdownTrigger>
               <DropdownMenu>
-                <DropdownItem 
-                  key="assign" 
-                  startContent={<Users className="w-4 h-4" />}
-                  onPress={() => {
-                    // Open a simple selection - for now we cycle through or unassign
-                    const currentIdx = members.findIndex(m => m.id === phase.assigned_to)
-                    const nextIdx = (currentIdx + 1) % (members.length + 1)
-                    onAssignPhase(nextIdx < members.length ? members[nextIdx].id : null)
-                  }}
-                >
-                  {phase.assigned_to ? 'Change Assignment' : 'Assign Phase'}
-                </DropdownItem>
+                {onOpenAssignModal && (
+                  <DropdownItem 
+                    key="assign" 
+                    startContent={<Users className="w-4 h-4" />}
+                    onPress={onOpenAssignModal}
+                  >
+                    {phase.assigned_to ? 'Change Assignment' : 'Assign Phase'}
+                  </DropdownItem>
+                )}
                 <DropdownItem key="delete" className="text-danger" color="danger" startContent={<Trash2 className="w-4 h-4" />} onPress={onDeletePhase}>
                   Delete Phase
                 </DropdownItem>
