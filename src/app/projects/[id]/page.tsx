@@ -2193,6 +2193,8 @@ function PhaseCardContent({
   const [editTitle, setEditTitle] = useState(phase.title)
   const titleInputRef = useRef<HTMLInputElement>(null)
   
+  console.log('PhaseCardContent render - onToggleSubItem exists:', !!onToggleSubItem, 'phase:', phase.title, 'sensors:', !!sensors, 'completed:', completed)
+  
   const items = phase.items || []
   const completedCount = items.filter(i => i.completed).length
   const totalCount = items.length
@@ -2405,6 +2407,7 @@ function SortableItemRow({
   onToggleSubItem?: (subId: string) => void
   onDelete?: () => void
 }) {
+  console.log('SortableItemRow render - onToggleSubItem exists:', !!onToggleSubItem, 'for item:', item.title)
   const {
     attributes,
     listeners,
