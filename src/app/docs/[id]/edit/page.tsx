@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { ArrowLeft, Eye, Save, X, Trash2 } from 'lucide-react'
+import { ArrowLeft, Eye, Save, X, Trash2, Users, Globe } from 'lucide-react'
 import {
   Button,
   Input,
@@ -31,11 +31,19 @@ interface Document {
   content: string
   task_id: string | null
   business_id: string | null
+  space_id: string | null
+  project_id: string | null
   created_by: string | null
   created_at: string
   updated_at: string
   status: 'draft' | 'in_review' | 'approved' | 'needs_revision'
   version: number
+}
+
+interface Project {
+  id: string
+  name: string
+  space_id: string
 }
 
 interface UserData {
@@ -64,6 +72,8 @@ export default function DocumentEditPage({ params }: { params: Promise<{ id: str
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('')
   const [status, setStatus] = useState<string>('draft')
+  const [projectId, setProjectId] = useState<string>('space') // 'space' = visible to all space members
+  const [projects, setProjects] = useState<Project[]>([])
   
   const supabase = createClient()
   const router = useRouter()
@@ -72,18 +82,21 @@ export default function DocumentEditPage({ params }: { params: Promise<{ id: str
   useEffect(() => {
     loadUser()
     loadDocument()
+    loadProjects()
   }, [id])
 
   // Track changes
   useEffect(() => {
     if (document) {
+      const currentProjectId = document.project_id || 'space'
       const changed = 
         title !== document.title ||
         content !== document.content ||
-        status !== document.status
+        status !== document.status ||
+        projectId !== currentProjectId
       setHasChanges(changed)
     }
-  }, [title, content, status, document])
+  }, [title, content, status, projectId, document])
 
   async function loadUser() {
     try {
@@ -114,12 +127,28 @@ export default function DocumentEditPage({ params }: { params: Promise<{ id: str
       setTitle(data.title)
       setContent(data.content)
       setStatus(data.status)
+      setProjectId(data.project_id || 'space')
     } catch (error) {
       console.error('Load document error:', error)
       showErrorToast(error, 'Failed to load document')
       router.push('/docs')
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function loadProjects() {
+    try {
+      const { data, error } = await supabase
+        .from('projects')
+        .select('id, name, space_id')
+        .eq('status', 'active')
+        .order('name')
+      
+      if (error) throw error
+      setProjects(data || [])
+    } catch (error) {
+      console.error('Load projects error:', error)
     }
   }
 
@@ -155,6 +184,7 @@ export default function DocumentEditPage({ params }: { params: Promise<{ id: str
         title: title.trim(),
         content,
         status: status as 'draft' | 'in_review' | 'approved',
+        project_id: projectId === 'space' ? null : projectId,
         updated_at: new Date().toISOString(),
         version: (document?.version || 1) + 1, // Always increment version
       }
@@ -203,6 +233,7 @@ export default function DocumentEditPage({ params }: { params: Promise<{ id: str
       setTitle(document.title)
       setContent(document.content)
       setStatus(document.status)
+      setProjectId(document.project_id || 'space')
       setHasChanges(false)
     }
   }
@@ -289,16 +320,38 @@ export default function DocumentEditPage({ params }: { params: Promise<{ id: str
               }}
             />
             
-            <Select
-              label="Status"
-              selectedKeys={[status]}
-              onChange={(e) => setStatus(e.target.value)}
-              className="max-w-xs"
-            >
-              {statusOptions.map(s => (
-                <SelectItem key={s.key}>{s.label}</SelectItem>
-              ))}
-            </Select>
+            <div className="flex flex-wrap gap-4">
+              <Select
+                label="Status"
+                selectedKeys={[status]}
+                onChange={(e) => setStatus(e.target.value)}
+                className="max-w-xs"
+              >
+                {statusOptions.map(s => (
+                  <SelectItem key={s.key}>{s.label}</SelectItem>
+                ))}
+              </Select>
+
+              <Select
+                label="Visible to"
+                selectedKeys={[projectId]}
+                onChange={(e) => setProjectId(e.target.value)}
+                className="max-w-xs"
+                startContent={projectId === 'space' ? <Globe className="w-4 h-4 text-slate-400" /> : <Users className="w-4 h-4 text-slate-400" />}
+                description={projectId === 'space' ? 'Everyone in this space can view' : 'Only project members can view'}
+              >
+                <SelectItem key="space" startContent={<Globe className="w-4 h-4" />}>
+                  Everyone in Space
+                </SelectItem>
+                <>
+                  {projects.map(p => (
+                    <SelectItem key={p.id} startContent={<Users className="w-4 h-4" />}>
+                      {p.name} (Project Only)
+                    </SelectItem>
+                  ))}
+                </>
+              </Select>
+            </div>
 
             <div>
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-300 mb-2">

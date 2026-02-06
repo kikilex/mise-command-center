@@ -4,7 +4,7 @@ import { useState, useEffect, useMemo, Suspense, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { 
   FileText, Search, Plus, Clock, Tag, Archive, Eye, EyeOff,
-  X, Check, Folder, Settings, Pencil, ListFilter, NotebookPen
+  X, Check, Folder, Settings, Pencil, ListFilter, NotebookPen, Users, Globe
 } from 'lucide-react'
 import {
   Button,
@@ -35,6 +35,7 @@ interface Document {
   task_id: string | null
   business_id: string | null
   space_id: string | null
+  project_id: string | null
   created_by: string | null
   created_at: string
   updated_at: string
@@ -46,6 +47,13 @@ interface Document {
   archived: boolean
   doc_type: 'document' | 'note'
   tasks?: { title: string } | null
+  projects?: { name: string } | null
+}
+
+interface Project {
+  id: string
+  name: string
+  space_id: string
 }
 
 interface UserData {
@@ -188,7 +196,7 @@ function DocsPageContent() {
     try {
       const { data, error } = await supabase
         .from('documents')
-        .select(`*, tasks:task_id (title)`)
+        .select(`*, tasks:task_id (title), projects:project_id (name)`)
         .order('updated_at', { ascending: false })
 
       if (error) throw error
@@ -391,7 +399,15 @@ function DocsPageContent() {
                   </div>
                   <p className="text-sm text-slate-500 line-clamp-3 mb-3">{getPreview(doc.content)}</p>
                   <div className="flex items-center justify-between text-[10px] text-slate-400">
-                    <span>{new Date(doc.updated_at).toLocaleDateString()}</span>
+                    <div className="flex items-center gap-2">
+                      <span>{new Date(doc.updated_at).toLocaleDateString()}</span>
+                      {doc.project_id && doc.projects && (
+                        <span className="flex items-center gap-1 text-violet-500">
+                          <Users className="w-3 h-3" />
+                          {doc.projects.name}
+                        </span>
+                      )}
+                    </div>
                     <Chip size="sm" variant="dot" color={doc.doc_type === 'note' ? 'secondary' : 'primary'}>
                       {doc.doc_type === 'note' ? 'Note' : 'Document'}
                     </Chip>
