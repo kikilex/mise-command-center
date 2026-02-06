@@ -7,20 +7,29 @@ import {
   CardBody,
   Button,
   Spinner,
-  Chip,
-  Avatar,
-  AvatarGroup,
+  Dropdown,
+  DropdownTrigger,
+  DropdownMenu,
+  DropdownItem,
   useDisclosure,
 } from '@heroui/react'
-import { Plus, User } from 'lucide-react'
+import { Plus, User, MoreVertical, Edit, Trash2 } from 'lucide-react'
 import * as LucideIcons from 'lucide-react'
 import Navbar from '@/components/Navbar'
 import AddSpaceModal from '@/components/AddSpaceModal'
-import { useSpace } from '@/lib/space-context'
+import EditSpaceModal from '@/components/EditSpaceModal'
+import { useSpace, Space } from '@/lib/space-context'
+import { createClient } from '@/lib/supabase/client'
+import { showErrorToast, showSuccessToast } from '@/lib/errors'
 
 export default function SpacesPage() {
   const { spaces, loading, refreshSpaces } = useSpace()
-  const { isOpen, onOpen, onClose } = useDisclosure()
+  const { isOpen: isAddOpen, onOpen: onAddOpen, onClose: onAddClose } = useDisclosure()
+  const { isOpen: isEditOpen, onOpen: onEditOpen, onClose: onEditClose } = useDisclosure()
+  const [selectedSpace, setSelectedSpace] = useState<Space | null>(null)
+  const [deletingId, setDeletingId] = useState<string | null>(null)
+
+  const supabase = createClient()
 
   const renderSpaceIcon = (iconName: string | null, fallback: string) => {
     if (iconName) {
@@ -32,7 +41,52 @@ export default function SpacesPage() {
 
   function handleAddSuccess() {
     refreshSpaces()
-    onClose()
+    onAddClose()
+  }
+
+  function handleEditSuccess() {
+    refreshSpaces()
+    onEditClose()
+    setSelectedSpace(null)
+  }
+
+  function handleEditSpace(space: Space, e: React.MouseEvent) {
+    e.preventDefault()
+    e.stopPropagation()
+    setSelectedSpace(space)
+    onEditOpen()
+  }
+
+  async function handleDeleteSpace(space: Space, e: React.MouseEvent) {
+    e.preventDefault()
+    e.stopPropagation()
+    
+    if (space.is_default) {
+      showErrorToast(new Error('Cannot delete the default space'), 'Delete Failed')
+      return
+    }
+
+    if (!confirm(`Are you sure you want to delete "${space.name}"? This action cannot be undone.`)) {
+      return
+    }
+
+    setDeletingId(space.id)
+    try {
+      const { error } = await supabase
+        .from('spaces')
+        .delete()
+        .eq('id', space.id)
+
+      if (error) throw error
+
+      showSuccessToast('Space deleted')
+      refreshSpaces()
+    } catch (error) {
+      console.error('Delete space error:', error)
+      showErrorToast(error, 'Failed to delete space')
+    } finally {
+      setDeletingId(null)
+    }
   }
 
   if (loading) {
@@ -56,7 +110,7 @@ export default function SpacesPage() {
           <Button
             color="primary"
             startContent={<Plus className="w-5 h-5" />}
-            onPress={onOpen}
+            onPress={onAddOpen}
             className="sm:self-start"
           >
             New Space
@@ -71,7 +125,7 @@ export default function SpacesPage() {
               </div>
               <h2 className="text-xl font-semibold mb-2">No spaces yet</h2>
               <p className="text-default-500 mb-4">Create your first space to get started</p>
-              <Button color="primary" onPress={onOpen}>Create Space</Button>
+              <Button color="primary" onPress={onAddOpen}>Create Space</Button>
             </CardBody>
           </Card>
         ) : (
@@ -80,22 +134,56 @@ export default function SpacesPage() {
               <Link key={space.id} href={`/spaces/${space.id}`}>
                 <Card
                   isPressable
-                  className="h-full hover:shadow-lg transition-shadow flex flex-col"
+                  className="h-[200px] hover:shadow-lg transition-shadow"
                 >
-                  <CardBody className="p-6 flex flex-col flex-1">
+                  <CardBody className="p-6 flex flex-col h-full">
                     <div className="flex items-start justify-between mb-4">
                       <div 
-                        className="w-14 h-14 rounded-xl flex items-center justify-center text-white text-2xl font-bold shadow-md"
+                        className="w-14 h-14 rounded-xl flex items-center justify-center text-white text-2xl font-bold shadow-md flex-shrink-0"
                         style={{ backgroundColor: space.color || '#3b82f6' }}
                       >
                         {renderSpaceIcon(space.icon, space.name.charAt(0))}
                       </div>
-                      {/* Removed Personal chip as requested */}
+                      <Dropdown>
+                        <DropdownTrigger>
+                          <Button
+                            isIconOnly
+                            variant="light"
+                            size="sm"
+                            className="text-default-400 hover:text-default-600"
+                            onClick={(e) => {
+                              e.preventDefault()
+                              e.stopPropagation()
+                            }}
+                          >
+                            <MoreVertical className="w-5 h-5" />
+                          </Button>
+                        </DropdownTrigger>
+                        <DropdownMenu aria-label="Space actions">
+                          <DropdownItem
+                            key="edit"
+                            startContent={<Edit className="w-4 h-4" />}
+                            onClick={(e) => handleEditSpace(space, e)}
+                          >
+                            Edit Space
+                          </DropdownItem>
+                          <DropdownItem
+                            key="delete"
+                            className="text-danger"
+                            color="danger"
+                            startContent={<Trash2 className="w-4 h-4" />}
+                            onClick={(e) => handleDeleteSpace(space, e)}
+                            isDisabled={space.is_default || deletingId === space.id}
+                          >
+                            {deletingId === space.id ? 'Deleting...' : 'Delete Space'}
+                          </DropdownItem>
+                        </DropdownMenu>
+                      </Dropdown>
                     </div>
 
-                    <h3 className="text-lg font-semibold mb-2">{space.name}</h3>
-                    <p className="text-sm text-default-500 line-clamp-2 mb-6 flex-1">
-                      {space.description || 'No description'}
+                    <h3 className="text-lg font-semibold mb-2 line-clamp-1">{space.name}</h3>
+                    <p className="text-sm text-default-500 line-clamp-2 flex-1 min-h-[40px]">
+                      {space.description || ''}
                     </p>
 
                     <div className="flex items-center justify-between mt-auto pt-4 border-t border-default-100">
@@ -113,9 +201,19 @@ export default function SpacesPage() {
       </main>
 
       <AddSpaceModal
-        isOpen={isOpen}
-        onClose={onClose}
+        isOpen={isAddOpen}
+        onClose={onAddClose}
         onSuccess={handleAddSuccess}
+      />
+
+      <EditSpaceModal
+        space={selectedSpace}
+        isOpen={isEditOpen}
+        onClose={() => {
+          onEditClose()
+          setSelectedSpace(null)
+        }}
+        onSuccess={handleEditSuccess}
       />
     </div>
   )
