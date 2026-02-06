@@ -172,12 +172,13 @@ export default function SpacesPage() {
               <Link key={space.id} href={`/spaces/${space.id}`}>
                 <Card
                   isPressable
-                  className="h-[200px] hover:shadow-lg transition-shadow"
+                  className="hover:shadow-lg transition-shadow"
                 >
-                  <CardBody className="p-6 flex flex-col h-full">
+                  <CardBody className="p-5">
+                    {/* Header row: icon + kebab menu */}
                     <div className="flex items-start justify-between mb-4">
                       <div 
-                        className="w-14 h-14 rounded-xl flex items-center justify-center text-white text-2xl font-bold shadow-md flex-shrink-0"
+                        className="w-12 h-12 rounded-xl flex items-center justify-center text-white text-xl font-bold shadow-md"
                         style={{ backgroundColor: space.color || '#3b82f6' }}
                       >
                         {renderSpaceIcon(space.icon, space.name.charAt(0))}
@@ -211,7 +212,7 @@ export default function SpacesPage() {
                             color="danger"
                             startContent={<Trash2 className="w-4 h-4" />}
                             onClick={(e) => handleDeleteSpace(space, e)}
-                            isDisabled={space.is_default || deletingId === space.id}
+                            isDisabled={deletingId === space.id}
                           >
                             {deletingId === space.id ? 'Deleting...' : 'Delete Space'}
                           </DropdownItem>
@@ -219,16 +220,21 @@ export default function SpacesPage() {
                       </Dropdown>
                     </div>
 
-                    <h3 className="text-lg font-semibold mb-2 line-clamp-1">{space.name}</h3>
-                    <p className="text-sm text-default-500 line-clamp-2 flex-1 min-h-[40px]">
-                      {space.description || ''}
-                    </p>
+                    {/* Space name */}
+                    <h3 className="text-lg font-semibold text-default-800 mb-1">{space.name}</h3>
+                    
+                    {/* Description - only show if exists */}
+                    {space.description && (
+                      <p className="text-sm text-default-500 line-clamp-2 mb-4">
+                        {space.description}
+                      </p>
+                    )}
 
-                    <div className="flex items-center justify-between mt-auto pt-4 border-t border-default-100">
+                    {/* Footer: role */}
+                    <div className="flex items-center pt-3 mt-auto border-t border-default-100">
                       <span className="text-xs text-default-400 capitalize">
                         {space.role || 'member'}
                       </span>
-                      {/* TODO: Show member avatars when we have that data */}
                     </div>
                   </CardBody>
                 </Card>
