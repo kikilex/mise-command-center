@@ -18,16 +18,25 @@ import * as LucideIcons from 'lucide-react'
 import Navbar from '@/components/Navbar'
 import AddSpaceModal from '@/components/AddSpaceModal'
 import EditSpaceModal from '@/components/EditSpaceModal'
+import TransferDeleteSpaceModal from '@/components/TransferDeleteSpaceModal'
 import { useSpace, Space } from '@/lib/space-context'
 import { createClient } from '@/lib/supabase/client'
 import { showErrorToast, showSuccessToast } from '@/lib/errors'
+
+interface ContentCounts {
+  documents: number
+  tasks: number
+  projects: number
+}
 
 export default function SpacesPage() {
   const { spaces, loading, refreshSpaces } = useSpace()
   const { isOpen: isAddOpen, onOpen: onAddOpen, onClose: onAddClose } = useDisclosure()
   const { isOpen: isEditOpen, onOpen: onEditOpen, onClose: onEditClose } = useDisclosure()
+  const { isOpen: isTransferOpen, onOpen: onTransferOpen, onClose: onTransferClose } = useDisclosure()
   const [selectedSpace, setSelectedSpace] = useState<Space | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
+  const [contentCounts, setContentCounts] = useState<ContentCounts>({ documents: 0, tasks: 0, projects: 0 })
 
   const supabase = createClient()
 
@@ -66,27 +75,56 @@ export default function SpacesPage() {
       return
     }
 
-    if (!confirm(`Are you sure you want to delete "${space.name}"? This action cannot be undone.`)) {
-      return
-    }
-
     setDeletingId(space.id)
     try {
-      const { error } = await supabase
-        .from('spaces')
-        .delete()
-        .eq('id', space.id)
+      // Check for content in this space
+      const [docsResult, tasksResult, projectsResult] = await Promise.all([
+        supabase.from('documents').select('id', { count: 'exact', head: true }).eq('space_id', space.id),
+        supabase.from('tasks').select('id', { count: 'exact', head: true }).eq('space_id', space.id),
+        supabase.from('projects').select('id', { count: 'exact', head: true }).eq('space_id', space.id),
+      ])
 
-      if (error) throw error
+      const counts: ContentCounts = {
+        documents: docsResult.count || 0,
+        tasks: tasksResult.count || 0,
+        projects: projectsResult.count || 0,
+      }
 
-      showSuccessToast('Space deleted')
-      refreshSpaces()
+      const totalItems = counts.documents + counts.tasks + counts.projects
+
+      if (totalItems > 0) {
+        // Space has content - show transfer modal
+        setContentCounts(counts)
+        setSelectedSpace(space)
+        onTransferOpen()
+      } else {
+        // Space is empty - confirm and delete directly
+        if (!confirm(`Are you sure you want to delete "${space.name}"? This action cannot be undone.`)) {
+          return
+        }
+
+        const { error } = await supabase
+          .from('spaces')
+          .delete()
+          .eq('id', space.id)
+
+        if (error) throw error
+
+        showSuccessToast('Space deleted')
+        refreshSpaces()
+      }
     } catch (error) {
       console.error('Delete space error:', error)
       showErrorToast(error, 'Failed to delete space')
     } finally {
       setDeletingId(null)
     }
+  }
+
+  function handleTransferSuccess() {
+    refreshSpaces()
+    onTransferClose()
+    setSelectedSpace(null)
   }
 
   if (loading) {
@@ -214,6 +252,18 @@ export default function SpacesPage() {
           setSelectedSpace(null)
         }}
         onSuccess={handleEditSuccess}
+      />
+
+      <TransferDeleteSpaceModal
+        isOpen={isTransferOpen}
+        onClose={() => {
+          onTransferClose()
+          setSelectedSpace(null)
+        }}
+        onSuccess={handleTransferSuccess}
+        space={selectedSpace}
+        otherSpaces={spaces.filter(s => s.id !== selectedSpace?.id)}
+        contentCounts={contentCounts}
       />
     </div>
   )
