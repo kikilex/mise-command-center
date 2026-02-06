@@ -87,6 +87,26 @@ const isAI = (name: string) => ['ax', 'tony', 'neo'].includes(name.toLowerCase()
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
+// Notification sound using Web Audio API
+function playNotificationSound() {
+  try {
+    const audioContext = new (window.AudioContext || (window as any).webkitAudioContext)()
+    const oscillator = audioContext.createOscillator()
+    const gainNode = audioContext.createGain()
+    
+    oscillator.connect(gainNode)
+    gainNode.connect(audioContext.destination)
+    
+    oscillator.frequency.value = 800
+    oscillator.type = 'sine'
+    gainNode.gain.value = 0.1
+    
+    oscillator.start()
+    gainNode.gain.exponentialRampToValueAtTime(0.01, audioContext.currentTime + 0.2)
+    oscillator.stop(audioContext.currentTime + 0.2)
+  } catch {}
+}
+
 /* ------------------------------------------------------------------ */
 /*  Component                                                          */
 /* ------------------------------------------------------------------ */
@@ -263,16 +283,13 @@ export default function ChatWidget() {
     // Store channel ref for sending broadcasts
     channelRef.current = channel
 
-    // Backup polling every 10s in case broadcast fails
+    // Backup polling every 30s (just for thread list, messages come via broadcast)
     const pollInterval = setInterval(() => {
       const currentUser = userRef.current
       if (currentUser) {
         loadThreads(currentUser.id, userNameRef.current)
-        if (activeThreadRef.current) {
-          loadMessages(activeThreadRef.current.id)
-        }
       }
-    }, 10000)
+    }, 30000)
 
     return () => { 
       supabase.removeChannel(channel)
@@ -461,6 +478,11 @@ export default function ChatWidget() {
     const partner = msg.from_agent || msg.to_recipient
     const threadId = msg.thread_id || `dm-${partner}`
     const isActive = isOpenRef.current && activeThreadRef.current?.id === threadId
+
+    // Play notification sound for incoming messages (not from me, not actively viewing)
+    if (isToMe && !isFromMe && !isActive) {
+      playNotificationSound()
+    }
 
     // If active and for me, mark as read immediately in DB
     if (isActive && isToMe && msg.status === 'pending') {
