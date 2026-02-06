@@ -448,14 +448,22 @@ export default function ChatWidget() {
   function handleIncomingMessage(msg: any) {
     if (msg.item_type !== 'message') return
     
+    const currentUser = userRef.current
+    const currentUserName = userNameRef.current?.toLowerCase()
+    
+    // Only process messages relevant to me
+    const isFromMe = msg.user_id === currentUser?.id
+    const isToMe = msg.to_recipient?.toLowerCase() === currentUserName
+    
+    // Ignore messages that aren't from me or to me
+    if (!isFromMe && !isToMe) return
+    
     const partner = msg.from_agent || msg.to_recipient
     const threadId = msg.thread_id || `dm-${partner}`
-    const currentUserName = userNameRef.current?.toLowerCase()
-    const isForMe = msg.to_recipient?.toLowerCase() === currentUserName
     const isActive = isOpenRef.current && activeThreadRef.current?.id === threadId
 
     // If active and for me, mark as read immediately in DB
-    if (isActive && isForMe && msg.status === 'pending') {
+    if (isActive && isToMe && msg.status === 'pending') {
       supabase.from('inbox').update({ status: 'processed' }).eq('id', msg.id).then()
     }
 
@@ -470,7 +478,7 @@ export default function ChatWidget() {
       
       // Calculate new unread count
       let unreadCount = existing?.unreadCount || 0
-      if (isForMe && msg.status === 'pending' && !isActive) {
+      if (isToMe && msg.status === 'pending' && !isActive) {
         unreadCount++
       }
 
