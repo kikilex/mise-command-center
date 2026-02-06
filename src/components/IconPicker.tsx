@@ -10,29 +10,56 @@ import {
   PopoverTrigger,
   PopoverContent
 } from '@heroui/react'
-import { Search, X } from 'lucide-react'
+import { Search } from 'lucide-react'
 
 interface IconPickerProps {
   value: string
   onChange: (iconName: string) => void
 }
 
-// Filter out non-icon exports
-const iconNames = Object.keys(LucideIcons).filter(
-  key => typeof (LucideIcons as any)[key] === 'function' && 
-  key !== 'createLucideIcon' && 
-  /^[A-Z]/.test(key) // Starts with uppercase
-)
+// Curated list of useful icons for spaces
+const iconNames = [
+  // General
+  'Layout', 'Grid', 'Layers', 'Box', 'Package', 'Archive', 'Folder', 'FolderOpen',
+  // Business
+  'Briefcase', 'Building', 'Building2', 'Store', 'ShoppingBag', 'ShoppingCart', 'CreditCard', 'Wallet',
+  'DollarSign', 'TrendingUp', 'BarChart', 'PieChart', 'LineChart', 'Target', 'Award', 'Trophy',
+  // People
+  'User', 'Users', 'UserCircle', 'Heart', 'Home', 'House',
+  // Communication
+  'Mail', 'MessageSquare', 'MessageCircle', 'Phone', 'Video', 'Mic', 'Speaker',
+  // Content
+  'FileText', 'File', 'Files', 'BookOpen', 'Book', 'Notebook', 'Pencil', 'PenTool',
+  // Creative
+  'Palette', 'Camera', 'Image', 'Film', 'Music', 'Headphones', 'Youtube', 'Instagram',
+  // Tech
+  'Code', 'Terminal', 'Database', 'Server', 'Cloud', 'Globe', 'Wifi', 'Smartphone',
+  'Monitor', 'Laptop', 'Cpu', 'HardDrive', 'Settings', 'Wrench', 'Tool',
+  // Nature
+  'Sun', 'Moon', 'Star', 'Sparkles', 'Zap', 'Flame', 'Leaf', 'Trees',
+  // Objects
+  'Key', 'Lock', 'Unlock', 'Shield', 'Flag', 'Bookmark', 'Tag', 'Hash',
+  'Calendar', 'Clock', 'Timer', 'Bell', 'AlarmClock',
+  // Actions
+  'Play', 'Pause', 'CirclePlay', 'Rocket', 'Send', 'Download', 'Upload', 'Share',
+  // Religious / Spiritual
+  'Church', 'Cross', 'Sparkle', 'Sunrise', 'Sunset',
+  // Shapes
+  'Circle', 'Square', 'Triangle', 'Hexagon', 'Pentagon', 'Octagon',
+  // Misc
+  'Coffee', 'Pizza', 'Gift', 'PartyPopper', 'Gamepad', 'Dumbbell', 'Plane', 'Car',
+  'Lightbulb', 'Brain', 'Eye', 'Glasses', 'Compass', 'Map', 'Navigation',
+]
 
 export default function IconPicker({ value, onChange }: IconPickerProps) {
   const [search, setSearch] = useState('')
   const [isOpen, setIsOpen] = useState(false)
 
   const filteredIcons = useMemo(() => {
-    if (!search) return iconNames.slice(0, 100) // Show first 100 by default
+    if (!search) return iconNames
     return iconNames.filter(name => 
       name.toLowerCase().includes(search.toLowerCase())
-    ).slice(0, 100)
+    )
   }, [search])
 
   const SelectedIcon = (LucideIcons as any)[value] || LucideIcons.HelpCircle
