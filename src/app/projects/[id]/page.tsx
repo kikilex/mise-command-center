@@ -2525,27 +2525,20 @@ function ItemRowContent({
       
       {/* Sub-items - separate row, indented */}
       {subItems.length > 0 && (
-        <div className="mt-2 ml-7 space-y-1">
+        <div className="mt-2 ml-7 space-y-1" onClick={(e) => e.stopPropagation()}>
           {subItems.map(sub => (
             <div 
               key={sub.id} 
               data-sub-item
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 cursor-pointer hover:bg-default-200/50 rounded px-1 py-0.5 -mx-1"
+              onClick={() => onToggleSubItem?.(sub.id)}
             >
               <Checkbox
                 isSelected={sub.completed}
                 size="sm"
-                onValueChange={() => {
-                  if (onToggleSubItem) onToggleSubItem(sub.id)
-                }}
+                onValueChange={() => onToggleSubItem?.(sub.id)}
               />
-              <span 
-                className={`text-sm ${sub.completed ? 'line-through text-default-400' : ''}`}
-                onClick={(e) => {
-                  e.stopPropagation()
-                  if (onToggleSubItem) onToggleSubItem(sub.id)
-                }}
-              >
+              <span className={`text-sm ${sub.completed ? 'line-through text-default-400' : ''}`}>
                 {sub.text}
               </span>
             </div>
