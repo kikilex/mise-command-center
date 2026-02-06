@@ -2455,6 +2455,10 @@ function ItemRowContent({
   dragHandleProps?: any
   isDragging?: boolean
 }) {
+  const hasSubItems = item.sub_items && item.sub_items.length > 0
+  if (hasSubItems) {
+    console.log('ItemRowContent render - onToggleSubItem exists:', !!onToggleSubItem, 'for item:', item.title, 'sub_items count:', item.sub_items?.length)
+  }
   // Parse sub-items for display
   const subItems: SubItem[] = (item.sub_items || []).map((sub, idx) => {
     try {
@@ -2549,8 +2553,13 @@ function ItemRowContent({
                 isSelected={sub.completed}
                 size="sm"
                 onValueChange={() => {
-                  console.log('Checkbox onValueChange:', sub.id)
-                  onToggleSubItem?.(sub.id)
+                  console.log('Checkbox onValueChange:', sub.id, 'onToggleSubItem exists in closure:', !!onToggleSubItem)
+                  if (onToggleSubItem) {
+                    console.log('Calling onToggleSubItem with:', sub.id)
+                    onToggleSubItem(sub.id)
+                  } else {
+                    console.log('onToggleSubItem is UNDEFINED!')
+                  }
                 }}
               />
               <span className={`text-sm ${sub.completed ? 'line-through text-default-400' : ''}`}>
