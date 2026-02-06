@@ -43,6 +43,7 @@ import {
 import * as LucideIcons from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import Navbar from '@/components/Navbar'
+import RichTextEditor from '@/components/RichTextEditor'
 import { showErrorToast, showSuccessToast } from '@/lib/errors'
 import { formatDistanceToNow, format } from 'date-fns'
 import ReactMarkdown from 'react-markdown'
@@ -1433,7 +1434,10 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                           <StickyNote className="inline-block w-3 h-3 text-warning ml-1" />
                         )}
                         {isNote && pin.notes && (
-                          <p className="text-xs text-default-500 mt-1 whitespace-pre-wrap">{pin.notes}</p>
+                          <div 
+                            className="text-xs text-default-500 mt-1 prose prose-xs dark:prose-invert max-w-none"
+                            dangerouslySetInnerHTML={{ __html: pin.notes }}
+                          />
                         )}
                       </div>
                       <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -1752,7 +1756,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
       </Modal>
 
       {/* Quick Note Modal */}
-      <Modal isOpen={isNoteOpen} onClose={onNoteClose} size="lg">
+      <Modal isOpen={isNoteOpen} onClose={onNoteClose} size="2xl">
         <ModalContent>
           <ModalHeader>Add Note</ModalHeader>
           <ModalBody>
@@ -1764,14 +1768,11 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
               variant="bordered"
               className="mb-3"
             />
-            <Textarea
-              label="Content"
+            <RichTextEditor
+              content={noteContent}
+              onChange={setNoteContent}
               placeholder="Write your note..."
-              value={noteContent}
-              onValueChange={setNoteContent}
-              variant="bordered"
-              minRows={6}
-              maxRows={12}
+              minHeight="200px"
             />
           </ModalBody>
           <ModalFooter>
@@ -1847,12 +1848,11 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                 {/* Notes */}
                 <div>
                   <label className="text-sm font-medium text-default-600 mb-2 block">Notes</label>
-                  <Textarea
-                    value={drawerNotes}
-                    onValueChange={setDrawerNotes}
-                    variant="bordered"
+                  <RichTextEditor
+                    content={drawerNotes}
+                    onChange={setDrawerNotes}
                     placeholder="Add notes, comments, context..."
-                    minRows={4}
+                    minHeight="120px"
                   />
                 </div>
 
@@ -1983,20 +1983,17 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                 <Spinner size="lg" />
               </div>
             ) : isEditingDoc ? (
-              <Textarea
-                value={editDocContent}
-                onValueChange={setEditDocContent}
-                variant="bordered"
-                placeholder="Write document content..."
-                minRows={15}
-                maxRows={30}
+              <RichTextEditor
+                content={editDocContent}
+                onChange={setEditDocContent}
+                placeholder="Start writing your document..."
+                minHeight="300px"
               />
             ) : (
-              <div className="prose prose-sm dark:prose-invert max-w-none">
-                <ReactMarkdown remarkPlugins={[remarkGfm]}>
-                  {previewDocContent || '*No content yet*'}
-                </ReactMarkdown>
-              </div>
+              <div 
+                className="prose prose-sm dark:prose-invert max-w-none"
+                dangerouslySetInnerHTML={{ __html: previewDocContent || '<p><em>No content yet</em></p>' }}
+              />
             )}
           </ModalBody>
           <ModalFooter>
