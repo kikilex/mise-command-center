@@ -283,13 +283,43 @@ export default function ChatWidget() {
     // Store channel ref for sending broadcasts
     channelRef.current = channel
 
-    // Backup polling every 30s (just for thread list, messages come via broadcast)
-    const pollInterval = setInterval(() => {
+    // Poll every 3s for reliability (broadcast may fail)
+    const pollInterval = setInterval(async () => {
       const currentUser = userRef.current
-      if (currentUser) {
-        loadThreads(currentUser.id, userNameRef.current)
+      if (!currentUser) return
+      
+      // Refresh thread list
+      loadThreads(currentUser.id, userNameRef.current)
+      
+      // If viewing a thread, check for new messages
+      const activeThread = activeThreadRef.current
+      if (activeThread) {
+        let query = supabase.from('inbox').select('*').eq('item_type', 'message')
+        
+        if (activeThread.id.startsWith('dm-')) {
+          const partner = activeThread.id.replace('dm-', '')
+          query = query.or(`from_agent.eq.${partner},to_recipient.eq.${partner}`).is('thread_id', null)
+        } else {
+          query = query.eq('thread_id', activeThread.id)
+        }
+        
+        const { data } = await query.order('created_at', { ascending: true })
+        
+        if (data) {
+          // Only update if we have new messages
+          setMessages(prev => {
+            if (data.length > prev.length) {
+              // Play sound for new incoming messages
+              const newMsgs = data.slice(prev.length)
+              const hasIncoming = newMsgs.some(m => m.user_id !== currentUser.id)
+              if (hasIncoming) playNotificationSound()
+              return data
+            }
+            return prev
+          })
+        }
       }
-    }, 30000)
+    }, 3000)
 
     return () => { 
       supabase.removeChannel(channel)
