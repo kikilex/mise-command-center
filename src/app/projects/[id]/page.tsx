@@ -1496,36 +1496,6 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                     <Send className="w-3.5 h-3.5" />
                   </Button>
                 </div>
-                {/* Formatting buttons */}
-                <div className="flex items-center gap-1 mt-2">
-                  <Button
-                    isIconOnly
-                    size="sm"
-                    variant="flat"
-                    onPress={() => applyFormatting(updateTextareaRef as any, newUpdate, setNewUpdate, '**', '**')}
-                    title="Bold"
-                  >
-                    <Bold className="w-3.5 h-3.5" />
-                  </Button>
-                  <Button
-                    isIconOnly
-                    size="sm"
-                    variant="flat"
-                    onPress={() => applyFormatting(updateTextareaRef as any, newUpdate, setNewUpdate, '_', '_')}
-                    title="Italic"
-                  >
-                    <Italic className="w-3.5 h-3.5" />
-                  </Button>
-                  <Button
-                    isIconOnly
-                    size="sm"
-                    variant="flat"
-                    onPress={() => applyFormatting(updateTextareaRef as any, newUpdate, setNewUpdate, '==', '==')}
-                    title="Highlight"
-                  >
-                    <Highlighter className="w-3.5 h-3.5" />
-                  </Button>
-                </div>
               </div>
             </div>
           </CardBody>
@@ -1795,45 +1765,14 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
               className="mb-3"
             />
             <Textarea
-              ref={noteContentRef}
               label="Content"
-              placeholder="Write your note (Markdown supported)..."
+              placeholder="Write your note..."
               value={noteContent}
               onValueChange={setNoteContent}
               variant="bordered"
               minRows={6}
               maxRows={12}
             />
-            <div className="flex items-center gap-1 mt-2">
-              <Button
-                isIconOnly
-                size="sm"
-                variant="flat"
-                onPress={() => applyFormatting(noteContentRef as any, noteContent, setNoteContent, '**', '**')}
-                title="Bold"
-              >
-                <Bold className="w-3.5 h-3.5" />
-              </Button>
-              <Button
-                isIconOnly
-                size="sm"
-                variant="flat"
-                onPress={() => applyFormatting(noteContentRef as any, noteContent, setNoteContent, '_', '_')}
-                title="Italic"
-              >
-                <Italic className="w-3.5 h-3.5" />
-              </Button>
-              <Button
-                isIconOnly
-                size="sm"
-                variant="flat"
-                onPress={() => applyFormatting(noteContentRef as any, noteContent, setNoteContent, '==', '==')}
-                title="Highlight"
-              >
-                <Highlighter className="w-3.5 h-3.5" />
-              </Button>
-              <span className="text-xs text-default-400 ml-2">Markdown supported</span>
-            </div>
           </ModalBody>
           <ModalFooter>
             <Button variant="flat" onPress={onNoteClose}>Cancel</Button>
@@ -1909,42 +1848,12 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                 <div>
                   <label className="text-sm font-medium text-default-600 mb-2 block">Notes</label>
                   <Textarea
-                    ref={notesTextareaRef}
                     value={drawerNotes}
                     onValueChange={setDrawerNotes}
                     variant="bordered"
                     placeholder="Add notes, comments, context..."
                     minRows={4}
                   />
-                  <div className="flex items-center gap-1 mt-2">
-                    <Button
-                      isIconOnly
-                      size="sm"
-                      variant="flat"
-                      onPress={() => applyFormatting(notesTextareaRef as any, drawerNotes, setDrawerNotes, '**', '**')}
-                      title="Bold"
-                    >
-                      <Bold className="w-3.5 h-3.5" />
-                    </Button>
-                    <Button
-                      isIconOnly
-                      size="sm"
-                      variant="flat"
-                      onPress={() => applyFormatting(notesTextareaRef as any, drawerNotes, setDrawerNotes, '_', '_')}
-                      title="Italic"
-                    >
-                      <Italic className="w-3.5 h-3.5" />
-                    </Button>
-                    <Button
-                      isIconOnly
-                      size="sm"
-                      variant="flat"
-                      onPress={() => applyFormatting(notesTextareaRef as any, drawerNotes, setDrawerNotes, '==', '==')}
-                      title="Highlight"
-                    >
-                      <Highlighter className="w-3.5 h-3.5" />
-                    </Button>
-                  </div>
                 </div>
 
                 {/* Sub-items */}
@@ -2074,66 +1983,14 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                 <Spinner size="lg" />
               </div>
             ) : isEditingDoc ? (
-              <div>
-                <Textarea
-                  ref={docEditRef}
-                  value={editDocContent}
-                  onValueChange={setEditDocContent}
-                  variant="bordered"
-                  placeholder="Write document content (Markdown supported)..."
-                  minRows={15}
-                  maxRows={30}
-                  classNames={{ input: 'font-mono text-sm' }}
-                />
-                <div className="flex items-center gap-1 mt-3">
-                  <Button
-                    isIconOnly
-                    size="sm"
-                    variant="flat"
-                    onPress={() => applyFormatting(docEditRef as any, editDocContent, setEditDocContent, '**', '**')}
-                    title="Bold"
-                  >
-                    <Bold className="w-3.5 h-3.5" />
-                  </Button>
-                  <Button
-                    isIconOnly
-                    size="sm"
-                    variant="flat"
-                    onPress={() => applyFormatting(docEditRef as any, editDocContent, setEditDocContent, '_', '_')}
-                    title="Italic"
-                  >
-                    <Italic className="w-3.5 h-3.5" />
-                  </Button>
-                  <Button
-                    isIconOnly
-                    size="sm"
-                    variant="flat"
-                    onPress={() => applyFormatting(docEditRef as any, editDocContent, setEditDocContent, '==', '==')}
-                    title="Highlight"
-                  >
-                    <Highlighter className="w-3.5 h-3.5" />
-                  </Button>
-                  <Button
-                    isIconOnly
-                    size="sm"
-                    variant="flat"
-                    onPress={() => applyFormatting(docEditRef as any, editDocContent, setEditDocContent, '# ', '')}
-                    title="Heading"
-                  >
-                    <span className="font-bold text-xs">H</span>
-                  </Button>
-                  <Button
-                    isIconOnly
-                    size="sm"
-                    variant="flat"
-                    onPress={() => applyFormatting(docEditRef as any, editDocContent, setEditDocContent, '- ', '')}
-                    title="Bullet List"
-                  >
-                    <span className="font-bold text-xs">•</span>
-                  </Button>
-                  <span className="text-xs text-default-400 ml-2">Markdown supported</span>
-                </div>
-              </div>
+              <Textarea
+                value={editDocContent}
+                onValueChange={setEditDocContent}
+                variant="bordered"
+                placeholder="Write document content..."
+                minRows={15}
+                maxRows={30}
+              />
             ) : (
               <div className="prose prose-sm dark:prose-invert max-w-none">
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>
@@ -2541,9 +2398,9 @@ function ItemRowContent({
         onClick?.()
       }}
     >
-      <div className="flex items-start gap-2">
+      <div className="flex items-center gap-2">
         {dragHandleProps && (
-          <div {...dragHandleProps} data-drag-handle className="cursor-grab active:cursor-grabbing p-0.5 -ml-1 hover:bg-default-200 rounded">
+          <div {...dragHandleProps} data-drag-handle className="cursor-grab active:cursor-grabbing p-0.5 -ml-1 hover:bg-default-200 rounded self-start mt-1">
             <GripVertical className="w-3 h-3 text-default-400" />
           </div>
         )}
@@ -2551,10 +2408,11 @@ function ItemRowContent({
           isSelected={item.completed}
           onValueChange={() => onToggle?.()}
           size="sm"
+          className="self-start mt-0.5"
         />
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2 min-h-[20px]">
-            <span className={`text-sm leading-5 ${item.completed ? 'line-through text-default-400' : ''}`}>{item.title}</span>
+          <div className="flex items-center gap-2">
+            <span className={`text-sm ${item.completed ? 'line-through text-default-400' : ''}`}>{item.title}</span>
             {item.due_date && (
               <span className="text-xs text-default-400">{format(new Date(item.due_date), 'MMM d')}</span>
             )}
