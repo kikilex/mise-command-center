@@ -22,6 +22,7 @@ import {
   DropdownTrigger,
   DropdownMenu,
   DropdownItem,
+  Progress,
 } from '@heroui/react'
 import { 
   ArrowLeft, Plus, Pin, FileText, Link as LinkIcon, 
@@ -72,6 +73,15 @@ interface Project {
   created_by: string
 }
 
+interface ActiveChecklist {
+  id: string
+  status: string
+  started_at: string
+  playbook?: { id: string; title: string }
+  assignee?: { id: string; name: string; display_name: string; avatar_url: string }
+  progress?: { completed: number; total: number }
+}
+
 export default function ProjectJournalPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const router = useRouter()
@@ -80,6 +90,7 @@ export default function ProjectJournalPage({ params }: { params: Promise<{ id: s
   const [project, setProject] = useState<Project | null>(null)
   const [updates, setUpdates] = useState<ProjectUpdate[]>([])
   const [pins, setPins] = useState<ProjectPin[]>([])
+  const [activeChecklists, setActiveChecklists] = useState<ActiveChecklist[]>([])
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [posting, setPosting] = useState(false)
@@ -142,6 +153,36 @@ export default function ProjectJournalPage({ params }: { params: Promise<{ id: s
 
       if (pinsError) throw pinsError
       setPins(pinsData || [])
+
+      // Load active checklists
+      const { data: checklistsData, error: checklistsError } = await supabase
+        .from('checklist_runs')
+        .select(`
+          id, status, started_at,
+          playbook:playbook_id (id, title),
+          assignee:assigned_to (id, name, display_name, avatar_url)
+        `)
+        .eq('project_id', id)
+        .eq('status', 'active')
+        .order('started_at', { ascending: false })
+
+      if (!checklistsError && checklistsData) {
+        // Get progress for each checklist
+        const checklistsWithProgress = await Promise.all(
+          checklistsData.map(async (cl) => {
+            const { data: progressData } = await supabase
+              .from('checklist_step_progress')
+              .select('completed')
+              .eq('run_id', cl.id)
+            
+            const total = progressData?.length || 0
+            const completed = progressData?.filter(p => p.completed).length || 0
+            
+            return { ...cl, progress: { completed, total } }
+          })
+        )
+        setActiveChecklists(checklistsWithProgress)
+      }
 
     } catch (error) {
       console.error('Load error:', error)
@@ -375,6 +416,50 @@ export default function ProjectJournalPage({ params }: { params: Promise<{ id: s
             </div>
           )}
         </div>
+
+        {/* Active Checklists */}
+        {activeChecklists.length > 0 && (
+          <div className="mb-6">
+            <div className="flex items-center gap-2 text-default-600 mb-3">
+              <ClipboardList className="w-4 h-4" />
+              <span className="text-sm font-medium">Active Checklists</span>
+            </div>
+            <div className="space-y-2">
+              {activeChecklists.map(checklist => (
+                <Card 
+                  key={checklist.id} 
+                  isPressable 
+                  className="hover:shadow-sm transition-shadow"
+                  onPress={() => router.push(`/checklists/${checklist.id}`)}
+                >
+                  <CardBody className="p-4">
+                    <div className="flex items-center justify-between mb-2">
+                      <div className="flex items-center gap-2">
+                        <ClipboardList className="w-4 h-4 text-primary" />
+                        <span className="font-medium">{checklist.playbook?.title}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Avatar 
+                          src={checklist.assignee?.avatar_url}
+                          name={checklist.assignee?.display_name || checklist.assignee?.name}
+                          size="sm"
+                        />
+                        <span className="text-sm text-default-500">
+                          {checklist.progress?.completed}/{checklist.progress?.total}
+                        </span>
+                      </div>
+                    </div>
+                    <Progress 
+                      value={checklist.progress?.total ? (checklist.progress.completed / checklist.progress.total) * 100 : 0}
+                      size="sm"
+                      color="primary"
+                    />
+                  </CardBody>
+                </Card>
+              ))}
+            </div>
+          </div>
+        )}
 
         {/* Update Composer */}
         <Card className="mb-6">

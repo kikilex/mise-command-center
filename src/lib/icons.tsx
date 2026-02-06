@@ -59,6 +59,7 @@ import {
   User,
   LogOut,
   Briefcase,
+  ClipboardList,
   type LucideIcon,
 } from 'lucide-react'
 
@@ -77,6 +78,7 @@ export const navIcons: Record<string, LucideIcon> = {
   ai: Bot,
   bot: Bot,
   settings: Settings,
+  playbooks: ClipboardList,
 }
 
 // Icon mapping for project templates
