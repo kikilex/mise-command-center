@@ -106,12 +106,17 @@ export default function ChatWidget() {
 
   /* ---- refs for callbacks ---- */
   const activeThreadRef = useRef<ChatThread | null>(null)
+  const userRef = useRef<any>(null)
   const userNameRef = useRef<string>('')
   const isOpenRef = useRef(false)
 
   useEffect(() => {
     activeThreadRef.current = activeThread
   }, [activeThread])
+
+  useEffect(() => {
+    userRef.current = user
+  }, [user])
 
   useEffect(() => {
     isOpenRef.current = isOpen
@@ -257,14 +262,15 @@ export default function ChatWidget() {
 
     // Poll frequently for new messages (realtime blocked by RLS)
     const pollInterval = setInterval(() => {
-      if (user) {
-        loadThreads(user.id, userNameRef.current)
+      const currentUser = userRef.current
+      if (currentUser) {
+        loadThreads(currentUser.id, userNameRef.current)
         // Also refresh active thread messages
         if (activeThreadRef.current) {
           loadMessages(activeThreadRef.current.id)
         }
       }
-    }, 3000)
+    }, 2000)
 
     return () => { 
       supabase.removeChannel(channel)
