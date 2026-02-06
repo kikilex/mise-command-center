@@ -34,7 +34,7 @@ const iconNames = [
   'Palette', 'Camera', 'Image', 'Film', 'Music', 'Headphones', 'Youtube', 'Instagram',
   // Tech
   'Code', 'Terminal', 'Database', 'Server', 'Cloud', 'Globe', 'Wifi', 'Smartphone',
-  'Monitor', 'Laptop', 'Cpu', 'HardDrive', 'Settings', 'Wrench', 'Tool',
+  'Monitor', 'Laptop', 'Cpu', 'HardDrive', 'Settings', 'Wrench', 'Hammer',
   // Nature
   'Sun', 'Moon', 'Star', 'Sparkles', 'Zap', 'Flame', 'Leaf', 'Trees',
   // Objects
@@ -93,6 +93,7 @@ export default function IconPicker({ value, onChange }: IconPickerProps) {
             <div className="grid grid-cols-5 gap-1">
               {filteredIcons.map((name) => {
                 const Icon = (LucideIcons as any)[name]
+                if (!Icon) return null // Skip missing icons
                 return (
                   <Button
                     key={name}
