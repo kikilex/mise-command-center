@@ -687,16 +687,17 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
             <ArrowLeft className="w-5 h-5" />
           </Button>
           
-          <div className="flex items-center gap-3 flex-wrap gap-y-2">
+          <div className="flex items-center gap-2 flex-wrap justify-end">
             {tableOfContents.length > 2 && (
               <Button
                 variant="flat"
                 isIconOnly
+                size="sm"
                 title="Table of Contents"
                 onPress={() => setShowTOC(!showTOC)}
                 className="sm:hidden"
               >
-                <List className="w-5 h-5" />
+                <List className="w-4 h-4" />
               </Button>
             )}
             
@@ -705,11 +706,12 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
               <Button
                 color="success"
                 isIconOnly
+                size="sm"
                 title="Approve document"
                 onPress={handleApprove}
                 isLoading={approving}
               >
-                <CheckCircle2 className="w-5 h-5" />
+                <CheckCircle2 className="w-4 h-4" />
               </Button>
             )}
             
@@ -719,29 +721,33 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
                 variant="flat"
                 color="warning"
                 isIconOnly
+                size="sm"
                 title="Request revision"
                 onPress={onRevisionOpen}
               >
-                <RotateCcw className="w-5 h-5" />
+                <RotateCcw className="w-4 h-4" />
               </Button>
             )}
             
             <Button
               variant="flat"
               isIconOnly
+              size="sm"
               title={copied ? "Link copied!" : "Share document"}
               onPress={handleShare}
             >
-              {copied ? <Check className="w-5 h-5" /> : <Share2 className="w-5 h-5" />}
+              {copied ? <Check className="w-4 h-4" /> : <Share2 className="w-4 h-4" />}
             </Button>
+            
             <Popover isOpen={propertiesOpen} onOpenChange={setPropertiesOpen} placement="bottom-end">
               <PopoverTrigger>
                 <Button
                   variant="flat"
                   isIconOnly
+                  size="sm"
                   title="Document properties"
                 >
-                  <Settings className="w-5 h-5" />
+                  <Settings className="w-4 h-4" />
                 </Button>
               </PopoverTrigger>
               <PopoverContent className="w-72 p-4">
@@ -760,7 +766,7 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
                       size="sm"
                       selectedKeys={[editCategory]}
                       onChange={(e) => setEditCategory(e.target.value)}
-                      className="w-full"
+                      className="w-full max-w-[240px]"
                     >
                       {categoryOptions.map(cat => (
                         <SelectItem key={cat.key}>{cat.label}</SelectItem>
@@ -820,9 +826,6 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
                         <Plus className="w-3 h-3" />
                       </Button>
                     </div>
-                    <p className="text-xs text-slate-400 mt-1">
-                      Press Enter or click + to add
-                    </p>
                   </div>
                   
                   {/* Save Button */}
@@ -842,48 +845,35 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
                   >
                     {savingMeta ? 'Saving...' : 'Save Changes'}
                   </Button>
-                  
-                  {/* Current Values (read-only) */}
-                  <div className="pt-4 border-t border-slate-100 dark:border-slate-700">
-                    <div className="text-xs text-slate-500 dark:text-slate-400 space-y-1">
-                      <div className="flex justify-between">
-                        <span>Current Category:</span>
-                        <span className="font-medium text-slate-700 dark:text-slate-300">
-                          {categoryOptions.find(c => c.key === (document?.category || 'all'))?.label || 'Uncategorized'}
-                        </span>
-                      </div>
-                      <div className="flex justify-between">
-                        <span>Tags Count:</span>
-                        <span className="font-medium text-slate-700 dark:text-slate-300">
-                          {(document?.tags || []).length}
-                        </span>
-                      </div>
-                    </div>
-                  </div>
                 </div>
               </PopoverContent>
             </Popover>
+            
             <Button
               variant="flat"
               isIconOnly
+              size="sm"
               title="Version History"
               onPress={handleOpenHistory}
             >
-              <History className="w-5 h-5" />
+              <History className="w-4 h-4" />
             </Button>
+            
             <Link href={`/docs/${id}/edit`}>
-              <Button color="primary" isIconOnly title="Edit document">
-                <Edit className="w-5 h-5" />
+              <Button color="primary" isIconOnly size="sm" title="Edit document">
+                <Pencil className="w-4 h-4" />
               </Button>
             </Link>
+            
             <Button
               variant="flat"
               color="danger"
               isIconOnly
+              size="sm"
               title="Delete document"
               onPress={onDeleteOpen}
             >
-              <Trash2 className="w-5 h-5" />
+              <Trash2 className="w-4 h-4" />
             </Button>
           </div>
         </div>
