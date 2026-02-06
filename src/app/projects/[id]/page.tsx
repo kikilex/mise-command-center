@@ -2525,23 +2525,24 @@ function ItemRowContent({
       
       {/* Sub-items - separate row, indented */}
       {subItems.length > 0 && (
-        <div className="mt-2 ml-7 space-y-1" onClick={(e) => e.stopPropagation()}>
+        <div className="mt-2 ml-7 space-y-1">
           {subItems.map(sub => (
-            <div 
+            <label 
               key={sub.id} 
               data-sub-item
               className="flex items-center gap-2 cursor-pointer hover:bg-default-200/50 rounded px-1 py-0.5 -mx-1"
-              onClick={() => onToggleSubItem?.(sub.id)}
+              onClick={(e) => e.stopPropagation()}
             >
-              <Checkbox
-                isSelected={sub.completed}
-                size="sm"
-                onValueChange={() => onToggleSubItem?.(sub.id)}
+              <input
+                type="checkbox"
+                checked={sub.completed}
+                onChange={() => onToggleSubItem?.(sub.id)}
+                className="w-4 h-4 rounded border-default-300 text-primary focus:ring-primary"
               />
               <span className={`text-sm ${sub.completed ? 'line-through text-default-400' : ''}`}>
                 {sub.text}
               </span>
-            </div>
+            </label>
           ))}
         </div>
       )}
