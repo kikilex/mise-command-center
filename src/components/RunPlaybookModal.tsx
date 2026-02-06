@@ -206,11 +206,17 @@ export default function RunPlaybookModal({
               onChange={(e) => setSelectedProject(e.target.value)}
               isRequired
               isLoading={loading}
+              description={projects.length === 0 ? "No projects found. Create one in your Space first." : undefined}
             >
               {projects.map(p => (
                 <SelectItem key={p.id}>{p.name}</SelectItem>
               ))}
             </Select>
+            {projects.length === 0 && (
+              <p className="text-xs text-warning-600">
+                💡 Go to Spaces → select a space → click "New Project" to create one first
+              </p>
+            )}
 
             <Select
               label="Assign to"
