@@ -932,6 +932,19 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
     setDrawerSubItems(prev => prev.filter(sub => sub.id !== subId))
   }
 
+  // Reorder sub-items
+  function handleSubItemDragEnd(event: DragEndEvent) {
+    const { active, over } = event
+    if (!over || active.id === over.id) return
+    
+    const oldIndex = drawerSubItems.findIndex(s => s.id === active.id)
+    const newIndex = drawerSubItems.findIndex(s => s.id === over.id)
+    
+    if (oldIndex === -1 || newIndex === -1) return
+    
+    setDrawerSubItems(prev => arrayMove(prev, oldIndex, newIndex))
+  }
+
   // Phase drag end
   function handlePhaseDragEnd(event: DragEndEvent) {
     const { active, over } = event
@@ -1556,29 +1569,24 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                 {/* Sub-items */}
                 <div>
                   <label className="text-sm font-medium text-default-600 mb-2 block">Sub-items</label>
-                  <div className="space-y-2 mb-3">
-                    {drawerSubItems.map(sub => (
-                      <div key={sub.id} className="flex items-center gap-2 bg-default-100 rounded-lg p-2">
-                        <Checkbox
-                          isSelected={sub.completed}
-                          onValueChange={() => handleToggleSubItem(sub.id)}
-                          size="sm"
-                        />
-                        <span className={`flex-1 text-sm ${sub.completed ? 'line-through text-default-400' : ''}`}>
-                          {sub.text}
-                        </span>
-                        <Button
-                          isIconOnly
-                          size="sm"
-                          variant="light"
-                          onPress={() => handleRemoveSubItem(sub.id)}
-                          className="min-w-6 w-6 h-6"
-                        >
-                          <X className="w-3 h-3" />
-                        </Button>
+                  <DndContext
+                    sensors={sensors}
+                    collisionDetection={closestCenter}
+                    onDragEnd={handleSubItemDragEnd}
+                  >
+                    <SortableContext items={drawerSubItems.map(s => s.id)} strategy={verticalListSortingStrategy}>
+                      <div className="space-y-2 mb-3">
+                        {drawerSubItems.map(sub => (
+                          <SortableSubItem
+                            key={sub.id}
+                            sub={sub}
+                            onToggle={() => handleToggleSubItem(sub.id)}
+                            onRemove={() => handleRemoveSubItem(sub.id)}
+                          />
+                        ))}
                       </div>
-                    ))}
-                  </div>
+                    </SortableContext>
+                  </DndContext>
                   <div className="flex gap-2">
                     <Input
                       size="sm"
@@ -2089,6 +2097,61 @@ function ItemRowContent({
           )}
         </div>
       </div>
+    </div>
+  )
+}
+
+// Sortable Sub-Item for drawer
+function SortableSubItem({
+  sub,
+  onToggle,
+  onRemove,
+}: {
+  sub: SubItem
+  onToggle: () => void
+  onRemove: () => void
+}) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: sub.id })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  }
+
+  return (
+    <div 
+      ref={setNodeRef} 
+      style={style}
+      className="flex items-center gap-2 bg-default-100 rounded-lg p-2"
+    >
+      <div {...attributes} {...listeners} className="cursor-grab active:cursor-grabbing p-0.5 hover:bg-default-200 rounded">
+        <GripVertical className="w-3 h-3 text-default-400" />
+      </div>
+      <Checkbox
+        isSelected={sub.completed}
+        onValueChange={onToggle}
+        size="sm"
+      />
+      <span className={`flex-1 text-sm ${sub.completed ? 'line-through text-default-400' : ''}`}>
+        {sub.text}
+      </span>
+      <Button
+        isIconOnly
+        size="sm"
+        variant="light"
+        onPress={onRemove}
+        className="min-w-6 w-6 h-6"
+      >
+        <X className="w-3 h-3" />
+      </Button>
     </div>
   )
 }
