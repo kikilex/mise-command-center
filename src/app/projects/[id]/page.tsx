@@ -31,6 +31,7 @@ import {
   DrawerHeader,
   DrawerBody,
   DrawerFooter,
+  Tooltip,
 } from '@heroui/react'
 import { 
   ArrowLeft, Plus, Pin, FileText, Link as LinkIcon, 
@@ -1295,6 +1296,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                       sensors={sensors}
                       onToggleItem={(itemId, completed) => handleToggleItem(phase.id, itemId, completed)}
                       onToggleSubItem={(itemId, subId) => handleToggleSubItem(phase.id, itemId, subId)}
+                      onDeleteItem={(itemId) => handleDeleteItem(phase.id, itemId)}
                       onOpenItem={(item) => openItemDrawer(item)}
                       onOpenAssignModal={() => openAssignPhaseModal(phase)}
                       onDeletePhase={() => handleDeletePhase(phase.id)}
@@ -2024,6 +2026,7 @@ function SortablePhaseCard({
   sensors,
   onToggleItem,
   onToggleSubItem,
+  onDeleteItem,
   onOpenItem,
   onOpenAssignModal,
   onDeletePhase,
@@ -2036,6 +2039,7 @@ function SortablePhaseCard({
   sensors: ReturnType<typeof useSensors>
   onToggleItem: (itemId: string, completed: boolean) => void
   onToggleSubItem: (itemId: string, subId: string) => void
+  onDeleteItem: (itemId: string) => void
   onOpenItem: (item: PhaseItem) => void
   onOpenAssignModal: () => void
   onDeletePhase: () => void
@@ -2067,6 +2071,7 @@ function SortablePhaseCard({
         dragHandleProps={{ ...attributes, ...listeners }}
         onToggleItem={onToggleItem}
         onToggleSubItem={onToggleSubItem}
+        onDeleteItem={onDeleteItem}
         onOpenItem={onOpenItem}
         onOpenAssignModal={onOpenAssignModal}
         onDeletePhase={onDeletePhase}
@@ -2086,6 +2091,7 @@ function PhaseCardContent({
   dragHandleProps,
   onToggleItem,
   onToggleSubItem,
+  onDeleteItem,
   onOpenItem,
   onOpenAssignModal,
   onDeletePhase,
@@ -2102,6 +2108,7 @@ function PhaseCardContent({
   dragHandleProps?: any
   onToggleItem?: (itemId: string, completed: boolean) => void
   onToggleSubItem?: (itemId: string, subId: string) => void
+  onDeleteItem?: (itemId: string) => void
   onOpenItem?: (item: PhaseItem) => void
   onOpenAssignModal?: () => void
   onDeletePhase?: () => void
@@ -2260,6 +2267,7 @@ function PhaseCardContent({
                     onToggle={() => onToggleItem?.(item.id, item.completed)}
                     onClick={() => onOpenItem?.(item)}
                     onToggleSubItem={onToggleSubItem ? (subId) => onToggleSubItem(item.id, subId) : undefined}
+                    onDelete={onDeleteItem ? () => onDeleteItem(item.id) : undefined}
                   />
                 ))}
               </div>
@@ -2282,6 +2290,7 @@ function PhaseCardContent({
                 onToggle={() => onToggleItem?.(item.id, item.completed)}
                 onClick={() => onOpenItem?.(item)}
                 onToggleSubItem={onToggleSubItem ? (subId) => onToggleSubItem(item.id, subId) : undefined}
+                onDelete={onDeleteItem ? () => onDeleteItem(item.id) : undefined}
               />
             ))}
           </div>
@@ -2324,11 +2333,13 @@ function SortableItemRow({
   onToggle,
   onClick,
   onToggleSubItem,
+  onDelete,
 }: {
   item: PhaseItem
   onToggle: () => void
   onClick: () => void
   onToggleSubItem?: (subId: string) => void
+  onDelete?: () => void
 }) {
   const {
     attributes,
@@ -2352,6 +2363,7 @@ function SortableItemRow({
         onToggle={onToggle}
         onClick={onClick}
         onToggleSubItem={onToggleSubItem}
+        onDelete={onDelete}
         dragHandleProps={{ ...attributes, ...listeners }}
       />
     </div>
@@ -2364,6 +2376,7 @@ function ItemRowContent({
   onToggle,
   onClick,
   onToggleSubItem,
+  onDelete,
   dragHandleProps,
   isDragging = false,
 }: {
@@ -2371,6 +2384,7 @@ function ItemRowContent({
   onToggle?: () => void
   onClick?: () => void
   onToggleSubItem?: (subId: string) => void
+  onDelete?: () => void
   dragHandleProps?: any
   isDragging?: boolean
 }) {
@@ -2388,15 +2402,16 @@ function ItemRowContent({
     <div 
       className={`rounded-lg p-2 ${item.completed ? 'bg-success-50 dark:bg-success-900/10' : 'bg-default-50 dark:bg-default-100'} ${isDragging ? 'shadow-md' : ''} ${onClick ? 'cursor-pointer hover:bg-default-100 dark:hover:bg-default-200/50' : ''}`}
       onClick={(e) => {
-        // Don't trigger onClick if clicking checkbox, sub-item, or drag handle
+        // Don't trigger onClick if clicking checkbox, sub-item, drag handle, or delete button
         if ((e.target as HTMLElement).closest('[data-slot="wrapper"]') || 
             (e.target as HTMLElement).closest('[data-drag-handle]') ||
-            (e.target as HTMLElement).closest('[data-sub-item]')) return
+            (e.target as HTMLElement).closest('[data-sub-item]') ||
+            (e.target as HTMLElement).closest('[data-delete-btn]')) return
         onClick?.()
       }}
     >
       {/* Main item row - grip, checkbox, title all on one line */}
-      <div className="flex items-center gap-2">
+      <div className="flex items-center gap-2 group/item">
         {dragHandleProps && (
           <div {...dragHandleProps} data-drag-handle className="cursor-grab active:cursor-grabbing p-0.5 -ml-1 hover:bg-default-200 rounded">
             <GripVertical className="w-3 h-3 text-default-400" />
@@ -2408,8 +2423,42 @@ function ItemRowContent({
           size="sm"
         />
         <span className={`text-sm flex-1 ${item.completed ? 'line-through text-default-400' : ''}`}>{item.title}</span>
+        
+        {/* Note indicator with tooltip */}
+        {item.notes && (
+          <Tooltip 
+            content={
+              <div className="max-w-xs p-1">
+                <div className="text-xs prose prose-xs dark:prose-invert" dangerouslySetInnerHTML={{ __html: item.notes }} />
+              </div>
+            }
+            placement="top"
+          >
+            <div className="text-warning">
+              <StickyNote className="w-3.5 h-3.5" />
+            </div>
+          </Tooltip>
+        )}
+        
         {item.due_date && (
           <span className="text-xs text-default-400">{format(new Date(item.due_date), 'MMM d')}</span>
+        )}
+        
+        {/* Delete button - shows on hover */}
+        {onDelete && (
+          <Button
+            isIconOnly
+            size="sm"
+            variant="light"
+            className="opacity-0 group-hover/item:opacity-100 transition-opacity min-w-6 w-6 h-6"
+            onPress={(e) => {
+              e.stopPropagation()
+              onDelete()
+            }}
+            data-delete-btn
+          >
+            <Trash2 className="w-3.5 h-3.5 text-danger" />
+          </Button>
         )}
       </div>
       
