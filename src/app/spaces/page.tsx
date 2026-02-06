@@ -12,6 +12,11 @@ import {
   DropdownMenu,
   DropdownItem,
   useDisclosure,
+  Modal,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
 } from '@heroui/react'
 import { Plus, User, MoreVertical, Edit, Trash2 } from 'lucide-react'
 import * as LucideIcons from 'lucide-react'
@@ -34,7 +39,9 @@ export default function SpacesPage() {
   const { isOpen: isAddOpen, onOpen: onAddOpen, onClose: onAddClose } = useDisclosure()
   const { isOpen: isEditOpen, onOpen: onEditOpen, onClose: onEditClose } = useDisclosure()
   const { isOpen: isTransferOpen, onOpen: onTransferOpen, onClose: onTransferClose } = useDisclosure()
+  const { isOpen: isDeleteOpen, onOpen: onDeleteOpen, onClose: onDeleteClose } = useDisclosure()
   const [selectedSpace, setSelectedSpace] = useState<Space | null>(null)
+  const [spaceToDelete, setSpaceToDelete] = useState<Space | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [contentCounts, setContentCounts] = useState<ContentCounts>({ documents: 0, tasks: 0, projects: 0 })
 
@@ -88,21 +95,33 @@ export default function SpacesPage() {
         setSelectedSpace(space)
         onTransferOpen()
       } else {
-        // Space is empty - confirm and delete directly
-        if (!confirm(`Are you sure you want to delete "${space.name}"? This action cannot be undone.`)) {
-          return
-        }
-
-        const { error } = await supabase
-          .from('spaces')
-          .delete()
-          .eq('id', space.id)
-
-        if (error) throw error
-
-        showSuccessToast('Space deleted')
-        refreshSpaces()
+        // Space is empty - show delete confirmation modal
+        setSpaceToDelete(space)
+        onDeleteOpen()
       }
+    } catch (error) {
+      console.error('Delete space error:', error)
+      showErrorToast(error, 'Failed to delete space')
+    } finally {
+      setDeletingId(null)
+    }
+  }
+
+  async function confirmDeleteEmptySpace() {
+    if (!spaceToDelete) return
+    setDeletingId(spaceToDelete.id)
+    try {
+      const { error } = await supabase
+        .from('spaces')
+        .delete()
+        .eq('id', spaceToDelete.id)
+
+      if (error) throw error
+
+      showSuccessToast('Space deleted')
+      refreshSpaces()
+      onDeleteClose()
+      setSpaceToDelete(null)
     } catch (error) {
       console.error('Delete space error:', error)
       showErrorToast(error, 'Failed to delete space')
@@ -159,10 +178,10 @@ export default function SpacesPage() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6" style={{ gridAutoRows: '180px' }}>
             {spaces.map((space) => (
-              <Link key={space.id} href={`/spaces/${space.id}`} className="block h-full">
+              <Link key={space.id} href={`/spaces/${space.id}`} className="block w-full h-full">
                 <Card
                   isPressable
-                  className="hover:shadow-lg transition-shadow h-full"
+                  className="hover:shadow-lg transition-shadow w-full h-full"
                 >
                   <CardBody className="p-5 flex flex-col h-full">
                     {/* Header row: icon + kebab menu */}
@@ -267,6 +286,33 @@ export default function SpacesPage() {
         otherSpaces={spaces.filter(s => s.id !== selectedSpace?.id)}
         contentCounts={contentCounts}
       />
+
+      {/* Delete Empty Space Confirmation Modal */}
+      <Modal isOpen={isDeleteOpen} onClose={onDeleteClose}>
+        <ModalContent>
+          <ModalHeader className="flex flex-col gap-1">Delete Space</ModalHeader>
+          <ModalBody>
+            <p className="text-default-600">
+              Are you sure you want to delete <strong>"{spaceToDelete?.name}"</strong>?
+            </p>
+            <p className="text-sm text-default-400">
+              This action cannot be undone.
+            </p>
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="flat" onPress={onDeleteClose}>
+              Cancel
+            </Button>
+            <Button 
+              color="danger" 
+              onPress={confirmDeleteEmptySpace}
+              isLoading={deletingId === spaceToDelete?.id}
+            >
+              Delete Space
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
     </div>
   )
 }
