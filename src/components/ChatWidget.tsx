@@ -46,7 +46,6 @@ interface ChatMessage {
   status: string
   created_at: string
   user_id: string
-  user?: { name: string; slug: string } | null
 }
 
 interface ChatThread {
@@ -388,7 +387,7 @@ export default function ChatWidget() {
 
   async function loadMessages(threadId: string) {
     setLoading(true)
-    let query = supabase.from('inbox').select('*, user:users!inbox_user_id_fkey(name, slug)').eq('item_type', 'message')
+    let query = supabase.from('inbox').select('*').eq('item_type', 'message')
 
     if (threadId.startsWith('dm-')) {
       const partner = threadId.replace('dm-', '')
@@ -1176,7 +1175,7 @@ export default function ChatWidget() {
                         }`}>
                           {!isMe && (
                             <p className={`text-[10px] font-semibold mb-0.5 ${msg.from_agent ? 'text-violet-500' : 'text-blue-500'}`}>
-                              {cap(msg.from_agent || msg.user?.name || msg.user?.slug || 'Unknown')}
+                              {cap(msg.from_agent || activeThread?.recipient || 'Someone')}
                             </p>
                           )}
                           {editingMsgId === msg.id ? (
