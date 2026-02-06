@@ -208,6 +208,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   const [noteTitle, setNoteTitle] = useState('')
   const [noteContent, setNoteContent] = useState('')
   const [savingNote, setSavingNote] = useState(false)
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null)
   
   // Image preview modal
   const { isOpen: isImageOpen, onOpen: onImageOpen, onClose: onImageClose } = useDisclosure()
@@ -787,31 +788,62 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
     }
   }
 
-  // Save a quick note as a resource
+  // Open note for editing
+  function openNoteForEdit(pin: ProjectPin) {
+    setEditingNoteId(pin.id)
+    setNoteTitle(pin.title)
+    setNoteContent(pin.notes || '')
+    onNoteOpen()
+  }
+
+  // Save a quick note as a resource (create or update)
   async function handleSaveNote() {
     if (!noteTitle.trim() || !noteContent.trim()) return
     setSavingNote(true)
     try {
-      const { data, error } = await supabase
-        .from('project_pins')
-        .insert({
-          project_id: id,
-          title: noteTitle.trim(),
-          pin_type: 'note',
-          notes: noteContent.trim(),
-          position: pins.length,
-          created_by: user?.id,
-        })
-        .select()
-        .single()
+      if (editingNoteId) {
+        // Update existing note
+        const { error } = await supabase
+          .from('project_pins')
+          .update({
+            title: noteTitle.trim(),
+            notes: noteContent.trim(),
+          })
+          .eq('id', editingNoteId)
+        
+        if (error) throw error
+        
+        setPins(prev => prev.map(p => 
+          p.id === editingNoteId 
+            ? { ...p, title: noteTitle.trim(), notes: noteContent.trim() }
+            : p
+        ))
+        showSuccessToast('Note updated')
+      } else {
+        // Create new note
+        const { data, error } = await supabase
+          .from('project_pins')
+          .insert({
+            project_id: id,
+            title: noteTitle.trim(),
+            pin_type: 'note',
+            notes: noteContent.trim(),
+            position: pins.length,
+            created_by: user?.id,
+          })
+          .select()
+          .single()
+        
+        if (error) throw error
+        
+        setPins(prev => [...prev, data])
+        showSuccessToast('Note saved')
+      }
       
-      if (error) throw error
-      
-      setPins(prev => [...prev, data])
       setNoteTitle('')
       setNoteContent('')
+      setEditingNoteId(null)
       onNoteClose()
-      showSuccessToast('Note saved')
     } catch (error) {
       showErrorToast(error, 'Failed to save note')
     } finally {
@@ -1400,7 +1432,12 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                 <Button size="sm" variant="flat" startContent={<FileText className="w-4 h-4" />} onPress={openDocModal}>
                   Doc
                 </Button>
-                <Button size="sm" variant="flat" startContent={<StickyNote className="w-4 h-4" />} onPress={onNoteOpen}>
+                <Button size="sm" variant="flat" startContent={<StickyNote className="w-4 h-4" />} onPress={() => {
+                  setEditingNoteId(null)
+                  setNoteTitle('')
+                  setNoteContent('')
+                  onNoteOpen()
+                }}>
                   Note
                 </Button>
               </div>
@@ -1422,17 +1459,23 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                   const isNote = pin.pin_type === 'note'
                   const isImage = isFile && /\.(jpg|jpeg|png|gif|webp)$/i.test(pin.url || '')
                   
+                  // Get snippet for notes (strip HTML and truncate)
+                  const noteSnippet = isNote && pin.notes 
+                    ? pin.notes.replace(/<[^>]*>/g, '').slice(0, 100) + (pin.notes.length > 100 ? '...' : '')
+                    : ''
+                  
                   return (
                     <div 
                       key={pin.id} 
-                      className={`group flex items-center gap-3 p-2 rounded-lg hover:bg-default-100 transition-colors ${isNote ? '' : 'cursor-pointer'}`}
+                      className="group flex items-center gap-3 p-2 rounded-lg hover:bg-default-100 transition-colors cursor-pointer"
                       onClick={() => {
-                        if (isNote) return // Notes expand inline, no click action
-                        if (isImage && pin.url) {
+                        if (isNote) {
+                          // Open note for editing
+                          openNoteForEdit(pin)
+                        } else if (isImage && pin.url) {
                           setPreviewImage(pin.url)
                           onImageOpen()
                         } else if (isDoc && pin.url) {
-                          // Extract doc ID from URL like /docs/{id}
                           const docId = pin.url.split('/docs/')[1]
                           if (docId) loadDocForPreview(docId, pin.title)
                         } else if (pin.url) {
@@ -1457,20 +1500,20 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                         {pin.notes && !isNote && (
                           <StickyNote className="inline-block w-3 h-3 text-warning ml-1" />
                         )}
-                        {isNote && pin.notes && (
-                          renderContent(pin.notes, 'text-xs text-default-500 mt-1 prose prose-xs dark:prose-invert max-w-none')
+                        {isNote && noteSnippet && (
+                          <p className="text-xs text-default-500 mt-1 line-clamp-2">{noteSnippet}</p>
                         )}
                       </div>
-                      <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
+                      <div 
+                        className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={(e) => e.stopPropagation()}
+                      >
                         <Button 
                           isIconOnly 
                           size="sm" 
                           variant="light" 
                           className="min-w-7 w-7 h-7" 
-                          onPress={(e) => {
-                            e.stopPropagation()
-                            handleDeletePin(pin.id)
-                          }}
+                          onPress={() => handleDeletePin(pin.id)}
                         >
                           <Trash2 className="w-3.5 h-3.5 text-danger" />
                         </Button>
@@ -1779,7 +1822,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
       {/* Quick Note Modal */}
       <Modal isOpen={isNoteOpen} onClose={onNoteClose} size="2xl">
         <ModalContent>
-          <ModalHeader>Add Note</ModalHeader>
+          <ModalHeader>{editingNoteId ? 'Edit Note' : 'Add Note'}</ModalHeader>
           <ModalBody>
             <Input
               label="Title"
@@ -1804,7 +1847,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
               isLoading={savingNote}
               isDisabled={!noteTitle.trim() || !noteContent.trim()}
             >
-              Save Note
+              {editingNoteId ? 'Update Note' : 'Save Note'}
             </Button>
           </ModalFooter>
         </ModalContent>
@@ -2466,19 +2509,17 @@ function ItemRowContent({
         
         {/* Delete button - shows on hover */}
         {onDelete && (
-          <Button
-            isIconOnly
-            size="sm"
-            variant="light"
-            className="opacity-0 group-hover/item:opacity-100 transition-opacity min-w-6 w-6 h-6"
-            onPress={(e) => {
-              e.stopPropagation()
-              onDelete()
-            }}
-            data-delete-btn
-          >
-            <Trash2 className="w-3.5 h-3.5 text-danger" />
-          </Button>
+          <div onClick={(e) => e.stopPropagation()} data-delete-btn>
+            <Button
+              isIconOnly
+              size="sm"
+              variant="light"
+              className="opacity-0 group-hover/item:opacity-100 transition-opacity min-w-6 w-6 h-6"
+              onPress={onDelete}
+            >
+              <Trash2 className="w-3.5 h-3.5 text-danger" />
+            </Button>
+          </div>
         )}
       </div>
       
