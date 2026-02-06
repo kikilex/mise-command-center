@@ -179,6 +179,8 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   const titleInputRef = useRef<HTMLInputElement>(null)
   const notesTextareaRef = useRef<HTMLTextAreaElement>(null)
   const updateTextareaRef = useRef<HTMLTextAreaElement>(null)
+  const noteContentRef = useRef<HTMLTextAreaElement>(null)
+  const docEditRef = useRef<HTMLTextAreaElement>(null)
   
   // File upload
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -1793,14 +1795,45 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
               className="mb-3"
             />
             <Textarea
+              ref={noteContentRef}
               label="Content"
-              placeholder="Write your note..."
+              placeholder="Write your note (Markdown supported)..."
               value={noteContent}
               onValueChange={setNoteContent}
               variant="bordered"
-              minRows={4}
-              maxRows={10}
+              minRows={6}
+              maxRows={12}
             />
+            <div className="flex items-center gap-1 mt-2">
+              <Button
+                isIconOnly
+                size="sm"
+                variant="flat"
+                onPress={() => applyFormatting(noteContentRef as any, noteContent, setNoteContent, '**', '**')}
+                title="Bold"
+              >
+                <Bold className="w-3.5 h-3.5" />
+              </Button>
+              <Button
+                isIconOnly
+                size="sm"
+                variant="flat"
+                onPress={() => applyFormatting(noteContentRef as any, noteContent, setNoteContent, '_', '_')}
+                title="Italic"
+              >
+                <Italic className="w-3.5 h-3.5" />
+              </Button>
+              <Button
+                isIconOnly
+                size="sm"
+                variant="flat"
+                onPress={() => applyFormatting(noteContentRef as any, noteContent, setNoteContent, '==', '==')}
+                title="Highlight"
+              >
+                <Highlighter className="w-3.5 h-3.5" />
+              </Button>
+              <span className="text-xs text-default-400 ml-2">Markdown supported</span>
+            </div>
           </ModalBody>
           <ModalFooter>
             <Button variant="flat" onPress={onNoteClose}>Cancel</Button>
@@ -2041,15 +2074,66 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                 <Spinner size="lg" />
               </div>
             ) : isEditingDoc ? (
-              <Textarea
-                value={editDocContent}
-                onValueChange={setEditDocContent}
-                variant="bordered"
-                placeholder="Write document content (Markdown supported)..."
-                minRows={15}
-                maxRows={30}
-                classNames={{ input: 'font-mono text-sm' }}
-              />
+              <div>
+                <Textarea
+                  ref={docEditRef}
+                  value={editDocContent}
+                  onValueChange={setEditDocContent}
+                  variant="bordered"
+                  placeholder="Write document content (Markdown supported)..."
+                  minRows={15}
+                  maxRows={30}
+                  classNames={{ input: 'font-mono text-sm' }}
+                />
+                <div className="flex items-center gap-1 mt-3">
+                  <Button
+                    isIconOnly
+                    size="sm"
+                    variant="flat"
+                    onPress={() => applyFormatting(docEditRef as any, editDocContent, setEditDocContent, '**', '**')}
+                    title="Bold"
+                  >
+                    <Bold className="w-3.5 h-3.5" />
+                  </Button>
+                  <Button
+                    isIconOnly
+                    size="sm"
+                    variant="flat"
+                    onPress={() => applyFormatting(docEditRef as any, editDocContent, setEditDocContent, '_', '_')}
+                    title="Italic"
+                  >
+                    <Italic className="w-3.5 h-3.5" />
+                  </Button>
+                  <Button
+                    isIconOnly
+                    size="sm"
+                    variant="flat"
+                    onPress={() => applyFormatting(docEditRef as any, editDocContent, setEditDocContent, '==', '==')}
+                    title="Highlight"
+                  >
+                    <Highlighter className="w-3.5 h-3.5" />
+                  </Button>
+                  <Button
+                    isIconOnly
+                    size="sm"
+                    variant="flat"
+                    onPress={() => applyFormatting(docEditRef as any, editDocContent, setEditDocContent, '# ', '')}
+                    title="Heading"
+                  >
+                    <span className="font-bold text-xs">H</span>
+                  </Button>
+                  <Button
+                    isIconOnly
+                    size="sm"
+                    variant="flat"
+                    onPress={() => applyFormatting(docEditRef as any, editDocContent, setEditDocContent, '- ', '')}
+                    title="Bullet List"
+                  >
+                    <span className="font-bold text-xs">•</span>
+                  </Button>
+                  <span className="text-xs text-default-400 ml-2">Markdown supported</span>
+                </div>
+              </div>
             ) : (
               <div className="prose prose-sm dark:prose-invert max-w-none">
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>
