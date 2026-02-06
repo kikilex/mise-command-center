@@ -192,6 +192,12 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   const [creatingDoc, setCreatingDoc] = useState(false)
   const [docSearch, setDocSearch] = useState('')
   
+  // Note modal (for quick notes as resources)
+  const { isOpen: isNoteOpen, onOpen: onNoteOpen, onClose: onNoteClose } = useDisclosure()
+  const [noteTitle, setNoteTitle] = useState('')
+  const [noteContent, setNoteContent] = useState('')
+  const [savingNote, setSavingNote] = useState(false)
+  
   // Image preview modal
   const { isOpen: isImageOpen, onOpen: onImageOpen, onClose: onImageClose } = useDisclosure()
   const [previewImage, setPreviewImage] = useState<string | null>(null)
@@ -751,6 +757,38 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
     }
   }
 
+  // Save a quick note as a resource
+  async function handleSaveNote() {
+    if (!noteTitle.trim() || !noteContent.trim()) return
+    setSavingNote(true)
+    try {
+      const { data, error } = await supabase
+        .from('project_pins')
+        .insert({
+          project_id: id,
+          title: noteTitle.trim(),
+          pin_type: 'note',
+          notes: noteContent.trim(),
+          position: pins.length,
+          created_by: user?.id,
+        })
+        .select()
+        .single()
+      
+      if (error) throw error
+      
+      setPins(prev => [...prev, data])
+      setNoteTitle('')
+      setNoteContent('')
+      onNoteClose()
+      showSuccessToast('Note saved')
+    } catch (error) {
+      showErrorToast(error, 'Failed to save note')
+    } finally {
+      setSavingNote(false)
+    }
+  }
+
   // Load docs for linking
   async function loadSpaceDocs() {
     if (!project?.space_id) return
@@ -1301,6 +1339,9 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                 <Button size="sm" variant="flat" startContent={<FileText className="w-4 h-4" />} onPress={openDocModal}>
                   Doc
                 </Button>
+                <Button size="sm" variant="flat" startContent={<StickyNote className="w-4 h-4" />} onPress={onNoteOpen}>
+                  Note
+                </Button>
               </div>
             </div>
             <input 
@@ -1317,13 +1358,15 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                 {pins.map(pin => {
                   const isFile = pin.pin_type === 'file'
                   const isDoc = pin.pin_type === 'doc'
+                  const isNote = pin.pin_type === 'note'
                   const isImage = isFile && /\.(jpg|jpeg|png|gif|webp)$/i.test(pin.url || '')
                   
                   return (
                     <div 
                       key={pin.id} 
-                      className="group flex items-center gap-3 p-2 rounded-lg hover:bg-default-100 transition-colors cursor-pointer"
+                      className={`group flex items-center gap-3 p-2 rounded-lg hover:bg-default-100 transition-colors ${isNote ? '' : 'cursor-pointer'}`}
                       onClick={() => {
+                        if (isNote) return // Notes expand inline, no click action
                         if (isImage && pin.url) {
                           setPreviewImage(pin.url)
                           onImageOpen()
@@ -1336,8 +1379,9 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                         }
                       }}
                     >
-                      <div className="w-8 h-8 rounded-lg bg-default-100 flex items-center justify-center flex-shrink-0">
-                        {isImage ? <ImageIcon className="w-4 h-4 text-default-500" /> :
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${isNote ? 'bg-warning-100' : 'bg-default-100'}`}>
+                        {isNote ? <StickyNote className="w-4 h-4 text-warning" /> :
+                         isImage ? <ImageIcon className="w-4 h-4 text-default-500" /> :
                          isFile ? <File className="w-4 h-4 text-default-500" /> :
                          isDoc ? <FileText className="w-4 h-4 text-primary" /> :
                          <LinkIcon className="w-4 h-4 text-default-500" />}
@@ -1346,11 +1390,14 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                         <span className="text-sm font-medium hover:text-primary">
                           {pin.title}
                         </span>
-                        {!isDoc && !isImage && pin.url && (
+                        {!isDoc && !isImage && !isNote && pin.url && (
                           <ExternalLink className="inline-block w-3 h-3 text-default-400 ml-1" />
                         )}
-                        {pin.notes && (
+                        {pin.notes && !isNote && (
                           <StickyNote className="inline-block w-3 h-3 text-warning ml-1" />
+                        )}
+                        {isNote && pin.notes && (
+                          <p className="text-xs text-default-500 mt-1 whitespace-pre-wrap">{pin.notes}</p>
                         )}
                       </div>
                       <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -1707,6 +1754,43 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
           </ModalBody>
           <ModalFooter>
             <Button variant="flat" onPress={onDocClose}>Cancel</Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+
+      {/* Quick Note Modal */}
+      <Modal isOpen={isNoteOpen} onClose={onNoteClose} size="lg">
+        <ModalContent>
+          <ModalHeader>Add Note</ModalHeader>
+          <ModalBody>
+            <Input
+              label="Title"
+              placeholder="Note title..."
+              value={noteTitle}
+              onValueChange={setNoteTitle}
+              variant="bordered"
+              className="mb-3"
+            />
+            <Textarea
+              label="Content"
+              placeholder="Write your note..."
+              value={noteContent}
+              onValueChange={setNoteContent}
+              variant="bordered"
+              minRows={4}
+              maxRows={10}
+            />
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="flat" onPress={onNoteClose}>Cancel</Button>
+            <Button 
+              color="primary" 
+              onPress={handleSaveNote} 
+              isLoading={savingNote}
+              isDisabled={!noteTitle.trim() || !noteContent.trim()}
+            >
+              Save Note
+            </Button>
           </ModalFooter>
         </ModalContent>
       </Modal>
