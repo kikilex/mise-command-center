@@ -84,7 +84,7 @@ interface InboxItem {
   thread_id: string | null
   subject: string | null
   tags: string[] | null
-  status: 'pending' | 'processing' | 'processed'
+  status: 'pending' | 'processing' | 'processed' | 'archived'
   created_at: string
 }
 
@@ -344,12 +344,12 @@ export default function Home() {
 
   async function handleDeleteDump(id: string) {
     try {
-      const { error } = await supabase.from('inbox').delete().eq('id', id);
+      const { error } = await supabase.from('inbox').update({ status: 'archived' }).eq('id', id);
       if (error) throw error;
       setInboxItems(prev => prev.filter(i => i.id !== id));
-      showSuccessToast('Removed');
+      showSuccessToast('Archived');
     } catch (error) {
-      showErrorToast(error, 'Failed to delete');
+      showErrorToast(error, 'Failed to archive');
     }
   }
 
