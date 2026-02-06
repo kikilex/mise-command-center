@@ -162,13 +162,13 @@ export default function SpacesPage() {
               <Link key={space.id} href={`/spaces/${space.id}`}>
                 <Card
                   isPressable
-                  className="hover:shadow-lg transition-shadow"
+                  className="h-[180px] hover:shadow-lg transition-shadow"
                 >
-                  <CardBody className="p-5">
+                  <CardBody className="p-5 h-full flex flex-col">
                     {/* Header row: icon + kebab menu */}
-                    <div className="flex items-start justify-between mb-4">
+                    <div className="flex items-start justify-between mb-3">
                       <div 
-                        className="w-12 h-12 rounded-xl flex items-center justify-center text-white text-xl font-bold shadow-md"
+                        className="w-11 h-11 rounded-xl flex items-center justify-center text-white text-lg font-bold shadow-md flex-shrink-0"
                         style={{ backgroundColor: space.color || '#3b82f6' }}
                       >
                         {renderSpaceIcon(space.icon, space.name.charAt(0))}
@@ -218,18 +218,18 @@ export default function SpacesPage() {
                       </Dropdown>
                     </div>
 
-                    {/* Space name */}
-                    <h3 className="text-lg font-semibold text-default-800 mb-1">{space.name}</h3>
-                    
-                    {/* Description - only show if exists */}
-                    {space.description && (
-                      <p className="text-sm text-default-500 line-clamp-2 mb-4">
-                        {space.description}
-                      </p>
-                    )}
+                    {/* Content area - flex grow */}
+                    <div className="flex-1 min-h-0">
+                      <h3 className="text-base font-semibold text-default-800 line-clamp-1">{space.name}</h3>
+                      {space.description && (
+                        <p className="text-sm text-default-500 line-clamp-2 mt-1">
+                          {space.description}
+                        </p>
+                      )}
+                    </div>
 
-                    {/* Footer: role */}
-                    <div className="flex items-center pt-3 mt-auto border-t border-default-100">
+                    {/* Footer: role - always at bottom */}
+                    <div className="flex items-center pt-2 border-t border-default-100">
                       <span className="text-xs text-default-400 capitalize">
                         {space.role || 'member'}
                       </span>
