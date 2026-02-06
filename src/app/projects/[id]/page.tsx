@@ -579,14 +579,9 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
 
   // Toggle sub-item completion (immediate save)
   async function handleToggleSubItem(phaseId: string, itemId: string, subId: string) {
-    console.log('handleToggleSubItem called:', { phaseId, itemId, subId })
     const phase = phases.find(p => p.id === phaseId)
     const item = phase?.items?.find(i => i.id === itemId)
-    if (!item) {
-      console.log('Item not found!', { phase, itemId })
-      return
-    }
-    console.log('Found item:', item.title, 'sub_items:', item.sub_items)
+    if (!item) return
 
     // Parse existing sub-items
     const subItems: SubItem[] = (item.sub_items || []).map((sub, idx) => {
@@ -1354,10 +1349,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                       members={members}
                       sensors={sensors}
                       onToggleItem={(itemId, completed) => handleToggleItem(phase.id, itemId, completed)}
-                      onToggleSubItem={(itemId, subId) => {
-                        console.log('Main component - about to call handleToggleSubItem:', phase.id, itemId, subId)
-                        handleToggleSubItem(phase.id, itemId, subId)
-                      }}
+                      onToggleSubItem={(itemId, subId) => handleToggleSubItem(phase.id, itemId, subId)}
                       onDeleteItem={(itemId) => handleDeleteItem(phase.id, itemId)}
                       onOpenItem={(item) => openItemDrawer(item)}
                       onOpenAssignModal={() => openAssignPhaseModal(phase)}
@@ -2196,8 +2188,6 @@ function PhaseCardContent({
   const [editTitle, setEditTitle] = useState(phase.title)
   const titleInputRef = useRef<HTMLInputElement>(null)
   
-  console.log('PhaseCardContent render - onToggleSubItem exists:', !!onToggleSubItem, 'phase:', phase.title, 'sensors:', !!sensors, 'completed:', completed)
-  
   const items = phase.items || []
   const completedCount = items.filter(i => i.completed).length
   const totalCount = items.length
@@ -2335,10 +2325,7 @@ function PhaseCardContent({
                     item={item}
                     onToggle={() => onToggleItem?.(item.id, item.completed)}
                     onClick={() => onOpenItem?.(item)}
-                    onToggleSubItem={onToggleSubItem ? (subId) => {
-                      console.log('SortableItemRow wrapper - calling parent onToggleSubItem:', item.id, subId)
-                      onToggleSubItem(item.id, subId)
-                    } : undefined}
+                    onToggleSubItem={onToggleSubItem ? (subId) => onToggleSubItem(item.id, subId) : undefined}
                     onDelete={onDeleteItem ? () => onDeleteItem(item.id) : undefined}
                   />
                 ))}
@@ -2361,10 +2348,7 @@ function PhaseCardContent({
                 item={item}
                 onToggle={() => onToggleItem?.(item.id, item.completed)}
                 onClick={() => onOpenItem?.(item)}
-                onToggleSubItem={onToggleSubItem ? (subId) => {
-                  console.log('ItemRowContent wrapper - calling parent onToggleSubItem:', item.id, subId)
-                  onToggleSubItem(item.id, subId)
-                } : undefined}
+                onToggleSubItem={onToggleSubItem ? (subId) => onToggleSubItem(item.id, subId) : undefined}
                 onDelete={onDeleteItem ? () => onDeleteItem(item.id) : undefined}
               />
             ))}
@@ -2416,7 +2400,6 @@ function SortableItemRow({
   onToggleSubItem?: (subId: string) => void
   onDelete?: () => void
 }) {
-  console.log('SortableItemRow render - onToggleSubItem exists:', !!onToggleSubItem, 'for item:', item.title)
   const {
     attributes,
     listeners,
@@ -2465,9 +2448,6 @@ function ItemRowContent({
   isDragging?: boolean
 }) {
   const hasSubItems = item.sub_items && item.sub_items.length > 0
-  if (hasSubItems) {
-    console.log('ItemRowContent render - onToggleSubItem exists:', !!onToggleSubItem, 'for item:', item.title, 'sub_items count:', item.sub_items?.length)
-  }
   // Parse sub-items for display
   const subItems: SubItem[] = (item.sub_items || []).map((sub, idx) => {
     try {
@@ -2554,22 +2534,13 @@ function ItemRowContent({
               className="flex items-center gap-2 cursor-pointer hover:bg-default-200/50 rounded px-1 py-0.5 -mx-1"
               onClick={(e) => {
                 e.stopPropagation()
-                console.log('Sub-item row clicked:', sub.id, 'onToggleSubItem exists:', !!onToggleSubItem)
                 onToggleSubItem?.(sub.id)
               }}
             >
               <Checkbox
                 isSelected={sub.completed}
                 size="sm"
-                onValueChange={() => {
-                  console.log('Checkbox onValueChange:', sub.id, 'onToggleSubItem exists in closure:', !!onToggleSubItem)
-                  if (onToggleSubItem) {
-                    console.log('Calling onToggleSubItem with:', sub.id)
-                    onToggleSubItem(sub.id)
-                  } else {
-                    console.log('onToggleSubItem is UNDEFINED!')
-                  }
-                }}
+                onValueChange={() => onToggleSubItem?.(sub.id)}
               />
               <span className={`text-sm ${sub.completed ? 'line-through text-default-400' : ''}`}>
                 {sub.text}
