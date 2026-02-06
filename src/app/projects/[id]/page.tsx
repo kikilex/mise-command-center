@@ -37,7 +37,8 @@ import {
   MoreVertical, Send, X, ExternalLink, Trash2, 
   CheckCircle2, Circle, MessageSquare, GripVertical,
   User, Calendar, ChevronDown, ChevronUp, Users,
-  Bold, Italic, Highlighter, RotateCcw, Save
+  Bold, Italic, Highlighter, RotateCcw, Save,
+  Upload, File, Image as ImageIcon
 } from 'lucide-react'
 import * as LucideIcons from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
@@ -175,6 +176,17 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   // Refs for selection-based formatting
   const titleInputRef = useRef<HTMLInputElement>(null)
   const notesTextareaRef = useRef<HTMLTextAreaElement>(null)
+  
+  // File upload
+  const fileInputRef = useRef<HTMLInputElement>(null)
+  const [uploading, setUploading] = useState(false)
+  
+  // Doc modal
+  const { isOpen: isDocOpen, onOpen: onDocOpen, onClose: onDocClose } = useDisclosure()
+  const [spaceDocs, setSpaceDocs] = useState<any[]>([])
+  const [loadingDocs, setLoadingDocs] = useState(false)
+  const [newDocTitle, setNewDocTitle] = useState('')
+  const [creatingDoc, setCreatingDoc] = useState(false)
 
   // Phase assignment modal
   const { isOpen: isAssignPhaseOpen, onOpen: onAssignPhaseOpen, onClose: onAssignPhaseClose } = useDisclosure()
@@ -624,6 +636,161 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
     }
   }
 
+  // File upload
+  async function handleFileUpload(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    
+    // Check file size (50MB max)
+    if (file.size > 50 * 1024 * 1024) {
+      showErrorToast(new Error('File too large'), 'Maximum file size is 50MB')
+      return
+    }
+    
+    setUploading(true)
+    try {
+      const fileExt = file.name.split('.').pop()
+      const fileName = `${id}/${Date.now()}.${fileExt}`
+      
+      const { data: uploadData, error: uploadError } = await supabase.storage
+        .from('project-files')
+        .upload(fileName, file)
+      
+      if (uploadError) throw uploadError
+      
+      // Get public URL
+      const { data: urlData } = supabase.storage
+        .from('project-files')
+        .getPublicUrl(fileName)
+      
+      // Create pin record
+      const { data: pinData, error: pinError } = await supabase
+        .from('project_pins')
+        .insert({
+          project_id: id,
+          title: file.name,
+          pin_type: 'file',
+          url: urlData.publicUrl,
+          position: pins.length,
+          created_by: user?.id,
+        })
+        .select()
+        .single()
+      
+      if (pinError) throw pinError
+      
+      setPins(prev => [...prev, pinData])
+      showSuccessToast('File uploaded')
+    } catch (error) {
+      showErrorToast(error, 'Failed to upload file')
+    } finally {
+      setUploading(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
+  // Load docs for linking
+  async function loadSpaceDocs() {
+    if (!project?.space_id) return
+    setLoadingDocs(true)
+    try {
+      const { data, error } = await supabase
+        .from('documents')
+        .select('id, title, created_at')
+        .eq('space_id', project.space_id)
+        .order('created_at', { ascending: false })
+        .limit(50)
+      if (error) throw error
+      setSpaceDocs(data || [])
+    } catch (error) {
+      console.error('Failed to load docs:', error)
+    } finally {
+      setLoadingDocs(false)
+    }
+  }
+
+  // Open doc modal
+  function openDocModal() {
+    loadSpaceDocs()
+    setNewDocTitle('')
+    onDocOpen()
+  }
+
+  // Link existing doc
+  async function handleLinkDoc(docId: string, docTitle: string) {
+    try {
+      const { data, error } = await supabase
+        .from('project_pins')
+        .insert({
+          project_id: id,
+          title: docTitle,
+          pin_type: 'doc',
+          url: `/docs/${docId}`,
+          position: pins.length,
+          created_by: user?.id,
+        })
+        .select()
+        .single()
+      
+      if (error) throw error
+      
+      setPins(prev => [...prev, data])
+      onDocClose()
+      showSuccessToast('Document linked')
+    } catch (error) {
+      showErrorToast(error, 'Failed to link document')
+    }
+  }
+
+  // Create new doc and link
+  async function handleCreateDoc() {
+    if (!newDocTitle.trim() || !project?.space_id) return
+    setCreatingDoc(true)
+    try {
+      // Create the document
+      const { data: docData, error: docError } = await supabase
+        .from('documents')
+        .insert({
+          title: newDocTitle.trim(),
+          content: '',
+          space_id: project.space_id,
+          project_id: id,
+          author_id: user?.id,
+        })
+        .select()
+        .single()
+      
+      if (docError) throw docError
+      
+      // Create pin
+      const { data: pinData, error: pinError } = await supabase
+        .from('project_pins')
+        .insert({
+          project_id: id,
+          title: newDocTitle.trim(),
+          pin_type: 'doc',
+          url: `/docs/${docData.id}`,
+          position: pins.length,
+          created_by: user?.id,
+        })
+        .select()
+        .single()
+      
+      if (pinError) throw pinError
+      
+      setPins(prev => [...prev, pinData])
+      onDocClose()
+      showSuccessToast('Document created and linked')
+      
+      // Open the new doc
+      router.push(`/docs/${docData.id}/edit`)
+    } catch (error) {
+      showErrorToast(error, 'Failed to create document')
+    } finally {
+      setCreatingDoc(false)
+    }
+  }
+
   // Post update
   async function postUpdate(content: string, type: string = 'post') {
     try {
@@ -985,42 +1152,74 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
               </div>
               <div className="flex gap-1">
                 <Button size="sm" variant="flat" startContent={<LinkIcon className="w-4 h-4" />} onPress={onPinOpen}>
-                  Add Link
+                  Link
+                </Button>
+                <Button 
+                  size="sm" 
+                  variant="flat" 
+                  startContent={<Upload className="w-4 h-4" />} 
+                  onPress={() => fileInputRef.current?.click()}
+                  isLoading={uploading}
+                >
+                  Upload
+                </Button>
+                <Button size="sm" variant="flat" startContent={<FileText className="w-4 h-4" />} onPress={openDocModal}>
+                  Doc
                 </Button>
               </div>
             </div>
+            <input 
+              ref={fileInputRef}
+              type="file"
+              className="hidden"
+              onChange={handleFileUpload}
+              accept="*/*"
+            />
             {pins.length === 0 ? (
               <p className="text-sm text-default-400 text-center py-4">No resources pinned yet. Add links, files, or docs.</p>
             ) : (
               <div className="space-y-2">
-                {pins.map(pin => (
-                  <div 
-                    key={pin.id} 
-                    className="group flex items-center gap-3 p-2 rounded-lg hover:bg-default-100 transition-colors"
-                  >
-                    <div className="w-8 h-8 rounded-lg bg-default-100 flex items-center justify-center flex-shrink-0">
-                      <LinkIcon className="w-4 h-4 text-default-500" />
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      {pin.url ? (
-                        <a href={pin.url} target="_blank" rel="noopener noreferrer" className="text-sm font-medium hover:text-primary flex items-center gap-1">
-                          {pin.title} <ExternalLink className="w-3 h-3 text-default-400" />
-                        </a>
-                      ) : (
-                        <span className="text-sm font-medium">{pin.title}</span>
-                      )}
-                    </div>
-                    <Button 
-                      isIconOnly 
-                      size="sm" 
-                      variant="light" 
-                      className="opacity-0 group-hover:opacity-100 min-w-7 w-7 h-7" 
-                      onPress={() => handleDeletePin(pin.id)}
+                {pins.map(pin => {
+                  const isFile = pin.pin_type === 'file'
+                  const isDoc = pin.pin_type === 'doc'
+                  const isImage = isFile && /\.(jpg|jpeg|png|gif|webp)$/i.test(pin.url || '')
+                  
+                  return (
+                    <div 
+                      key={pin.id} 
+                      className="group flex items-center gap-3 p-2 rounded-lg hover:bg-default-100 transition-colors"
                     >
-                      <Trash2 className="w-3.5 h-3.5 text-danger" />
-                    </Button>
-                  </div>
-                ))}
+                      <div className="w-8 h-8 rounded-lg bg-default-100 flex items-center justify-center flex-shrink-0">
+                        {isImage ? <ImageIcon className="w-4 h-4 text-default-500" /> :
+                         isFile ? <File className="w-4 h-4 text-default-500" /> :
+                         isDoc ? <FileText className="w-4 h-4 text-primary" /> :
+                         <LinkIcon className="w-4 h-4 text-default-500" />}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        {isDoc && pin.url ? (
+                          <a href={pin.url} className="text-sm font-medium hover:text-primary">
+                            {pin.title}
+                          </a>
+                        ) : pin.url ? (
+                          <a href={pin.url} target="_blank" rel="noopener noreferrer" className="text-sm font-medium hover:text-primary flex items-center gap-1">
+                            {pin.title} <ExternalLink className="w-3 h-3 text-default-400" />
+                          </a>
+                        ) : (
+                          <span className="text-sm font-medium">{pin.title}</span>
+                        )}
+                      </div>
+                      <Button 
+                        isIconOnly 
+                        size="sm" 
+                        variant="light" 
+                        className="opacity-0 group-hover:opacity-100 min-w-7 w-7 h-7" 
+                        onPress={() => handleDeletePin(pin.id)}
+                      >
+                        <Trash2 className="w-3.5 h-3.5 text-danger" />
+                      </Button>
+                    </div>
+                  )
+                })}
               </div>
             )}
           </CardBody>
@@ -1162,6 +1361,67 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
             <Button color="primary" onPress={handleSavePhaseAssignment}>
               Save
             </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
+
+      {/* Add/Link Doc Modal */}
+      <Modal isOpen={isDocOpen} onClose={onDocClose} size="lg">
+        <ModalContent>
+          <ModalHeader>Add Document</ModalHeader>
+          <ModalBody>
+            {/* Create new doc */}
+            <div className="mb-4">
+              <label className="text-sm font-medium text-default-600 mb-2 block">Create New Document</label>
+              <div className="flex gap-2">
+                <Input
+                  placeholder="Document title..."
+                  value={newDocTitle}
+                  onValueChange={setNewDocTitle}
+                  variant="bordered"
+                  className="flex-1"
+                />
+                <Button 
+                  color="primary" 
+                  onPress={handleCreateDoc}
+                  isDisabled={!newDocTitle.trim()}
+                  isLoading={creatingDoc}
+                >
+                  Create
+                </Button>
+              </div>
+            </div>
+            
+            {/* Or link existing */}
+            <div>
+              <label className="text-sm font-medium text-default-600 mb-2 block">Or Link Existing Document</label>
+              {loadingDocs ? (
+                <div className="flex justify-center py-4">
+                  <Spinner size="sm" />
+                </div>
+              ) : spaceDocs.length === 0 ? (
+                <p className="text-sm text-default-400 text-center py-4">No documents in this space yet.</p>
+              ) : (
+                <div className="max-h-60 overflow-y-auto space-y-1">
+                  {spaceDocs.map(doc => (
+                    <div 
+                      key={doc.id}
+                      className="flex items-center gap-3 p-2 rounded-lg hover:bg-default-100 cursor-pointer transition-colors"
+                      onClick={() => handleLinkDoc(doc.id, doc.title)}
+                    >
+                      <FileText className="w-4 h-4 text-default-400" />
+                      <span className="text-sm flex-1">{doc.title}</span>
+                      <span className="text-xs text-default-400">
+                        {formatDistanceToNow(new Date(doc.created_at), { addSuffix: true })}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="flat" onPress={onDocClose}>Cancel</Button>
           </ModalFooter>
         </ModalContent>
       </Modal>
