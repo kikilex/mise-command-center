@@ -116,19 +116,14 @@ export default function PlaybooksPage() {
       setSpaces(spaceList)
 
       // Load playbooks
-      let query = supabase
+      // Load ALL playbooks the user has access to (RLS handles filtering)
+      const { data: playbooksData, error } = await supabase
         .from('playbooks')
         .select(`
           *,
           steps:playbook_steps (*)
         `)
         .order('created_at', { ascending: false })
-
-      if (selectedBusinessId) {
-        query = query.eq('space_id', selectedBusinessId)
-      }
-
-      const { data: playbooksData, error } = await query
 
       if (error) throw error
       setPlaybooks(playbooksData || [])
