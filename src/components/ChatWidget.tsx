@@ -296,7 +296,12 @@ export default function ChatWidget() {
     const { data: { user } } = await supabase.auth.getUser()
     if (!user) return
     setUser(user)
-    await Promise.all([loadThreads(user.id), loadSpacesAndProjects()])
+    
+    // Fetch profile to get user name/slug for recipient checks
+    const { data: profile } = await supabase.from('users').select('name').eq('id', user.id).single()
+    const userName = profile?.name || user.email?.split('@')[0] || ''
+    
+    await Promise.all([loadThreads(user.id, userName), loadSpacesAndProjects()])
   }
 
   async function loadSpacesAndProjects() {
@@ -308,7 +313,7 @@ export default function ChatWidget() {
     setProjects(projectsRes.data || [])
   }
 
-  async function loadThreads(userId: string) {
+  async function loadThreads(userId: string, userName?: string) {
     const { data } = await supabase
       .from('inbox')
       .select('*')
@@ -318,6 +323,7 @@ export default function ChatWidget() {
     if (!data) return
 
     const threadMap = new Map<string, ChatThread>()
+    const currentUserName = userName?.toLowerCase()
 
     data.forEach(item => {
       const partner = item.from_agent || item.to_recipient || 'unknown'
@@ -337,8 +343,14 @@ export default function ChatWidget() {
         })
       }
 
-      // Collect participants
       const t = threadMap.get(id)!
+      
+      // Increment unread count if message is pending and user is the recipient
+      if (item.status === 'pending' && item.to_recipient?.toLowerCase() === currentUserName) {
+        t.unreadCount++
+      }
+
+      // Collect participants
       if (item.from_agent && !t.participants.includes(item.from_agent)) t.participants.push(item.from_agent)
       if (item.to_recipient && !t.participants.includes(item.to_recipient)) t.participants.push(item.to_recipient)
     })
@@ -797,7 +809,7 @@ export default function ChatWidget() {
                     </div>
                     <div className="flex-1 min-w-0">
                       <div className="flex justify-between items-center">
-                        <span className={`font-semibold text-base md:text-sm truncate ${active ? 'text-white' : 'text-slate-800 dark:text-slate-100'}`}>
+                        <span className={`font-semibold text-base truncate ${active ? 'text-white' : 'text-slate-800 dark:text-slate-100'}`}>
                           {t.subject || `Chat with ${cap(t.recipient)}`}
                         </span>
                         <div className="flex items-center gap-2 md:gap-1.5 flex-shrink-0 ml-1">
@@ -847,7 +859,7 @@ export default function ChatWidget() {
                       ) : (
                         <>
                           <div className="flex items-center gap-1">
-                            <p className={`text-[15px] md:text-[13px] truncate ${active ? 'text-blue-100' : 'text-slate-500'}`}>
+                            <p className={`text-[15px] truncate ${active ? 'text-blue-100' : 'text-slate-500'}`}>
                               {cap(t.recipient)}: {t.lastMessage}
                             </p>
                           </div>

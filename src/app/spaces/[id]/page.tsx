@@ -77,9 +77,30 @@ export default function SpaceDetailPage() {
     const uid = userId || user?.id
     setLoading(true)
     try {
-      const [spaceRes, membersRes, tasksRes, projectsRes, docsRes, threadsRes, userRoleRes] = await Promise.all([
+      // First fetch members to get user IDs
+      const { data: membersData, error: membersError } = await supabase
+        .from('space_members')
+        .select('*')
+        .eq('space_id', id)
+      
+      if (membersError) throw membersError
+
+      const memberUserIds = membersData?.map(m => m.user_id) || []
+      
+      // Then fetch user profiles for those IDs
+      const { data: usersData } = await supabase
+        .from('users')
+        .select('*')
+        .in('id', memberUserIds)
+
+      // Map profiles back to members
+      const membersWithUsers = (membersData || []).map(member => ({
+        ...member,
+        user: usersData?.find(u => u.id === member.user_id)
+      }))
+
+      const [spaceRes, tasksRes, projectsRes, docsRes, threadsRes, userRoleRes] = await Promise.all([
         supabase.from('spaces').select('*').eq('id', id).single(),
-        supabase.from('space_members').select('*, user:users!space_members_user_id_fkey(*)').eq('space_id', id),
         supabase.from('tasks')
           .select('*, assignee:users(*)')
           .eq('space_id', id)
@@ -103,12 +124,12 @@ export default function SpaceDetailPage() {
           .select('role')
           .eq('space_id', id)
           .eq('user_id', uid)
-          .single() : Promise.resolve({ data: null, error: null })
+          .maybeSingle() : Promise.resolve({ data: null, error: null })
       ])
 
       if (spaceRes.error) throw spaceRes.error
       setSpace(spaceRes.data)
-      setMembers(membersRes.data || [])
+      setMembers(membersWithUsers)
       setTasks(tasksRes.data || [])
       setProjects(projectsRes.data || [])
       setDocuments(docsRes.data || [])

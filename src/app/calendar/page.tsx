@@ -448,8 +448,18 @@ export default function CalendarPage() {
                   color="primary"
                   radius="full"
                   onPress={() => openNewEventModal()}
+                  className="sm:hidden"
                 >
                   <Plus className="w-5 h-5" />
+                </Button>
+                <Button
+                  color="primary"
+                  radius="full"
+                  onPress={() => openNewEventModal()}
+                  startContent={<Plus className="w-5 h-5" />}
+                  className="hidden sm:flex"
+                >
+                  New Event
                 </Button>
               </div>
             </div>
