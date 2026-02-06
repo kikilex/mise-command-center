@@ -306,10 +306,22 @@ export default function ChatWidget() {
         const { data } = await query.order('created_at', { ascending: true })
         
         if (data) {
-          // Only update if we have new messages
+          const currentSlug = userNameRef.current?.toLowerCase()
+          
+          // Mark pending messages as read
+          const pendingIds = data
+            .filter(msg => msg.status === 'pending' && msg.to_recipient?.toLowerCase() === currentSlug)
+            .map(msg => msg.id)
+          
+          if (pendingIds.length > 0) {
+            await supabase.from('inbox').update({ status: 'processed' }).in('id', pendingIds)
+            // Update thread unread count
+            setThreads(prev => prev.map(t => t.id === activeThread.id ? { ...t, unreadCount: 0 } : t))
+          }
+          
+          // Only update messages if we have new ones
           setMessages(prev => {
             if (data.length > prev.length) {
-              // Play sound for new incoming messages
               const newMsgs = data.slice(prev.length)
               const hasIncoming = newMsgs.some(m => m.user_id !== currentUser.id)
               if (hasIncoming) playNotificationSound()
