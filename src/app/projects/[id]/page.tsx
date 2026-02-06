@@ -1354,7 +1354,10 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                       members={members}
                       sensors={sensors}
                       onToggleItem={(itemId, completed) => handleToggleItem(phase.id, itemId, completed)}
-                      onToggleSubItem={(itemId, subId) => handleToggleSubItem(phase.id, itemId, subId)}
+                      onToggleSubItem={(itemId, subId) => {
+                        console.log('Main component - about to call handleToggleSubItem:', phase.id, itemId, subId)
+                        handleToggleSubItem(phase.id, itemId, subId)
+                      }}
                       onDeleteItem={(itemId) => handleDeleteItem(phase.id, itemId)}
                       onOpenItem={(item) => openItemDrawer(item)}
                       onOpenAssignModal={() => openAssignPhaseModal(phase)}
