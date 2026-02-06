@@ -2395,9 +2395,10 @@ function ItemRowContent({
         onClick?.()
       }}
     >
+      {/* Main item row - grip, checkbox, title all on one line */}
       <div className="flex items-center gap-2">
         {dragHandleProps && (
-          <div {...dragHandleProps} data-drag-handle className="cursor-grab active:cursor-grabbing p-0.5 -ml-1 hover:bg-default-200 rounded self-start mt-1">
+          <div {...dragHandleProps} data-drag-handle className="cursor-grab active:cursor-grabbing p-0.5 -ml-1 hover:bg-default-200 rounded">
             <GripVertical className="w-3 h-3 text-default-400" />
           </div>
         )}
@@ -2405,47 +2406,42 @@ function ItemRowContent({
           isSelected={item.completed}
           onValueChange={() => onToggle?.()}
           size="sm"
-          className="self-start mt-0.5"
         />
-        <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-2">
-            <span className={`text-sm ${item.completed ? 'line-through text-default-400' : ''}`}>{item.title}</span>
-            {item.due_date && (
-              <span className="text-xs text-default-400">{format(new Date(item.due_date), 'MMM d')}</span>
-            )}
-          </div>
-          
-          {/* Sub-items */}
-          {subItems.length > 0 && (
-            <div className="mt-2 space-y-1 ml-1">
-              {subItems.map(sub => (
-                <div 
-                  key={sub.id} 
-                  data-sub-item
-                  className="flex items-center gap-2"
-                >
-                  <Checkbox
-                    isSelected={sub.completed}
-                    size="sm"
-                    onValueChange={() => {
-                      if (onToggleSubItem) onToggleSubItem(sub.id)
-                    }}
-                  />
-                  <span 
-                    className={`text-sm ${sub.completed ? 'line-through text-default-400' : ''}`}
-                    onClick={(e) => {
-                      e.stopPropagation()
-                      if (onToggleSubItem) onToggleSubItem(sub.id)
-                    }}
-                  >
-                    {sub.text}
-                  </span>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+        <span className={`text-sm flex-1 ${item.completed ? 'line-through text-default-400' : ''}`}>{item.title}</span>
+        {item.due_date && (
+          <span className="text-xs text-default-400">{format(new Date(item.due_date), 'MMM d')}</span>
+        )}
       </div>
+      
+      {/* Sub-items - separate row, indented */}
+      {subItems.length > 0 && (
+        <div className="mt-2 ml-7 space-y-1">
+          {subItems.map(sub => (
+            <div 
+              key={sub.id} 
+              data-sub-item
+              className="flex items-center gap-2"
+            >
+              <Checkbox
+                isSelected={sub.completed}
+                size="sm"
+                onValueChange={() => {
+                  if (onToggleSubItem) onToggleSubItem(sub.id)
+                }}
+              />
+              <span 
+                className={`text-sm ${sub.completed ? 'line-through text-default-400' : ''}`}
+                onClick={(e) => {
+                  e.stopPropagation()
+                  if (onToggleSubItem) onToggleSubItem(sub.id)
+                }}
+              >
+                {sub.text}
+              </span>
+            </div>
+          ))}
+        </div>
+      )}
     </div>
   )
 }
