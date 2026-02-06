@@ -178,6 +178,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   // Refs for selection-based formatting
   const titleInputRef = useRef<HTMLInputElement>(null)
   const notesTextareaRef = useRef<HTMLTextAreaElement>(null)
+  const updateTextareaRef = useRef<HTMLTextAreaElement>(null)
   
   // File upload
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -1392,36 +1393,69 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
           <CardBody className="p-3">
             <div className="flex items-start gap-3">
               <Avatar src={user?.avatar_url} name={user?.display_name || user?.name} size="sm" className="flex-shrink-0 mt-1" />
-              <div className="flex-1 relative">
-                <Textarea
-                  placeholder="Write an update... (Enter to post)"
-                  value={newUpdate}
-                  onValueChange={setNewUpdate}
-                  minRows={1}
-                  maxRows={6}
-                  variant="bordered"
-                  classNames={{
-                    inputWrapper: 'pr-10 bg-default-50'
-                  }}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter' && !e.shiftKey) {
-                      e.preventDefault()
-                      if (newUpdate.trim()) handlePostManualUpdate()
-                    }
-                  }}
-                />
-                <Button 
-                  isIconOnly 
-                  size="sm" 
-                  color="primary" 
-                  variant="solid"
-                  className="absolute right-2 bottom-2 min-w-7 w-7 h-7"
-                  isDisabled={!newUpdate.trim()} 
-                  isLoading={posting} 
-                  onPress={handlePostManualUpdate}
-                >
-                  <Send className="w-3.5 h-3.5" />
-                </Button>
+              <div className="flex-1">
+                <div className="relative">
+                  <Textarea
+                    ref={updateTextareaRef}
+                    placeholder="Write an update... (Enter to post)"
+                    value={newUpdate}
+                    onValueChange={setNewUpdate}
+                    minRows={1}
+                    maxRows={6}
+                    variant="bordered"
+                    classNames={{
+                      inputWrapper: 'pr-10 bg-default-50'
+                    }}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault()
+                        if (newUpdate.trim()) handlePostManualUpdate()
+                      }
+                    }}
+                  />
+                  <Button 
+                    isIconOnly 
+                    size="sm" 
+                    color="primary" 
+                    variant="solid"
+                    className="absolute right-2 bottom-2 min-w-7 w-7 h-7"
+                    isDisabled={!newUpdate.trim()} 
+                    isLoading={posting} 
+                    onPress={handlePostManualUpdate}
+                  >
+                    <Send className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
+                {/* Formatting buttons */}
+                <div className="flex items-center gap-1 mt-2">
+                  <Button
+                    isIconOnly
+                    size="sm"
+                    variant="flat"
+                    onPress={() => applyFormatting(updateTextareaRef as any, newUpdate, setNewUpdate, '**', '**')}
+                    title="Bold"
+                  >
+                    <Bold className="w-3.5 h-3.5" />
+                  </Button>
+                  <Button
+                    isIconOnly
+                    size="sm"
+                    variant="flat"
+                    onPress={() => applyFormatting(updateTextareaRef as any, newUpdate, setNewUpdate, '_', '_')}
+                    title="Italic"
+                  >
+                    <Italic className="w-3.5 h-3.5" />
+                  </Button>
+                  <Button
+                    isIconOnly
+                    size="sm"
+                    variant="flat"
+                    onPress={() => applyFormatting(updateTextareaRef as any, newUpdate, setNewUpdate, '==', '==')}
+                    title="Highlight"
+                  >
+                    <Highlighter className="w-3.5 h-3.5" />
+                  </Button>
+                </div>
               </div>
             </div>
           </CardBody>
@@ -2032,50 +2066,49 @@ function PhaseCardContent({
     <Card className={`${completed ? 'bg-success-50 dark:bg-success-900/10' : ''} ${isDragging ? 'shadow-lg' : ''}`}>
       <CardBody className="p-4">
         {/* Phase Header */}
-        <div className="flex items-start justify-between mb-3">
+        <div className="flex items-center justify-between mb-3">
           <div className="flex items-center gap-2 flex-1">
             {dragHandleProps && !completed && (
               <div {...dragHandleProps} className="cursor-grab active:cursor-grabbing p-1 -ml-1 hover:bg-default-100 rounded">
                 <GripVertical className="w-4 h-4 text-default-400" />
               </div>
             )}
-            <div className="flex-1">
-              {isEditingTitle ? (
-                <Input
-                  ref={titleInputRef}
-                  value={editTitle}
-                  onValueChange={setEditTitle}
-                  size="sm"
-                  variant="bordered"
-                  classNames={{ input: 'font-semibold' }}
-                  onBlur={handleTitleSave}
-                  onKeyDown={(e) => {
-                    if (e.key === 'Enter') handleTitleSave()
-                    if (e.key === 'Escape') setIsEditingTitle(false)
-                  }}
-                />
-              ) : (
-                <h3 
-                  className={`font-semibold text-foreground ${!completed && onUpdateTitle ? 'cursor-pointer hover:text-primary' : ''}`}
-                  onClick={handleTitleClick}
-                >
-                  {phase.title}
-                </h3>
-              )}
-              <div className="flex items-center gap-2 mt-1">
-                <span className="text-xs text-default-400">{completedCount}/{totalCount}</span>
-                {phase.assignee && (
-                  <Avatar 
-                    src={phase.assignee.avatar_url} 
-                    name={phase.assignee.display_name || phase.assignee.name} 
-                    size="sm" 
-                    className="w-5 h-5"
-                    title={phase.assignee.display_name || phase.assignee.name}
-                  />
-                )}
-              </div>
-            </div>
+            {isEditingTitle ? (
+              <Input
+                ref={titleInputRef}
+                value={editTitle}
+                onValueChange={setEditTitle}
+                size="sm"
+                variant="bordered"
+                classNames={{ input: 'font-semibold', base: 'flex-1' }}
+                onBlur={handleTitleSave}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter') handleTitleSave()
+                  if (e.key === 'Escape') setIsEditingTitle(false)
+                }}
+              />
+            ) : (
+              <h3 
+                className={`font-semibold text-foreground flex-1 ${!completed && onUpdateTitle ? 'cursor-pointer hover:text-primary' : ''}`}
+                onClick={handleTitleClick}
+              >
+                {phase.title}
+              </h3>
+            )}
           </div>
+          
+          {/* Right side: count, avatar, kebab */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-default-400">{completedCount}/{totalCount}</span>
+            {phase.assignee && (
+              <Avatar 
+                src={phase.assignee.avatar_url} 
+                name={phase.assignee.display_name || phase.assignee.name} 
+                size="sm" 
+                className="w-5 h-5"
+                title={phase.assignee.display_name || phase.assignee.name}
+              />
+            )}
           
           {!completed && onDeletePhase && (
             <Dropdown>
@@ -2110,6 +2143,7 @@ function PhaseCardContent({
               Restore
             </Button>
           )}
+          </div>
         </div>
 
         {/* Progress Bar */}
@@ -2270,9 +2304,9 @@ function ItemRowContent({
         onClick?.()
       }}
     >
-      <div className="flex items-start gap-2">
+      <div className="flex items-center gap-2">
         {dragHandleProps && (
-          <div {...dragHandleProps} data-drag-handle className="cursor-grab active:cursor-grabbing p-0.5 -ml-1 hover:bg-default-200 rounded mt-0.5">
+          <div {...dragHandleProps} data-drag-handle className="cursor-grab active:cursor-grabbing p-0.5 -ml-1 hover:bg-default-200 rounded">
             <GripVertical className="w-3 h-3 text-default-400" />
           </div>
         )}
@@ -2280,14 +2314,10 @@ function ItemRowContent({
           isSelected={item.completed}
           onValueChange={() => onToggle?.()}
           size="sm"
-          className="mt-0.5"
         />
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-2">
             <span className={`text-sm ${item.completed ? 'line-through text-default-400' : ''}`}>{item.title}</span>
-            {item.assignee && (
-              <Avatar src={item.assignee.avatar_url} name={item.assignee.display_name || item.assignee.name} size="sm" className="w-4 h-4" />
-            )}
             {item.due_date && (
               <span className="text-xs text-default-400">{format(new Date(item.due_date), 'MMM d')}</span>
             )}
