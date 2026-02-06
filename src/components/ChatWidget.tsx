@@ -255,10 +255,16 @@ export default function ChatWidget() {
         console.log('[ChatWidget] Realtime subscription status:', status)
       })
 
-    // Polling fallback - refresh threads every 15 seconds
+    // Poll frequently for new messages (realtime blocked by RLS)
     const pollInterval = setInterval(() => {
-      if (user) loadThreads(user.id, userNameRef.current)
-    }, 15000)
+      if (user) {
+        loadThreads(user.id, userNameRef.current)
+        // Also refresh active thread messages
+        if (activeThreadRef.current) {
+          loadMessages(activeThreadRef.current.id)
+        }
+      }
+    }, 3000)
 
     return () => { 
       supabase.removeChannel(channel)
