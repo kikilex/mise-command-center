@@ -384,12 +384,12 @@ export default function ChatWidget() {
     if (!user) return
     setUser(user)
     
-    // Fetch profile to get user name/slug for recipient checks
-    const { data: profile } = await supabase.from('users').select('name').eq('id', user.id).single()
-    const userName = profile?.name || user.email?.split('@')[0] || ''
-    userNameRef.current = userName
+    // Fetch profile to get user slug for recipient matching
+    const { data: profile } = await supabase.from('users').select('slug').eq('id', user.id).single()
+    const userSlug = profile?.slug || user.email?.split('@')[0] || ''
+    userNameRef.current = userSlug
     
-    await Promise.all([loadThreads(user.id, userName), loadSpacesAndProjects()])
+    await Promise.all([loadThreads(user.id, userSlug), loadSpacesAndProjects()])
   }
 
   async function loadSpacesAndProjects() {
