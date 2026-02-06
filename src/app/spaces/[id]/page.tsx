@@ -14,9 +14,18 @@ import {
   AvatarGroup,
   Chip,
   Link as NextUILink,
-  useDisclosure
+  useDisclosure,
+  Dropdown,
+  DropdownTrigger,
+  DropdownMenu,
+  DropdownItem,
+  Modal,
+  ModalContent,
+  ModalHeader,
+  ModalBody,
+  ModalFooter,
 } from '@heroui/react'
-import { Plus, Settings, ArrowRight, ListTodo, Calendar, Users, FileText, MessageSquare, ChevronRight, FolderKanban, X } from 'lucide-react'
+import { Plus, Settings, ArrowRight, ListTodo, Calendar, Users, FileText, MessageSquare, ChevronRight, FolderKanban, X, MoreVertical, Edit, Trash2 } from 'lucide-react'
 import * as LucideIcons from 'lucide-react'
 import Link from 'next/link'
 import Navbar from '@/components/Navbar'
@@ -24,7 +33,9 @@ import { useSpace } from '@/lib/space-context'
 import { toast } from 'react-hot-toast'
 import AddTaskModal from '@/components/AddTaskModal'
 import AddProjectModal from '@/components/AddProjectModal'
+import EditProjectModal from '@/components/EditProjectModal'
 import InviteMemberModal from '@/components/InviteMemberModal'
+import { showErrorToast, showSuccessToast } from '@/lib/errors'
 
 export default function SpaceDetailPage() {
   // ... rest
@@ -47,7 +58,11 @@ export default function SpaceDetailPage() {
   
   const { isOpen: isTaskOpen, onOpen: onTaskOpen, onClose: onTaskClose } = useDisclosure()
   const { isOpen: isProjectOpen, onOpen: onProjectOpen, onClose: onProjectClose } = useDisclosure()
+  const { isOpen: isEditProjectOpen, onOpen: onEditProjectOpen, onClose: onEditProjectClose } = useDisclosure()
+  const { isOpen: isDeleteProjectOpen, onOpen: onDeleteProjectOpen, onClose: onDeleteProjectClose } = useDisclosure()
   const { isOpen: isInviteOpen, onOpen: onInviteOpen, onClose: onInviteClose } = useDisclosure()
+  const [selectedProject, setSelectedProject] = useState<any>(null)
+  const [deletingProjectId, setDeletingProjectId] = useState<string | null>(null)
   
   const supabase = createClient()
 
@@ -233,6 +248,37 @@ export default function SpaceDetailPage() {
     const Icon = (LucideIcons as any)[iconName]
     if (Icon) return <Icon className="w-5 h-5" />
     return fallback || iconName
+  }
+
+  const renderProjectIcon = (iconName: string | null) => {
+    if (iconName) {
+      const Icon = (LucideIcons as any)[iconName]
+      if (Icon) return <Icon className="w-4 h-4 text-primary-600 dark:text-primary-400" />
+    }
+    return <FolderKanban className="w-4 h-4 text-primary-600 dark:text-primary-400" />
+  }
+
+  async function handleDeleteProject() {
+    if (!selectedProject) return
+    setDeletingProjectId(selectedProject.id)
+    try {
+      const { error } = await supabase
+        .from('projects')
+        .delete()
+        .eq('id', selectedProject.id)
+
+      if (error) throw error
+
+      showSuccessToast('Project deleted')
+      setProjects(prev => prev.filter(p => p.id !== selectedProject.id))
+      onDeleteProjectClose()
+      setSelectedProject(null)
+    } catch (error) {
+      console.error('Delete project error:', error)
+      showErrorToast(error, 'Failed to delete project')
+    } finally {
+      setDeletingProjectId(null)
+    }
   }
 
   return (
@@ -442,27 +488,64 @@ export default function SpaceDetailPage() {
                       >
                         <CardBody className="p-4">
                           <div className="flex items-start justify-between">
-                            <div className="flex items-center gap-3 min-w-0">
-                              <div className="w-9 h-9 rounded-lg bg-primary-50 dark:bg-primary-900/20 flex items-center justify-center flex-shrink-0">
-                                <FolderKanban className="w-4 h-4 text-primary-600 dark:text-primary-400" />
+                            <div className="flex items-center gap-3 min-w-0 flex-1">
+                              <div 
+                                className="w-9 h-9 rounded-lg flex items-center justify-center flex-shrink-0"
+                                style={{ backgroundColor: project.color ? `${project.color}20` : undefined }}
+                              >
+                                {renderProjectIcon(project.icon)}
                               </div>
-                              <div className="min-w-0">
+                              <div className="min-w-0 flex-1">
                                 <h3 className="font-semibold text-foreground truncate">{project.name}</h3>
                                 <div className="flex items-center gap-2 mt-1">
                                   <span className="text-xs text-default-400">
                                     {projectTaskCounts[project.id] || 0} tasks
                                   </span>
+                                  <Chip
+                                    size="sm"
+                                    color={getProjectStatusColor(project.status) as any}
+                                    variant="flat"
+                                  >
+                                    {project.status === 'on_hold' ? 'On Hold' : project.status}
+                                  </Chip>
                                 </div>
                               </div>
                             </div>
-                            <Chip
-                              size="sm"
-                              color={getProjectStatusColor(project.status) as any}
-                              variant="flat"
-                              className="flex-shrink-0"
-                            >
-                              {project.status === 'on_hold' ? 'On Hold' : project.status}
-                            </Chip>
+                            <Dropdown>
+                              <DropdownTrigger>
+                                <Button
+                                  isIconOnly
+                                  variant="light"
+                                  size="sm"
+                                  className="text-default-400 hover:text-default-600"
+                                  onClick={(e) => {
+                                    e.preventDefault()
+                                    e.stopPropagation()
+                                  }}
+                                >
+                                  <MoreVertical className="w-4 h-4" />
+                                </Button>
+                              </DropdownTrigger>
+                              <DropdownMenu
+                                aria-label="Project actions"
+                                onAction={(key) => {
+                                  if (key === 'edit') {
+                                    setSelectedProject(project)
+                                    onEditProjectOpen()
+                                  } else if (key === 'delete') {
+                                    setSelectedProject(project)
+                                    onDeleteProjectOpen()
+                                  }
+                                }}
+                              >
+                                <DropdownItem key="edit" startContent={<Edit className="w-4 h-4" />}>
+                                  Edit Project
+                                </DropdownItem>
+                                <DropdownItem key="delete" className="text-danger" color="danger" startContent={<Trash2 className="w-4 h-4" />}>
+                                  Delete Project
+                                </DropdownItem>
+                              </DropdownMenu>
+                            </Dropdown>
                           </div>
                         </CardBody>
                       </Card>
@@ -593,22 +676,60 @@ export default function SpaceDetailPage() {
                       >
                         <CardBody className="p-5">
                           <div className="flex items-start justify-between mb-3">
-                            <div className="flex items-center gap-3">
-                              <div className="w-10 h-10 rounded-lg bg-primary-50 dark:bg-primary-900/20 flex items-center justify-center">
-                                <FolderKanban className="w-5 h-5 text-primary-600 dark:text-primary-400" />
+                            <div className="flex items-center gap-3 flex-1 min-w-0">
+                              <div 
+                                className="w-10 h-10 rounded-lg flex items-center justify-center flex-shrink-0"
+                                style={{ backgroundColor: project.color ? `${project.color}20` : undefined }}
+                              >
+                                {renderProjectIcon(project.icon)}
                               </div>
-                              <div>
-                                <h3 className="font-semibold text-foreground">{project.name}</h3>
-                                <span className="text-xs text-default-400 capitalize">{project.status === 'on_hold' ? 'On Hold' : project.status}</span>
+                              <div className="min-w-0 flex-1">
+                                <h3 className="font-semibold text-foreground truncate">{project.name}</h3>
+                                <Chip
+                                  size="sm"
+                                  color={getProjectStatusColor(project.status) as any}
+                                  variant="flat"
+                                  className="mt-1"
+                                >
+                                  {project.status === 'on_hold' ? 'On Hold' : project.status}
+                                </Chip>
                               </div>
                             </div>
-                            <Chip
-                              size="sm"
-                              color={getProjectStatusColor(project.status) as any}
-                              variant="flat"
-                            >
-                              {project.status === 'on_hold' ? 'On Hold' : project.status}
-                            </Chip>
+                            <Dropdown>
+                              <DropdownTrigger>
+                                <Button
+                                  isIconOnly
+                                  variant="light"
+                                  size="sm"
+                                  className="text-default-400 hover:text-default-600 flex-shrink-0"
+                                  onClick={(e) => {
+                                    e.preventDefault()
+                                    e.stopPropagation()
+                                  }}
+                                >
+                                  <MoreVertical className="w-4 h-4" />
+                                </Button>
+                              </DropdownTrigger>
+                              <DropdownMenu
+                                aria-label="Project actions"
+                                onAction={(key) => {
+                                  if (key === 'edit') {
+                                    setSelectedProject(project)
+                                    onEditProjectOpen()
+                                  } else if (key === 'delete') {
+                                    setSelectedProject(project)
+                                    onDeleteProjectOpen()
+                                  }
+                                }}
+                              >
+                                <DropdownItem key="edit" startContent={<Edit className="w-4 h-4" />}>
+                                  Edit Project
+                                </DropdownItem>
+                                <DropdownItem key="delete" className="text-danger" color="danger" startContent={<Trash2 className="w-4 h-4" />}>
+                                  Delete Project
+                                </DropdownItem>
+                              </DropdownMenu>
+                            </Dropdown>
                           </div>
 
                           {project.description && (
@@ -953,6 +1074,43 @@ export default function SpaceDetailPage() {
         spaceId={id as string}
         currentUserId={user?.id}
       />
+
+      <EditProjectModal
+        project={selectedProject}
+        isOpen={isEditProjectOpen}
+        onClose={() => {
+          onEditProjectClose()
+          setSelectedProject(null)
+        }}
+        onSuccess={loadSpaceData}
+      />
+
+      {/* Delete Project Confirmation Modal */}
+      <Modal isOpen={isDeleteProjectOpen} onClose={onDeleteProjectClose}>
+        <ModalContent>
+          <ModalHeader className="flex flex-col gap-1">Delete Project</ModalHeader>
+          <ModalBody>
+            <p className="text-default-600">
+              Are you sure you want to delete <strong>"{selectedProject?.name}"</strong>?
+            </p>
+            <p className="text-sm text-default-400">
+              This will also remove all tasks associated with this project. This action cannot be undone.
+            </p>
+          </ModalBody>
+          <ModalFooter>
+            <Button variant="flat" onPress={onDeleteProjectClose}>
+              Cancel
+            </Button>
+            <Button 
+              color="danger" 
+              onPress={handleDeleteProject}
+              isLoading={deletingProjectId === selectedProject?.id}
+            >
+              Delete Project
+            </Button>
+          </ModalFooter>
+        </ModalContent>
+      </Modal>
     </div>
   )
 }
