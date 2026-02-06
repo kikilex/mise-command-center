@@ -1515,7 +1515,7 @@ export default function ChatWidget() {
       >
         <MessageCircle className={`w-7 h-7 transition-transform duration-300 ${isOpen ? 'rotate-90' : ''}`} />
         {unreadTotal > 0 && (
-          <div className="absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center border-2 border-white dark:border-slate-800">
+          <div className="absolute -top-2 -right-2 bg-red-500 text-white text-xs font-bold min-w-6 h-6 px-1 rounded-full flex items-center justify-center border-2 border-white dark:border-slate-800 animate-pulse shadow-lg">
             {unreadTotal}
           </div>
         )}
