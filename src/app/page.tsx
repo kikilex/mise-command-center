@@ -53,6 +53,7 @@ interface UserData {
   name?: string
   avatar_url?: string
   role?: string
+  is_admin?: boolean
 }
 
 interface Space {
@@ -191,7 +192,8 @@ export default function Home() {
         email: authUser.email || '',
         name: profile?.name || authUser.email?.split('@')[0],
         avatar_url: profile?.avatar_url,
-        role: profile?.role || 'member'
+        role: profile?.role || 'member',
+        is_admin: profile?.is_admin || false
       });
 
       const [spacesRes, tasksRes, completedRes, inboxRes, messagesRes, agentsRes, workLogRes] = await Promise.all([
@@ -199,10 +201,12 @@ export default function Home() {
         supabase.from('tasks')
           .select('*')
           .neq('status', 'done')
+          .or(`created_by.eq.${authUser.id},assignee_id.eq.${authUser.id}`)
           .order('priority', { ascending: false }),
         supabase.from('tasks')
           .select('*')
           .eq('status', 'done')
+          .or(`created_by.eq.${authUser.id},assignee_id.eq.${authUser.id}`)
           .order('updated_at', { ascending: false })
           .limit(5),
         supabase.from('inbox')
@@ -971,57 +975,60 @@ export default function Home() {
               </CardBody>
             </Card>
 
-            <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-              <CardHeader className="bg-slate-50 dark:bg-slate-800/50 px-4 py-3 border-b border-slate-200 dark:border-slate-700">
-                <div className="flex items-center justify-between w-full">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
-                      <Bot className="w-4 h-4 text-white" />
-                    </div>
-                    <span className="font-semibold text-slate-800 dark:text-slate-100">Agents</span>
-                  </div>
-                  <Button size="sm" variant="light" radius="full" onPress={() => router.push('/ai')}>
-                    View All
-                  </Button>
-                </div>
-              </CardHeader>
-              <CardBody className="p-0 divide-y divide-slate-100 dark:divide-slate-800">
-                {agents.map((agent) => (
-                  <div 
-                    key={agent.id} 
-                    onClick={() => handleAgentClick(agent)}
-                    className="p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors"
-                  >
-                    <div className="flex items-center justify-between mb-2">
-                      <div className="flex items-center gap-3">
-                        <div className="relative">
-                          <Avatar name={agent.name} size="sm" className="bg-gradient-to-br from-violet-500 to-purple-600 text-white font-black" />
-                          <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white dark:border-slate-900 ${agent.is_active ? 'bg-emerald-500' : 'bg-slate-400'}`} />
-                        </div>
-                        <div>
-                          <p className="font-semibold text-sm text-slate-800 dark:text-slate-100">{agent.name}</p>
-                          <p className="text-[10px] text-slate-400 capitalize">{agent.role.replace(/_/g, ' ')}</p>
-                        </div>
+            {/* Agents Widget - Admin Only */}
+            {user?.is_admin && (
+              <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+                <CardHeader className="bg-slate-50 dark:bg-slate-800/50 px-4 py-3 border-b border-slate-200 dark:border-slate-700">
+                  <div className="flex items-center justify-between w-full">
+                    <div className="flex items-center gap-2">
+                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
+                        <Bot className="w-4 h-4 text-white" />
                       </div>
-                      <Chip size="sm" variant="flat" color={agent.is_active ? 'success' : 'default'} className="h-5 text-[10px]">
-                        {agent.is_active ? 'Online' : 'Offline'}
-                      </Chip>
+                      <span className="font-semibold text-slate-800 dark:text-slate-100">Agents</span>
                     </div>
-                    {agent.last_action && (
-                      <div className="ml-11 mt-1">
-                        <div className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
-                          <Activity className="w-3 h-3 text-slate-400 flex-shrink-0" />
-                          <span className="line-clamp-1">{agent.last_action}</span>
-                        </div>
-                        {agent.last_action_at && (
-                          <p className="text-[10px] text-slate-400 ml-4.5 mt-0.5">{timeAgo(agent.last_action_at)}</p>
-                        )}
-                      </div>
-                    )}
+                    <Button size="sm" variant="light" radius="full" onPress={() => router.push('/ai')}>
+                      View All
+                    </Button>
                   </div>
-                ))}
-              </CardBody>
-            </Card>
+                </CardHeader>
+                <CardBody className="p-0 divide-y divide-slate-100 dark:divide-slate-800">
+                  {agents.map((agent) => (
+                    <div 
+                      key={agent.id} 
+                      onClick={() => handleAgentClick(agent)}
+                      className="p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors"
+                    >
+                      <div className="flex items-center justify-between mb-2">
+                        <div className="flex items-center gap-3">
+                          <div className="relative">
+                            <Avatar name={agent.name} size="sm" className="bg-gradient-to-br from-violet-500 to-purple-600 text-white font-black" />
+                            <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white dark:border-slate-900 ${agent.is_active ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+                          </div>
+                          <div>
+                            <p className="font-semibold text-sm text-slate-800 dark:text-slate-100">{agent.name}</p>
+                            <p className="text-[10px] text-slate-400 capitalize">{agent.role.replace(/_/g, ' ')}</p>
+                          </div>
+                        </div>
+                        <Chip size="sm" variant="flat" color={agent.is_active ? 'success' : 'default'} className="h-5 text-[10px]">
+                          {agent.is_active ? 'Online' : 'Offline'}
+                        </Chip>
+                      </div>
+                      {agent.last_action && (
+                        <div className="ml-11 mt-1">
+                          <div className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
+                            <Activity className="w-3 h-3 text-slate-400 flex-shrink-0" />
+                            <span className="line-clamp-1">{agent.last_action}</span>
+                          </div>
+                          {agent.last_action_at && (
+                            <p className="text-[10px] text-slate-400 ml-4.5 mt-0.5">{timeAgo(agent.last_action_at)}</p>
+                          )}
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </CardBody>
+              </Card>
+            )}
           </div>
         </div>
       </main>
