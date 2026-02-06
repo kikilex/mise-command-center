@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, use } from 'react'
+import { useState, useEffect, use, useRef, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import {
@@ -26,12 +26,18 @@ import {
   DropdownItem,
   Select,
   SelectItem,
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerBody,
+  DrawerFooter,
 } from '@heroui/react'
 import { 
   ArrowLeft, Plus, Pin, FileText, Link as LinkIcon, 
   MoreVertical, Send, X, ExternalLink, Trash2, 
   CheckCircle2, Circle, MessageSquare, GripVertical,
-  User, Calendar, ChevronDown, ChevronUp, Users
+  User, Calendar, ChevronDown, ChevronUp, Users,
+  Bold, Italic, Highlighter, RotateCcw, Save
 } from 'lucide-react'
 import * as LucideIcons from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
@@ -40,6 +46,35 @@ import { showErrorToast, showSuccessToast } from '@/lib/errors'
 import { formatDistanceToNow, format } from 'date-fns'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
+
+// DnD Kit imports
+import {
+  DndContext,
+  closestCenter,
+  KeyboardSensor,
+  PointerSensor,
+  TouchSensor,
+  useSensor,
+  useSensors,
+  DragEndEvent,
+  DragStartEvent,
+  DragOverlay,
+} from '@dnd-kit/core'
+import {
+  arrayMove,
+  SortableContext,
+  sortableKeyboardCoordinates,
+  useSortable,
+  verticalListSortingStrategy,
+  horizontalListSortingStrategy,
+} from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
+
+interface SubItem {
+  id: string
+  text: string
+  completed: boolean
+}
 
 interface Phase {
   id: string
@@ -57,12 +92,13 @@ interface PhaseItem {
   id: string
   phase_id: string
   title: string
-  sub_items: string[]
+  sub_items: string[] // stored as JSON strings in db
   assigned_to: string | null
   due_date: string | null
   completed: boolean
   completed_at: string | null
   position: number
+  notes?: string | null
   assignee?: { id: string; name: string; display_name: string; avatar_url: string }
 }
 
@@ -125,10 +161,33 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   const [pinUrl, setPinUrl] = useState('')
   const [addingPin, setAddingPin] = useState(false)
 
-  // Item editing
-  const [editingItemId, setEditingItemId] = useState<string | null>(null)
-  const [newItemTitle, setNewItemTitle] = useState('')
-  const [addingItemToPhase, setAddingItemToPhase] = useState<string | null>(null)
+  // Item Drawer
+  const { isOpen: isDrawerOpen, onOpen: onDrawerOpen, onClose: onDrawerClose } = useDisclosure()
+  const [selectedItem, setSelectedItem] = useState<PhaseItem | null>(null)
+  const [drawerTitle, setDrawerTitle] = useState('')
+  const [drawerNotes, setDrawerNotes] = useState('')
+  const [drawerAssignee, setDrawerAssignee] = useState<string | null>(null)
+  const [drawerDueDate, setDrawerDueDate] = useState('')
+  const [drawerSubItems, setDrawerSubItems] = useState<SubItem[]>([])
+  const [newSubItemText, setNewSubItemText] = useState('')
+  const [savingDrawer, setSavingDrawer] = useState(false)
+
+  // DnD state
+  const [activePhaseId, setActivePhaseId] = useState<string | null>(null)
+  const [activeItemId, setActiveItemId] = useState<string | null>(null)
+
+  // DnD sensors with touch support
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 8 },
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: { delay: 200, tolerance: 8 },
+    }),
+    useSensor(KeyboardSensor, {
+      coordinateGetter: sortableKeyboardCoordinates,
+    })
+  )
 
   useEffect(() => {
     loadData()
@@ -248,9 +307,34 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
     }
   }
 
-  // Add item to phase
-  async function handleAddItem(phaseId: string) {
-    if (!newItemTitle.trim()) return
+  // Restore completed phase
+  async function handleRestorePhase(phaseId: string) {
+    const phase = phases.find(p => p.id === phaseId)
+    try {
+      const { error } = await supabase
+        .from('project_phases')
+        .update({ status: 'active', completed_at: null })
+        .eq('id', phaseId)
+      if (error) throw error
+      
+      setPhases(prev => prev.map(p => 
+        p.id === phaseId 
+          ? { ...p, status: 'active', completed_at: null }
+          : p
+      ))
+      
+      if (phase) {
+        await postUpdate(`Restored phase: "${phase.title}"`, 'phase_restored')
+        showSuccessToast(`Phase "${phase.title}" restored`)
+      }
+    } catch (error) {
+      showErrorToast(error, 'Failed to restore phase')
+    }
+  }
+
+  // Add item to phase (inline)
+  async function handleAddItem(phaseId: string, title: string) {
+    if (!title.trim()) return
     try {
       const phase = phases.find(p => p.id === phaseId)
       const position = phase?.items?.length || 0
@@ -259,7 +343,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
         .from('phase_items')
         .insert({
           phase_id: phaseId,
-          title: newItemTitle.trim(),
+          title: title.trim(),
           position,
         })
         .select('*, assignee:assigned_to (id, name, display_name, avatar_url)')
@@ -271,10 +355,10 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
           ? { ...p, items: [...(p.items || []), data] }
           : p
       ))
-      setNewItemTitle('')
-      setAddingItemToPhase(null)
+      return true
     } catch (error) {
       showErrorToast(error, 'Failed to add item')
+      return false
     }
   }
 
@@ -345,33 +429,10 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
           ? { ...p, items: p.items?.filter(i => i.id !== itemId) }
           : p
       ))
+      onDrawerClose()
+      showSuccessToast('Item deleted')
     } catch (error) {
       showErrorToast(error, 'Failed to delete item')
-    }
-  }
-
-  // Assign item
-  async function handleAssignItem(itemId: string, phaseId: string, userId: string | null) {
-    try {
-      const { error } = await supabase
-        .from('phase_items')
-        .update({ assigned_to: userId })
-        .eq('id', itemId)
-      if (error) throw error
-
-      const assignee = members.find(m => m.id === userId)
-      setPhases(prev => prev.map(p => 
-        p.id === phaseId 
-          ? { 
-              ...p, 
-              items: p.items?.map(i => 
-                i.id === itemId ? { ...i, assigned_to: userId, assignee } : i
-              )
-            }
-          : p
-      ))
-    } catch (error) {
-      showErrorToast(error, 'Failed to assign item')
     }
   }
 
@@ -473,12 +534,180 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
     }
   }
 
-  const renderProjectIcon = (iconName: string | null, fallback: string) => {
-    if (iconName) {
-      const Icon = (LucideIcons as any)[iconName]
-      if (Icon) return <Icon className="w-6 h-6" />
+  // Open item drawer
+  function openItemDrawer(item: PhaseItem) {
+    setSelectedItem(item)
+    setDrawerTitle(item.title)
+    setDrawerNotes(item.notes || '')
+    setDrawerAssignee(item.assigned_to)
+    setDrawerDueDate(item.due_date || '')
+    
+    // Parse sub_items - stored as JSON strings or plain text[]
+    const parsedSubItems: SubItem[] = (item.sub_items || []).map((sub, idx) => {
+      try {
+        const parsed = JSON.parse(sub)
+        return { id: parsed.id || `sub-${idx}`, text: parsed.text || sub, completed: parsed.completed || false }
+      } catch {
+        return { id: `sub-${idx}`, text: sub, completed: false }
+      }
+    })
+    setDrawerSubItems(parsedSubItems)
+    setNewSubItemText('')
+    onDrawerOpen()
+  }
+
+  // Save drawer changes
+  async function handleSaveDrawer() {
+    if (!selectedItem) return
+    setSavingDrawer(true)
+    
+    try {
+      // Serialize sub-items back to JSON strings
+      const serializedSubItems = drawerSubItems.map(sub => JSON.stringify(sub))
+      
+      const { error } = await supabase
+        .from('phase_items')
+        .update({
+          title: drawerTitle.trim(),
+          notes: drawerNotes.trim() || null,
+          assigned_to: drawerAssignee,
+          due_date: drawerDueDate || null,
+          sub_items: serializedSubItems,
+        })
+        .eq('id', selectedItem.id)
+      
+      if (error) throw error
+      
+      // Update local state
+      const assignee = members.find(m => m.id === drawerAssignee)
+      setPhases(prev => prev.map(p => ({
+        ...p,
+        items: p.items?.map(i => 
+          i.id === selectedItem.id 
+            ? { 
+                ...i, 
+                title: drawerTitle.trim(),
+                notes: drawerNotes.trim() || null,
+                assigned_to: drawerAssignee,
+                due_date: drawerDueDate || null,
+                sub_items: serializedSubItems,
+                assignee
+              }
+            : i
+        )
+      })))
+      
+      showSuccessToast('Item updated')
+      onDrawerClose()
+    } catch (error) {
+      showErrorToast(error, 'Failed to save item')
+    } finally {
+      setSavingDrawer(false)
     }
-    return fallback
+  }
+
+  // Add sub-item
+  function handleAddSubItem() {
+    if (!newSubItemText.trim()) return
+    const newSub: SubItem = {
+      id: `sub-${Date.now()}`,
+      text: newSubItemText.trim(),
+      completed: false,
+    }
+    setDrawerSubItems(prev => [...prev, newSub])
+    setNewSubItemText('')
+  }
+
+  // Toggle sub-item
+  function handleToggleSubItem(subId: string) {
+    setDrawerSubItems(prev => prev.map(sub =>
+      sub.id === subId ? { ...sub, completed: !sub.completed } : sub
+    ))
+  }
+
+  // Remove sub-item
+  function handleRemoveSubItem(subId: string) {
+    setDrawerSubItems(prev => prev.filter(sub => sub.id !== subId))
+  }
+
+  // Phase drag end
+  function handlePhaseDragEnd(event: DragEndEvent) {
+    const { active, over } = event
+    setActivePhaseId(null)
+    
+    if (!over || active.id === over.id) return
+    
+    const activePhases = phases.filter(p => p.status === 'active')
+    const oldIndex = activePhases.findIndex(p => p.id === active.id)
+    const newIndex = activePhases.findIndex(p => p.id === over.id)
+    
+    if (oldIndex === -1 || newIndex === -1) return
+    
+    const reordered = arrayMove(activePhases, oldIndex, newIndex)
+    
+    // Update positions
+    const updates = reordered.map((phase, idx) => ({
+      id: phase.id,
+      position: idx,
+    }))
+    
+    // Optimistic update
+    setPhases(prev => {
+      const completed = prev.filter(p => p.status === 'completed')
+      const updated = reordered.map((p, idx) => ({ ...p, position: idx }))
+      return [...updated, ...completed]
+    })
+    
+    // Persist to DB
+    Promise.all(
+      updates.map(u => 
+        supabase.from('project_phases').update({ position: u.position }).eq('id', u.id)
+      )
+    ).catch(err => {
+      showErrorToast(err, 'Failed to reorder phases')
+      loadData() // Reload on error
+    })
+  }
+
+  // Item drag end (within a phase)
+  function handleItemDragEnd(phaseId: string, event: DragEndEvent) {
+    const { active, over } = event
+    setActiveItemId(null)
+    
+    if (!over || active.id === over.id) return
+    
+    const phase = phases.find(p => p.id === phaseId)
+    if (!phase?.items) return
+    
+    const oldIndex = phase.items.findIndex(i => i.id === active.id)
+    const newIndex = phase.items.findIndex(i => i.id === over.id)
+    
+    if (oldIndex === -1 || newIndex === -1) return
+    
+    const reordered = arrayMove(phase.items, oldIndex, newIndex)
+    
+    // Update positions
+    const updates = reordered.map((item, idx) => ({
+      id: item.id,
+      position: idx,
+    }))
+    
+    // Optimistic update
+    setPhases(prev => prev.map(p => 
+      p.id === phaseId 
+        ? { ...p, items: reordered.map((item, idx) => ({ ...item, position: idx })) }
+        : p
+    ))
+    
+    // Persist to DB
+    Promise.all(
+      updates.map(u => 
+        supabase.from('phase_items').update({ position: u.position }).eq('id', u.id)
+      )
+    ).catch(err => {
+      showErrorToast(err, 'Failed to reorder items')
+      loadData() // Reload on error
+    })
   }
 
   // Separate active and completed phases
@@ -542,26 +771,43 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
               </CardBody>
             </Card>
           ) : (
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {activePhases.map(phase => (
-                <PhaseCard
-                  key={phase.id}
-                  phase={phase}
-                  members={members}
-                  onToggleItem={(itemId, completed) => handleToggleItem(phase.id, itemId, completed)}
-                  onDeleteItem={(itemId) => handleDeleteItem(phase.id, itemId)}
-                  onAssignItem={(itemId, userId) => handleAssignItem(itemId, phase.id, userId)}
-                  onAssignPhase={(userId) => handleAssignPhase(phase.id, userId)}
-                  onDeletePhase={() => handleDeletePhase(phase.id)}
-                  onAddItem={() => setAddingItemToPhase(phase.id)}
-                  addingItem={addingItemToPhase === phase.id}
-                  newItemTitle={newItemTitle}
-                  setNewItemTitle={setNewItemTitle}
-                  onSubmitItem={() => handleAddItem(phase.id)}
-                  onCancelAddItem={() => setAddingItemToPhase(null)}
-                />
-              ))}
-            </div>
+            <DndContext
+              sensors={sensors}
+              collisionDetection={closestCenter}
+              onDragStart={(e) => setActivePhaseId(e.active.id as string)}
+              onDragEnd={handlePhaseDragEnd}
+            >
+              <SortableContext items={activePhases.map(p => p.id)} strategy={horizontalListSortingStrategy}>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {activePhases.map(phase => (
+                    <SortablePhaseCard
+                      key={phase.id}
+                      phase={phase}
+                      members={members}
+                      sensors={sensors}
+                      onToggleItem={(itemId, completed) => handleToggleItem(phase.id, itemId, completed)}
+                      onOpenItem={(item) => openItemDrawer(item)}
+                      onAssignPhase={(userId) => handleAssignPhase(phase.id, userId)}
+                      onDeletePhase={() => handleDeletePhase(phase.id)}
+                      onAddItem={(title) => handleAddItem(phase.id, title)}
+                      onItemDragEnd={(e) => handleItemDragEnd(phase.id, e)}
+                    />
+                  ))}
+                </div>
+              </SortableContext>
+              
+              <DragOverlay>
+                {activePhaseId && (
+                  <div className="opacity-80">
+                    <PhaseCardContent 
+                      phase={phases.find(p => p.id === activePhaseId)!}
+                      members={members}
+                      isDragging
+                    />
+                  </div>
+                )}
+              </DragOverlay>
+            </DndContext>
           )}
 
           {/* Completed phases toggle */}
@@ -577,18 +823,17 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
               </Button>
 
               {showCompleted && (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 opacity-60">
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4 opacity-70">
                   {completedPhases.map(phase => (
-                    <PhaseCard
+                    <PhaseCardContent
                       key={phase.id}
                       phase={phase}
                       members={members}
-                      onToggleItem={(itemId, completed) => handleToggleItem(phase.id, itemId, completed)}
-                      onDeleteItem={(itemId) => handleDeleteItem(phase.id, itemId)}
-                      onAssignItem={(itemId, userId) => handleAssignItem(itemId, phase.id, userId)}
-                      onAssignPhase={(userId) => handleAssignPhase(phase.id, userId)}
-                      onDeletePhase={() => handleDeletePhase(phase.id)}
                       completed
+                      onToggleItem={(itemId, completed) => handleToggleItem(phase.id, itemId, completed)}
+                      onOpenItem={(item) => openItemDrawer(item)}
+                      onDeletePhase={() => handleDeletePhase(phase.id)}
+                      onRestorePhase={() => handleRestorePhase(phase.id)}
                     />
                   ))}
                 </div>
@@ -713,170 +958,543 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
           </ModalFooter>
         </ModalContent>
       </Modal>
+
+      {/* Item Detail Drawer */}
+      <Drawer isOpen={isDrawerOpen} onClose={onDrawerClose} placement="right" size="md">
+        <DrawerContent>
+          <DrawerHeader className="flex flex-col gap-1">
+            <span className="text-lg font-semibold">Item Details</span>
+          </DrawerHeader>
+          <DrawerBody className="gap-4">
+            {selectedItem && (
+              <>
+                {/* Title with formatting */}
+                <div>
+                  <label className="text-sm font-medium text-default-600 mb-2 block">Title</label>
+                  <div className="flex gap-1 mb-2">
+                    <Button 
+                      size="sm" 
+                      variant="flat" 
+                      isIconOnly 
+                      onPress={() => setDrawerTitle(prev => `**${prev}**`)}
+                      title="Bold"
+                    >
+                      <Bold className="w-4 h-4" />
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant="flat" 
+                      isIconOnly 
+                      onPress={() => setDrawerTitle(prev => `*${prev}*`)}
+                      title="Italic"
+                    >
+                      <Italic className="w-4 h-4" />
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant="flat" 
+                      isIconOnly 
+                      onPress={() => setDrawerTitle(prev => `==${prev}==`)}
+                      title="Highlight"
+                    >
+                      <Highlighter className="w-4 h-4" />
+                    </Button>
+                  </div>
+                  <Input
+                    value={drawerTitle}
+                    onValueChange={setDrawerTitle}
+                    variant="bordered"
+                    placeholder="Item title..."
+                  />
+                </div>
+
+                {/* Assignment */}
+                <div>
+                  <label className="text-sm font-medium text-default-600 mb-2 block">Assigned To</label>
+                  <Select
+                    selectedKeys={drawerAssignee ? [drawerAssignee] : []}
+                    onSelectionChange={(keys) => {
+                      const selected = Array.from(keys)[0] as string
+                      setDrawerAssignee(selected || null)
+                    }}
+                    variant="bordered"
+                    placeholder="Select assignee..."
+                    classNames={{ trigger: 'h-10' }}
+                  >
+                    {members.map(m => (
+                      <SelectItem key={m.id} textValue={m.display_name || m.name}>
+                        <div className="flex items-center gap-2">
+                          <Avatar src={m.avatar_url} name={m.display_name || m.name} size="sm" className="w-6 h-6" />
+                          <span>{m.display_name || m.name}</span>
+                        </div>
+                      </SelectItem>
+                    ))}
+                  </Select>
+                </div>
+
+                {/* Due Date */}
+                <div>
+                  <label className="text-sm font-medium text-default-600 mb-2 block">Due Date</label>
+                  <Input
+                    type="date"
+                    value={drawerDueDate}
+                    onValueChange={setDrawerDueDate}
+                    variant="bordered"
+                  />
+                </div>
+
+                {/* Notes */}
+                <div>
+                  <label className="text-sm font-medium text-default-600 mb-2 block">Notes</label>
+                  <div className="flex gap-1 mb-2">
+                    <Button 
+                      size="sm" 
+                      variant="flat" 
+                      isIconOnly 
+                      onPress={() => setDrawerNotes(prev => `${prev}**bold**`)}
+                      title="Bold"
+                    >
+                      <Bold className="w-4 h-4" />
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant="flat" 
+                      isIconOnly 
+                      onPress={() => setDrawerNotes(prev => `${prev}*italic*`)}
+                      title="Italic"
+                    >
+                      <Italic className="w-4 h-4" />
+                    </Button>
+                    <Button 
+                      size="sm" 
+                      variant="flat" 
+                      isIconOnly 
+                      onPress={() => setDrawerNotes(prev => `${prev}==highlight==`)}
+                      title="Highlight"
+                    >
+                      <Highlighter className="w-4 h-4" />
+                    </Button>
+                  </div>
+                  <Textarea
+                    value={drawerNotes}
+                    onValueChange={setDrawerNotes}
+                    variant="bordered"
+                    placeholder="Add notes, comments, context..."
+                    minRows={4}
+                  />
+                </div>
+
+                {/* Sub-items */}
+                <div>
+                  <label className="text-sm font-medium text-default-600 mb-2 block">Sub-items</label>
+                  <div className="space-y-2 mb-3">
+                    {drawerSubItems.map(sub => (
+                      <div key={sub.id} className="flex items-center gap-2 bg-default-100 rounded-lg p-2">
+                        <Checkbox
+                          isSelected={sub.completed}
+                          onValueChange={() => handleToggleSubItem(sub.id)}
+                          size="sm"
+                        />
+                        <span className={`flex-1 text-sm ${sub.completed ? 'line-through text-default-400' : ''}`}>
+                          {sub.text}
+                        </span>
+                        <Button
+                          isIconOnly
+                          size="sm"
+                          variant="light"
+                          onPress={() => handleRemoveSubItem(sub.id)}
+                          className="min-w-6 w-6 h-6"
+                        >
+                          <X className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    ))}
+                  </div>
+                  <div className="flex gap-2">
+                    <Input
+                      size="sm"
+                      placeholder="Add sub-item..."
+                      value={newSubItemText}
+                      onValueChange={setNewSubItemText}
+                      onKeyDown={(e) => e.key === 'Enter' && handleAddSubItem()}
+                      variant="bordered"
+                      className="flex-1"
+                    />
+                    <Button size="sm" color="primary" variant="flat" onPress={handleAddSubItem} isDisabled={!newSubItemText.trim()}>
+                      Add
+                    </Button>
+                  </div>
+                </div>
+              </>
+            )}
+          </DrawerBody>
+          <DrawerFooter className="flex justify-between">
+            <Button 
+              color="danger" 
+              variant="flat" 
+              startContent={<Trash2 className="w-4 h-4" />}
+              onPress={() => selectedItem && handleDeleteItem(selectedItem.phase_id, selectedItem.id)}
+            >
+              Delete
+            </Button>
+            <div className="flex gap-2">
+              <Button variant="flat" onPress={onDrawerClose}>Cancel</Button>
+              <Button 
+                color="primary" 
+                onPress={handleSaveDrawer} 
+                isLoading={savingDrawer}
+                startContent={<Save className="w-4 h-4" />}
+              >
+                Save
+              </Button>
+            </div>
+          </DrawerFooter>
+        </DrawerContent>
+      </Drawer>
     </div>
   )
 }
 
-// Phase Card Component
-function PhaseCard({
+// Sortable Phase Card wrapper
+function SortablePhaseCard({
   phase,
   members,
+  sensors,
   onToggleItem,
-  onDeleteItem,
-  onAssignItem,
+  onOpenItem,
   onAssignPhase,
   onDeletePhase,
   onAddItem,
-  addingItem,
-  newItemTitle,
-  setNewItemTitle,
-  onSubmitItem,
-  onCancelAddItem,
-  completed = false,
+  onItemDragEnd,
 }: {
   phase: Phase
   members: SpaceMember[]
+  sensors: ReturnType<typeof useSensors>
   onToggleItem: (itemId: string, completed: boolean) => void
-  onDeleteItem: (itemId: string) => void
-  onAssignItem: (itemId: string, userId: string | null) => void
+  onOpenItem: (item: PhaseItem) => void
   onAssignPhase: (userId: string | null) => void
   onDeletePhase: () => void
-  onAddItem?: () => void
-  addingItem?: boolean
-  newItemTitle?: string
-  setNewItemTitle?: (v: string) => void
-  onSubmitItem?: () => void
-  onCancelAddItem?: () => void
-  completed?: boolean
+  onAddItem: (title: string) => Promise<boolean | undefined>
+  onItemDragEnd: (event: DragEndEvent) => void
 }) {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: phase.id })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  }
+
+  return (
+    <div ref={setNodeRef} style={style}>
+      <PhaseCardContent
+        phase={phase}
+        members={members}
+        sensors={sensors}
+        dragHandleProps={{ ...attributes, ...listeners }}
+        onToggleItem={onToggleItem}
+        onOpenItem={onOpenItem}
+        onAssignPhase={onAssignPhase}
+        onDeletePhase={onDeletePhase}
+        onAddItem={onAddItem}
+        onItemDragEnd={onItemDragEnd}
+      />
+    </div>
+  )
+}
+
+// Phase Card Content (shared between sortable and static)
+function PhaseCardContent({
+  phase,
+  members,
+  sensors,
+  dragHandleProps,
+  onToggleItem,
+  onOpenItem,
+  onAssignPhase,
+  onDeletePhase,
+  onRestorePhase,
+  onAddItem,
+  onItemDragEnd,
+  completed = false,
+  isDragging = false,
+}: {
+  phase: Phase
+  members: SpaceMember[]
+  sensors?: ReturnType<typeof useSensors>
+  dragHandleProps?: any
+  onToggleItem?: (itemId: string, completed: boolean) => void
+  onOpenItem?: (item: PhaseItem) => void
+  onAssignPhase?: (userId: string | null) => void
+  onDeletePhase?: () => void
+  onRestorePhase?: () => void
+  onAddItem?: (title: string) => Promise<boolean | undefined>
+  onItemDragEnd?: (event: DragEndEvent) => void
+  completed?: boolean
+  isDragging?: boolean
+}) {
+  const [newItemTitle, setNewItemTitle] = useState('')
+  const [isAddingItem, setIsAddingItem] = useState(false)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const [activeItemId, setActiveItemId] = useState<string | null>(null)
+  
   const items = phase.items || []
   const completedCount = items.filter(i => i.completed).length
   const totalCount = items.length
   const progressPercent = totalCount > 0 ? (completedCount / totalCount) * 100 : 0
 
+  async function handleSubmitItem() {
+    if (!newItemTitle.trim() || !onAddItem) return
+    setIsAddingItem(true)
+    const success = await onAddItem(newItemTitle.trim())
+    setIsAddingItem(false)
+    if (success) {
+      setNewItemTitle('')
+      // Keep focus on input for rapid entry
+      setTimeout(() => inputRef.current?.focus(), 50)
+    }
+  }
+
   return (
-    <Card className={completed ? 'bg-success-50 dark:bg-success-900/10' : ''}>
+    <Card className={`${completed ? 'bg-success-50 dark:bg-success-900/10' : ''} ${isDragging ? 'shadow-lg' : ''}`}>
       <CardBody className="p-4">
         {/* Phase Header */}
         <div className="flex items-start justify-between mb-3">
-          <div className="flex-1">
-            <h3 className="font-semibold text-foreground">{phase.title}</h3>
-            <div className="flex items-center gap-2 mt-1">
-              <span className="text-xs text-default-400">{completedCount}/{totalCount}</span>
-              {phase.assignee && (
-                <Chip size="sm" variant="flat" avatar={<Avatar src={phase.assignee.avatar_url} name={phase.assignee.display_name || phase.assignee.name} />}>
-                  {phase.assignee.display_name || phase.assignee.name}
-                </Chip>
-              )}
+          <div className="flex items-center gap-2 flex-1">
+            {dragHandleProps && !completed && (
+              <div {...dragHandleProps} className="cursor-grab active:cursor-grabbing p-1 -ml-1 hover:bg-default-100 rounded">
+                <GripVertical className="w-4 h-4 text-default-400" />
+              </div>
+            )}
+            <div className="flex-1">
+              <h3 className="font-semibold text-foreground">{phase.title}</h3>
+              <div className="flex items-center gap-2 mt-1">
+                <span className="text-xs text-default-400">{completedCount}/{totalCount}</span>
+                {phase.assignee && (
+                  <Chip size="sm" variant="flat" avatar={<Avatar src={phase.assignee.avatar_url} name={phase.assignee.display_name || phase.assignee.name} />}>
+                    {phase.assignee.display_name || phase.assignee.name}
+                  </Chip>
+                )}
+              </div>
             </div>
           </div>
-          <Dropdown>
-            <DropdownTrigger>
-              <Button isIconOnly size="sm" variant="light"><MoreVertical className="w-4 h-4" /></Button>
-            </DropdownTrigger>
-            <DropdownMenu>
-              <DropdownItem key="assign" startContent={<Users className="w-4 h-4" />}>
-                <Select
-                  size="sm"
-                  label="Assign Phase"
-                  selectedKeys={phase.assigned_to ? [phase.assigned_to] : []}
-                  onChange={(e) => onAssignPhase(e.target.value || null)}
-                  className="min-w-[150px]"
+          
+          {!completed && onDeletePhase && onAssignPhase && (
+            <Dropdown>
+              <DropdownTrigger>
+                <Button isIconOnly size="sm" variant="light"><MoreVertical className="w-4 h-4" /></Button>
+              </DropdownTrigger>
+              <DropdownMenu>
+                <DropdownItem 
+                  key="assign" 
+                  startContent={<Users className="w-4 h-4" />}
+                  onPress={() => {
+                    // Open a simple selection - for now we cycle through or unassign
+                    const currentIdx = members.findIndex(m => m.id === phase.assigned_to)
+                    const nextIdx = (currentIdx + 1) % (members.length + 1)
+                    onAssignPhase(nextIdx < members.length ? members[nextIdx].id : null)
+                  }}
                 >
-                  {members.map(m => (
-                    <SelectItem key={m.id}>{m.display_name || m.name}</SelectItem>
-                  ))}
-                </Select>
-              </DropdownItem>
-              <DropdownItem key="delete" className="text-danger" color="danger" startContent={<Trash2 className="w-4 h-4" />} onPress={onDeletePhase}>
-                Delete Phase
-              </DropdownItem>
-            </DropdownMenu>
-          </Dropdown>
+                  {phase.assigned_to ? 'Change Assignment' : 'Assign Phase'}
+                </DropdownItem>
+                <DropdownItem key="delete" className="text-danger" color="danger" startContent={<Trash2 className="w-4 h-4" />} onPress={onDeletePhase}>
+                  Delete Phase
+                </DropdownItem>
+              </DropdownMenu>
+            </Dropdown>
+          )}
+          
+          {completed && onRestorePhase && (
+            <Button 
+              size="sm" 
+              variant="flat" 
+              color="success"
+              startContent={<RotateCcw className="w-4 h-4" />}
+              onPress={onRestorePhase}
+            >
+              Restore
+            </Button>
+          )}
         </div>
 
         {/* Progress Bar */}
         <Progress value={progressPercent} size="sm" color={completed ? 'success' : 'primary'} className="mb-3" />
 
-        {/* Items */}
-        <div className="space-y-2">
-          {items.map(item => (
-            <ItemRow
-              key={item.id}
-              item={item}
-              members={members}
-              onToggle={() => onToggleItem(item.id, item.completed)}
-              onDelete={() => onDeleteItem(item.id)}
-              onAssign={(userId) => onAssignItem(item.id, userId)}
-            />
-          ))}
-        </div>
-
-        {/* Add Item */}
-        {!completed && (
-          <>
-            {addingItem ? (
-              <div className="mt-3 flex items-center gap-2">
-                <Input
-                  size="sm"
-                  placeholder="New item..."
-                  value={newItemTitle}
-                  onValueChange={setNewItemTitle}
-                  autoFocus
-                  onKeyDown={(e) => e.key === 'Enter' && onSubmitItem?.()}
-                  className="flex-1"
-                />
-                <Button size="sm" color="primary" onPress={onSubmitItem} isDisabled={!newItemTitle?.trim()}>Add</Button>
-                <Button size="sm" variant="flat" onPress={onCancelAddItem}>Cancel</Button>
+        {/* Items with DnD */}
+        {sensors && onItemDragEnd && !completed ? (
+          <DndContext
+            sensors={sensors}
+            collisionDetection={closestCenter}
+            onDragStart={(e) => setActiveItemId(e.active.id as string)}
+            onDragEnd={(e) => {
+              setActiveItemId(null)
+              onItemDragEnd(e)
+            }}
+          >
+            <SortableContext items={items.map(i => i.id)} strategy={verticalListSortingStrategy}>
+              <div className="space-y-2">
+                {items.map(item => (
+                  <SortableItemRow
+                    key={item.id}
+                    item={item}
+                    onToggle={() => onToggleItem?.(item.id, item.completed)}
+                    onClick={() => onOpenItem?.(item)}
+                  />
+                ))}
               </div>
-            ) : (
-              <Button size="sm" variant="light" className="mt-3 w-full" startContent={<Plus className="w-4 h-4" />} onPress={onAddItem}>
-                Add Item
-              </Button>
-            )}
-          </>
+            </SortableContext>
+            
+            <DragOverlay>
+              {activeItemId && (
+                <div className="opacity-80">
+                  <ItemRowContent item={items.find(i => i.id === activeItemId)!} isDragging />
+                </div>
+              )}
+            </DragOverlay>
+          </DndContext>
+        ) : (
+          <div className="space-y-2">
+            {items.map(item => (
+              <ItemRowContent
+                key={item.id}
+                item={item}
+                onToggle={() => onToggleItem?.(item.id, item.completed)}
+                onClick={() => onOpenItem?.(item)}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Always-visible Add Item Input */}
+        {!completed && onAddItem && (
+          <div className="mt-3">
+            <Input
+              ref={inputRef}
+              size="sm"
+              placeholder="Add item and press Enter..."
+              value={newItemTitle}
+              onValueChange={setNewItemTitle}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') handleSubmitItem()
+                if (e.key === 'Escape') {
+                  setNewItemTitle('')
+                  inputRef.current?.blur()
+                }
+              }}
+              isDisabled={isAddingItem}
+              startContent={<Plus className="w-4 h-4 text-default-400" />}
+              variant="bordered"
+              classNames={{
+                input: 'text-sm',
+                inputWrapper: 'h-9'
+              }}
+            />
+          </div>
         )}
       </CardBody>
     </Card>
   )
 }
 
-// Item Row Component
-function ItemRow({
+// Sortable Item Row wrapper
+function SortableItemRow({
   item,
-  members,
   onToggle,
-  onDelete,
-  onAssign,
+  onClick,
 }: {
   item: PhaseItem
-  members: SpaceMember[]
   onToggle: () => void
-  onDelete: () => void
-  onAssign: (userId: string | null) => void
+  onClick: () => void
 }) {
-  const [expanded, setExpanded] = useState(false)
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({ id: item.id })
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+  }
 
   return (
-    <div className={`rounded-lg p-2 ${item.completed ? 'bg-success-50 dark:bg-success-900/10' : 'bg-default-50 dark:bg-default-100'}`}>
+    <div ref={setNodeRef} style={style}>
+      <ItemRowContent
+        item={item}
+        onToggle={onToggle}
+        onClick={onClick}
+        dragHandleProps={{ ...attributes, ...listeners }}
+      />
+    </div>
+  )
+}
+
+// Item Row Content
+function ItemRowContent({
+  item,
+  onToggle,
+  onClick,
+  dragHandleProps,
+  isDragging = false,
+}: {
+  item: PhaseItem
+  onToggle?: () => void
+  onClick?: () => void
+  dragHandleProps?: any
+  isDragging?: boolean
+}) {
+  // Parse sub-items for display
+  const subItems: SubItem[] = (item.sub_items || []).map((sub, idx) => {
+    try {
+      const parsed = JSON.parse(sub)
+      return { id: parsed.id || `sub-${idx}`, text: parsed.text || sub, completed: parsed.completed || false }
+    } catch {
+      return { id: `sub-${idx}`, text: sub, completed: false }
+    }
+  })
+  
+  const completedSubCount = subItems.filter(s => s.completed).length
+
+  return (
+    <div 
+      className={`rounded-lg p-2 ${item.completed ? 'bg-success-50 dark:bg-success-900/10' : 'bg-default-50 dark:bg-default-100'} ${isDragging ? 'shadow-md' : ''} ${onClick ? 'cursor-pointer hover:bg-default-100 dark:hover:bg-default-200/50' : ''}`}
+      onClick={(e) => {
+        // Don't trigger onClick if clicking checkbox or drag handle
+        if ((e.target as HTMLElement).closest('[data-slot="wrapper"]') || 
+            (e.target as HTMLElement).closest('[data-drag-handle]')) return
+        onClick?.()
+      }}
+    >
       <div className="flex items-start gap-2">
+        {dragHandleProps && (
+          <div {...dragHandleProps} data-drag-handle className="cursor-grab active:cursor-grabbing p-0.5 -ml-1 hover:bg-default-200 rounded mt-0.5">
+            <GripVertical className="w-3 h-3 text-default-400" />
+          </div>
+        )}
         <Checkbox
           isSelected={item.completed}
-          onValueChange={onToggle}
+          onValueChange={() => onToggle?.()}
           className="mt-0.5"
+          size="sm"
         />
         <div className="flex-1 min-w-0">
           <span className={`text-sm ${item.completed ? 'line-through text-default-400' : ''}`}>{item.title}</span>
           
-          {/* Sub-items */}
-          {item.sub_items && item.sub_items.length > 0 && (
-            <div className="mt-1 ml-4 space-y-1">
-              {item.sub_items.map((sub, i) => (
-                <div key={i} className="text-xs text-default-500 flex items-center gap-1">
-                  <span className="w-1 h-1 rounded-full bg-default-400" />
-                  {sub}
-                </div>
-              ))}
+          {/* Sub-items summary */}
+          {subItems.length > 0 && (
+            <div className="mt-1 text-xs text-default-400">
+              {completedSubCount}/{subItems.length} sub-items
             </div>
           )}
 
@@ -890,28 +1508,6 @@ function ItemRow({
             )}
           </div>
         </div>
-
-        <Dropdown>
-          <DropdownTrigger>
-            <Button isIconOnly size="sm" variant="light" className="min-w-6 w-6 h-6"><MoreVertical className="w-3 h-3" /></Button>
-          </DropdownTrigger>
-          <DropdownMenu>
-            <DropdownItem key="assign">
-              <Select
-                size="sm"
-                label="Assign to"
-                selectedKeys={item.assigned_to ? [item.assigned_to] : []}
-                onChange={(e) => onAssign(e.target.value || null)}
-                className="min-w-[150px]"
-              >
-                {members.map(m => (
-                  <SelectItem key={m.id}>{m.display_name || m.name}</SelectItem>
-                ))}
-              </Select>
-            </DropdownItem>
-            <DropdownItem key="delete" className="text-danger" color="danger" onPress={onDelete}>Delete</DropdownItem>
-          </DropdownMenu>
-        </Dropdown>
       </div>
     </div>
   )
