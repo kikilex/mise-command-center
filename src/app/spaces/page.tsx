@@ -59,17 +59,7 @@ export default function SpacesPage() {
     setSelectedSpace(null)
   }
 
-  function handleEditSpace(space: Space, e: React.MouseEvent) {
-    e.preventDefault()
-    e.stopPropagation()
-    setSelectedSpace(space)
-    onEditOpen()
-  }
-
-  async function handleDeleteSpace(space: Space, e: React.MouseEvent) {
-    e.preventDefault()
-    e.stopPropagation()
-    
+  async function handleDeleteSpace(space: Space) {
     if (space.is_default) {
       showErrorToast(new Error('Cannot delete the default space'), 'Delete Failed')
       return
@@ -198,11 +188,20 @@ export default function SpacesPage() {
                             <MoreVertical className="w-5 h-5" />
                           </Button>
                         </DropdownTrigger>
-                        <DropdownMenu aria-label="Space actions">
+                        <DropdownMenu 
+                          aria-label="Space actions"
+                          onAction={(key) => {
+                            if (key === 'edit') {
+                              setSelectedSpace(space)
+                              onEditOpen()
+                            } else if (key === 'delete') {
+                              handleDeleteSpace(space)
+                            }
+                          }}
+                        >
                           <DropdownItem
                             key="edit"
                             startContent={<Edit className="w-4 h-4" />}
-                            onClick={(e) => handleEditSpace(space, e)}
                           >
                             Edit Space
                           </DropdownItem>
@@ -211,7 +210,6 @@ export default function SpacesPage() {
                             className="text-danger"
                             color="danger"
                             startContent={<Trash2 className="w-4 h-4" />}
-                            onClick={(e) => handleDeleteSpace(space, e)}
                             isDisabled={deletingId === space.id}
                           >
                             {deletingId === space.id ? 'Deleting...' : 'Delete Space'}
