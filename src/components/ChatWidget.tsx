@@ -341,6 +341,11 @@ export default function ChatWidget() {
   }
 
   async function loadThreads(userId: string, userName?: string) {
+    // Load users for sender lookup
+    const { data: usersData } = await supabase.from('users').select('id, slug')
+    const userIdToSlug = new Map<string, string>()
+    usersData?.forEach(u => userIdToSlug.set(u.id, u.slug))
+    
     const { data } = await supabase
       .from('inbox')
       .select('*')
@@ -353,7 +358,19 @@ export default function ChatWidget() {
     const currentUserName = userName?.toLowerCase()
 
     data.forEach(item => {
-      const partner = item.from_agent || item.to_recipient || 'unknown'
+      // Determine the conversation partner (the other person in the chat)
+      let partner: string
+      if (item.from_agent) {
+        // AI message - partner is the AI
+        partner = item.from_agent
+      } else if (item.user_id === userId) {
+        // I sent this message - partner is the recipient
+        partner = item.to_recipient || 'unknown'
+      } else {
+        // Someone else sent this to me - partner is the sender
+        partner = userIdToSlug.get(item.user_id) || item.to_recipient || 'unknown'
+      }
+      
       const id = item.thread_id || `dm-${partner}`
 
       if (!threadMap.has(id)) {
