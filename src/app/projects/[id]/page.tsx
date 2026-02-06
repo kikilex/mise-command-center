@@ -1167,8 +1167,8 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
     setNewSubItemText('')
   }
 
-  // Toggle sub-item
-  function handleToggleSubItem(subId: string) {
+  // Toggle sub-item in drawer
+  function handleToggleDrawerSubItem(subId: string) {
     setDrawerSubItems(prev => prev.map(sub =>
       sub.id === subId ? { ...sub, completed: !sub.completed } : sub
     ))
@@ -1942,7 +1942,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                           <SortableSubItem
                             key={sub.id}
                             sub={sub}
-                            onToggle={() => handleToggleSubItem(sub.id)}
+                            onToggle={() => handleToggleDrawerSubItem(sub.id)}
                             onRemove={() => handleRemoveSubItem(sub.id)}
                           />
                         ))}
