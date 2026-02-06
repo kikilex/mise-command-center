@@ -77,10 +77,12 @@ interface ProjectOption {
 const RECIPIENTS = [
   { id: 'ax', name: 'Ax', type: 'ai' },
   { id: 'tony', name: 'Tony', type: 'ai' },
+  { id: 'neo', name: 'Neo', type: 'ai' },
+  { id: 'alex', name: 'Alex', type: 'family' },
   { id: 'mom', name: 'Mom', type: 'family' },
 ]
 
-const isAI = (name: string) => ['ax', 'tony'].includes(name.toLowerCase())
+const isAI = (name: string) => ['ax', 'tony', 'neo'].includes(name.toLowerCase())
 
 const cap = (s: string) => s.charAt(0).toUpperCase() + s.slice(1)
 
