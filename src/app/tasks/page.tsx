@@ -221,9 +221,14 @@ function TasksPageContent() {
     setLoadError(null)
     
     try {
+      // Get current user
+      const { data: { user: authUser } } = await supabase.auth.getUser()
+      if (!authUser) throw new Error('Not authenticated')
+      
       let query = supabase
         .from('tasks')
         .select('*')
+        .or(`created_by.eq.${authUser.id},assignee_id.eq.${authUser.id}`)
       
       if (localSpaceId && localSpaceId !== 'all') {
         query = query.eq('space_id', localSpaceId)
