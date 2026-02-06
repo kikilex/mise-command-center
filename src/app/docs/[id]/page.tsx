@@ -38,6 +38,8 @@ interface Document {
   content: string
   task_id: string | null
   business_id: string | null
+  space_id: string | null
+  project_id: string | null
   created_by: string | null
   created_at: string
   updated_at: string
@@ -48,6 +50,12 @@ interface Document {
   visibility: 'normal' | 'hidden'
   archived: boolean
   tasks?: { id: string; title: string } | null
+}
+
+interface Project {
+  id: string
+  name: string
+  space_id: string
 }
 
 interface UserData {
@@ -93,14 +101,6 @@ const getStatusLabel = (status: string) => {
   }
 }
 
-const categoryOptions = [
-  { key: 'all', label: 'Uncategorized' },
-  { key: 'research', label: 'Research' },
-  { key: 'scripts', label: 'Scripts' },
-  { key: 'notes', label: 'Notes' },
-  { key: 'reference', label: 'Reference' },
-]
-
 export default function DocumentReaderPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params)
   const searchParams = useSearchParams()
@@ -133,10 +133,9 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
   const [showScrollButton, setShowScrollButton] = useState(false)
   const [isAtBottom, setIsAtBottom] = useState(false)
   
-  // Category and tag editing state
-  const [editCategory, setEditCategory] = useState('all')
-  const [editTags, setEditTags] = useState<string[]>([])
-  const [newTag, setNewTag] = useState('')
+  // Permissions editing state
+  const [projects, setProjects] = useState<Project[]>([])
+  const [editProjectId, setEditProjectId] = useState<string>('space')
   const [savingMeta, setSavingMeta] = useState(false)
   
   // Document properties popover state
@@ -246,14 +245,33 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
       if (error) throw error
       setDocument(data)
       // Initialize edit state with document data
-      setEditCategory(data.category || 'all')
-      setEditTags(data.tags || [])
+      setEditProjectId(data.project_id || 'space')
+      // Load projects for this space
+      if (data.space_id) {
+        loadProjects(data.space_id)
+      }
     } catch (error) {
       console.error('Load document error:', error)
       showErrorToast(error, 'Failed to load document')
       router.push('/docs')
     } finally {
       setLoading(false)
+    }
+  }
+
+  async function loadProjects(spaceId: string) {
+    try {
+      const { data, error } = await supabase
+        .from('projects')
+        .select('id, name, space_id')
+        .eq('space_id', spaceId)
+        .eq('status', 'active')
+        .order('name')
+      
+      if (error) throw error
+      setProjects(data || [])
+    } catch (error) {
+      console.error('Load projects error:', error)
     }
   }
 
@@ -311,11 +329,11 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
     if (!document) return
     setSavingMeta(true)
     try {
+      const newProjectId = editProjectId === 'space' ? null : editProjectId
       const { error } = await supabase
         .from('documents')
         .update({
-          category: editCategory,
-          tags: editTags,
+          project_id: newProjectId,
         })
         .eq('id', document.id)
       
@@ -324,29 +342,16 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
       // Update local document state
       setDocument(prev => prev ? {
         ...prev,
-        category: editCategory,
-        tags: editTags,
+        project_id: newProjectId,
       } : null)
       
-      showSuccessToast('Document updated')
+      showSuccessToast('Permissions updated')
     } catch (error) {
       console.error('Save document error:', error)
-      showErrorToast(error, 'Failed to save document')
+      showErrorToast(error, 'Failed to save permissions')
     } finally {
       setSavingMeta(false)
     }
-  }
-
-  const addTag = () => {
-    const trimmedTag = newTag.trim().toLowerCase()
-    if (trimmedTag && !editTags.includes(trimmedTag)) {
-      setEditTags(prev => [...prev, trimmedTag])
-      setNewTag('')
-    }
-  }
-
-  const removeTag = (tagToRemove: string) => {
-    setEditTags(prev => prev.filter(tag => tag !== tagToRemove))
   }
 
   async function handleAddComment() {
@@ -753,79 +758,36 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
               <PopoverContent className="w-72 p-4">
                 <div className="space-y-4">
                   <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-2 flex items-center gap-2">
-                    <Folder className="w-4 h-4" />
-                    Document Properties
+                    <Settings className="w-4 h-4" />
+                    Document Permissions
                   </h4>
                   
-                  {/* Category */}
+                  {/* Visibility / Permissions */}
                   <div>
                     <label className="block text-xs font-medium text-slate-500 dark:text-slate-400 mb-1">
-                      Category
+                      Who can view this document?
                     </label>
                     <Select
                       size="sm"
-                      selectedKeys={[editCategory]}
-                      onChange={(e) => setEditCategory(e.target.value)}
-                      className="w-full max-w-[240px]"
+                      selectedKeys={[editProjectId]}
+                      onChange={(e) => setEditProjectId(e.target.value)}
+                      className="w-full"
+                      startContent={editProjectId === 'space' ? <Folder className="w-4 h-4 text-slate-400" /> : <Folder className="w-4 h-4 text-violet-500" />}
                     >
-                      {categoryOptions.map(cat => (
-                        <SelectItem key={cat.key}>{cat.label}</SelectItem>
+                      <SelectItem key="space" startContent={<Folder className="w-4 h-4" />}>
+                        Everyone in Space
+                      </SelectItem>
+                      {projects.map(p => (
+                        <SelectItem key={p.id} startContent={<Folder className="w-4 h-4" />}>
+                          {p.name} only
+                        </SelectItem>
                       ))}
                     </Select>
-                  </div>
-                  
-                  {/* Tags */}
-                  <div>
-                    <div className="flex items-center justify-between mb-1">
-                      <label className="block text-xs font-medium text-slate-500 dark:text-slate-400">
-                        Tags
-                      </label>
-                      <span className="text-xs text-slate-400">{editTags.length}/10</span>
-                    </div>
-                    
-                    {/* Current Tags */}
-                    <div className="flex flex-wrap gap-1 mb-2">
-                      {editTags.map(tag => (
-                        <Chip
-                          key={tag}
-                          size="sm"
-                          variant="flat"
-                          onClose={() => removeTag(tag)}
-                          className="text-xs"
-                        >
-                          {tag}
-                        </Chip>
-                      ))}
-                      {editTags.length === 0 && (
-                        <span className="text-xs text-slate-400 italic">No tags yet</span>
-                      )}
-                    </div>
-                    
-                    {/* Add Tag Input */}
-                    <div className="flex gap-1">
-                      <Input
-                        size="sm"
-                        placeholder="Add tag..."
-                        value={newTag}
-                        onChange={(e) => setNewTag(e.target.value)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter') {
-                            e.preventDefault()
-                            addTag()
-                          }
-                        }}
-                        className="flex-1"
-                      />
-                      <Button
-                        size="sm"
-                        isIconOnly
-                        variant="flat"
-                        onPress={addTag}
-                        isDisabled={!newTag.trim()}
-                      >
-                        <Plus className="w-3 h-3" />
-                      </Button>
-                    </div>
+                    <p className="text-xs text-slate-400 mt-2">
+                      {editProjectId === 'space' 
+                        ? 'All members of this space can view and edit.'
+                        : 'Only project members can view and edit.'}
+                    </p>
                   </div>
                   
                   {/* Save Button */}
@@ -838,12 +800,9 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
                       setPropertiesOpen(false)
                     }}
                     isLoading={savingMeta}
-                    isDisabled={savingMeta || (
-                      editCategory === (document?.category || 'all') &&
-                      JSON.stringify(editTags.sort()) === JSON.stringify((document?.tags || []).sort())
-                    )}
+                    isDisabled={savingMeta || editProjectId === (document?.project_id || 'space')}
                   >
-                    {savingMeta ? 'Saving...' : 'Save Changes'}
+                    {savingMeta ? 'Saving...' : 'Save'}
                   </Button>
                 </div>
               </PopoverContent>
