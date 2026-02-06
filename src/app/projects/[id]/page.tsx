@@ -208,6 +208,10 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   const [previewDocTitle, setPreviewDocTitle] = useState('')
   const [previewDocContent, setPreviewDocContent] = useState('')
   const [loadingDocContent, setLoadingDocContent] = useState(false)
+  const [previewDocId, setPreviewDocId] = useState<string | null>(null)
+  const [isEditingDoc, setIsEditingDoc] = useState(false)
+  const [editDocContent, setEditDocContent] = useState('')
+  const [savingDoc, setSavingDoc] = useState(false)
   
   // Update editing
   const [editingUpdateId, setEditingUpdateId] = useState<string | null>(null)
@@ -880,10 +884,16 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
       
       setPins(prev => [...prev, pinData])
       onDocClose()
-      showSuccessToast('Document created and linked')
+      showSuccessToast('Document created')
       
-      // Open the new doc
-      router.push(`/docs/${docData.id}/edit`)
+      // Open the new doc in edit mode within the modal
+      setPreviewDocId(docData.id)
+      setPreviewDocTitle(newDocTitle.trim())
+      setPreviewDocUrl(`/docs/${docData.id}`)
+      setPreviewDocContent('')
+      setEditDocContent('')
+      setIsEditingDoc(true)
+      onDocPreviewOpen()
     } catch (error) {
       showErrorToast(error, 'Failed to create document')
     } finally {
@@ -964,9 +974,11 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
 
   // Load doc content for preview
   async function loadDocForPreview(docId: string, title: string) {
+    setPreviewDocId(docId)
     setPreviewDocTitle(title)
     setPreviewDocUrl(`/docs/${docId}`)
     setLoadingDocContent(true)
+    setIsEditingDoc(false)
     onDocPreviewOpen()
     
     try {
@@ -978,11 +990,33 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
       
       if (error) throw error
       setPreviewDocContent(data?.content || '')
+      setEditDocContent(data?.content || '')
     } catch (error) {
       console.error('Failed to load doc:', error)
       setPreviewDocContent('Failed to load document content.')
     } finally {
       setLoadingDocContent(false)
+    }
+  }
+  
+  // Save doc changes
+  async function handleSaveDocContent() {
+    if (!previewDocId) return
+    setSavingDoc(true)
+    try {
+      const { error } = await supabase
+        .from('documents')
+        .update({ content: editDocContent })
+        .eq('id', previewDocId)
+      
+      if (error) throw error
+      setPreviewDocContent(editDocContent)
+      setIsEditingDoc(false)
+      showSuccessToast('Document saved')
+    } catch (error) {
+      showErrorToast(error, 'Failed to save document')
+    } finally {
+      setSavingDoc(false)
     }
   }
 
@@ -1849,6 +1883,35 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                     placeholder="Add notes, comments, context..."
                     minRows={4}
                   />
+                  <div className="flex items-center gap-1 mt-2">
+                    <Button
+                      isIconOnly
+                      size="sm"
+                      variant="flat"
+                      onPress={() => applyFormatting(notesTextareaRef as any, drawerNotes, setDrawerNotes, '**', '**')}
+                      title="Bold"
+                    >
+                      <Bold className="w-3.5 h-3.5" />
+                    </Button>
+                    <Button
+                      isIconOnly
+                      size="sm"
+                      variant="flat"
+                      onPress={() => applyFormatting(notesTextareaRef as any, drawerNotes, setDrawerNotes, '_', '_')}
+                      title="Italic"
+                    >
+                      <Italic className="w-3.5 h-3.5" />
+                    </Button>
+                    <Button
+                      isIconOnly
+                      size="sm"
+                      variant="flat"
+                      onPress={() => applyFormatting(notesTextareaRef as any, drawerNotes, setDrawerNotes, '==', '==')}
+                      title="Highlight"
+                    >
+                      <Highlighter className="w-3.5 h-3.5" />
+                    </Button>
+                  </div>
                 </div>
 
                 {/* Sub-items */}
@@ -1965,7 +2028,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
         </ModalContent>
       </Modal>
 
-      {/* Doc Preview Modal */}
+      {/* Doc Preview/Edit Modal */}
       <Modal isOpen={isDocPreviewOpen} onClose={onDocPreviewClose} size="3xl" scrollBehavior="inside">
         <ModalContent>
           <ModalHeader className="flex items-center gap-2">
@@ -1977,6 +2040,16 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
               <div className="flex justify-center py-8">
                 <Spinner size="lg" />
               </div>
+            ) : isEditingDoc ? (
+              <Textarea
+                value={editDocContent}
+                onValueChange={setEditDocContent}
+                variant="bordered"
+                placeholder="Write document content (Markdown supported)..."
+                minRows={15}
+                maxRows={30}
+                classNames={{ input: 'font-mono text-sm' }}
+              />
             ) : (
               <div className="prose prose-sm dark:prose-invert max-w-none">
                 <ReactMarkdown remarkPlugins={[remarkGfm]}>
@@ -1987,9 +2060,18 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
           </ModalBody>
           <ModalFooter>
             <Button variant="flat" onPress={onDocPreviewClose}>Close</Button>
-            <Button color="primary" as={Link} href={previewDocUrl ? `${previewDocUrl}/edit` : '#'}>
-              Edit Document
-            </Button>
+            {isEditingDoc ? (
+              <>
+                <Button variant="flat" onPress={() => setIsEditingDoc(false)}>Cancel</Button>
+                <Button color="primary" onPress={handleSaveDocContent} isLoading={savingDoc}>
+                  Save
+                </Button>
+              </>
+            ) : (
+              <Button color="primary" onPress={() => { setEditDocContent(previewDocContent); setIsEditingDoc(true) }}>
+                Edit
+              </Button>
+            )}
           </ModalFooter>
         </ModalContent>
       </Modal>
