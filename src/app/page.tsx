@@ -212,7 +212,7 @@ export default function Home() {
         supabase.from('inbox')
           .select('*')
           .eq('item_type', 'thought')
-          .in('status', ['pending', 'processing', 'processed'])
+          .eq('status', 'pending')
           .order('created_at', { ascending: false })
           .limit(20),
         supabase.from('inbox')
@@ -680,7 +680,7 @@ export default function Home() {
                     <p className="text-sm text-slate-400">No pending thoughts. Dump away.</p>
                   </div>
                 ) : (
-                  <div className="space-y-1">
+                  <div className="space-y-1 max-h-[400px] overflow-y-auto">
                     {inboxItems.map((item) => (
                       <div key={item.id} className="group">
                         {editingDump?.id === item.id ? (
