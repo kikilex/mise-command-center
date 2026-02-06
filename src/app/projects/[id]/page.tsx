@@ -74,6 +74,13 @@ import {
 } from '@dnd-kit/sortable'
 import { CSS } from '@dnd-kit/utilities'
 
+// Helper to detect if content is HTML (from Tiptap) or Markdown
+function isHtmlContent(content: string): boolean {
+  if (!content) return false
+  const htmlPattern = /^<[a-z]|<\/(p|div|h[1-6]|ul|ol|li|strong|em|mark|u)>/i
+  return htmlPattern.test(content.trim())
+}
+
 interface SubItem {
   id: string
   text: string
@@ -235,6 +242,21 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   // DnD state
   const [activePhaseId, setActivePhaseId] = useState<string | null>(null)
   const [activeItemId, setActiveItemId] = useState<string | null>(null)
+
+  // Render content as HTML or Markdown based on format
+  function renderContent(content: string, className: string = '') {
+    if (!content) return <p className="text-default-400 italic">No content</p>
+    
+    if (isHtmlContent(content)) {
+      return <div className={className} dangerouslySetInnerHTML={{ __html: content }} />
+    } else {
+      return (
+        <div className={className}>
+          <ReactMarkdown remarkPlugins={[remarkGfm]}>{content}</ReactMarkdown>
+        </div>
+      )
+    }
+  }
 
   // Selection-based text formatting helper
   function applyFormatting(
@@ -1436,10 +1458,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                           <StickyNote className="inline-block w-3 h-3 text-warning ml-1" />
                         )}
                         {isNote && pin.notes && (
-                          <div 
-                            className="text-xs text-default-500 mt-1 prose prose-xs dark:prose-invert max-w-none"
-                            dangerouslySetInnerHTML={{ __html: pin.notes }}
-                          />
+                          renderContent(pin.notes, 'text-xs text-default-500 mt-1 prose prose-xs dark:prose-invert max-w-none')
                         )}
                       </div>
                       <div className="flex gap-0.5 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -1992,10 +2011,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                 minHeight="300px"
               />
             ) : (
-              <div 
-                className="prose prose-sm dark:prose-invert max-w-none"
-                dangerouslySetInnerHTML={{ __html: previewDocContent || '<p><em>No content yet</em></p>' }}
-              />
+              renderContent(previewDocContent, 'prose prose-sm dark:prose-invert max-w-none')
             )}
           </ModalBody>
           <ModalFooter>
@@ -2428,8 +2444,12 @@ function ItemRowContent({
         {item.notes && (
           <Tooltip 
             content={
-              <div className="max-w-xs p-1">
-                <div className="text-xs prose prose-xs dark:prose-invert" dangerouslySetInnerHTML={{ __html: item.notes }} />
+              <div className="max-w-xs p-1 text-xs prose prose-xs dark:prose-invert">
+                {isHtmlContent(item.notes!) ? (
+                  <div dangerouslySetInnerHTML={{ __html: item.notes! }} />
+                ) : (
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{item.notes!}</ReactMarkdown>
+                )}
               </div>
             }
             placement="top"
