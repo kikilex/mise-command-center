@@ -10,7 +10,7 @@ import {
   PopoverTrigger,
   PopoverContent
 } from '@heroui/react'
-import { Search } from 'lucide-react'
+import { Search, HelpCircle } from 'lucide-react'
 
 interface IconPickerProps {
   value: string
@@ -62,7 +62,7 @@ export default function IconPicker({ value, onChange }: IconPickerProps) {
     )
   }, [search])
 
-  const SelectedIcon = (LucideIcons as any)[value] || LucideIcons.HelpCircle
+  const SelectedIcon = (LucideIcons as any)[value] || HelpCircle
 
   return (
     <Popover isOpen={isOpen} onOpenChange={setIsOpen} placement="bottom">
