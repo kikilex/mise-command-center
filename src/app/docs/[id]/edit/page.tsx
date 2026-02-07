@@ -3,7 +3,7 @@
 import { useState, useEffect, use } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
-import { ArrowLeft, Save, Trash2, Users, Globe } from 'lucide-react'
+import { ArrowLeft, Save, Trash2, Users, Globe, Folder } from 'lucide-react'
 import {
   Button,
   Input,
@@ -44,6 +44,11 @@ interface Project {
   space_id: string
 }
 
+interface Space {
+  id: string
+  name: string
+}
+
 interface UserData {
   id: string
   email: string
@@ -69,7 +74,9 @@ export default function DocumentEditPage({ params }: { params: Promise<{ id: str
   const [title, setTitle] = useState('')
   const [content, setContent] = useState('')
   const [status, setStatus] = useState<string>('draft')
+  const [spaceId, setSpaceId] = useState<string>('')
   const [projectId, setProjectId] = useState<string>('space')
+  const [spaces, setSpaces] = useState<Space[]>([])
   const [projects, setProjects] = useState<Project[]>([])
   
   const supabase = createClient()
@@ -79,20 +86,22 @@ export default function DocumentEditPage({ params }: { params: Promise<{ id: str
   useEffect(() => {
     loadUser()
     loadDocument()
-    loadProjects()
+    loadSpaces()
   }, [id])
 
   useEffect(() => {
     if (document) {
+      const currentSpaceId = document.space_id || ''
       const currentProjectId = document.project_id || 'space'
       const changed = 
         title !== document.title ||
         content !== document.content ||
         status !== document.status ||
+        spaceId !== currentSpaceId ||
         projectId !== currentProjectId
       setHasChanges(changed)
     }
-  }, [title, content, status, projectId, document])
+  }, [title, content, status, spaceId, projectId, document])
 
   async function loadUser() {
     try {
@@ -120,7 +129,13 @@ export default function DocumentEditPage({ params }: { params: Promise<{ id: str
       setTitle(data.title)
       setContent(data.content)
       setStatus(data.status)
+      setSpaceId(data.space_id || '')
       setProjectId(data.project_id || 'space')
+      
+      // Load projects for this space
+      if (data.space_id) {
+        loadProjects(data.space_id)
+      }
     } catch (error) {
       console.error('Load document error:', error)
       showErrorToast(error, 'Failed to load document')
@@ -130,11 +145,33 @@ export default function DocumentEditPage({ params }: { params: Promise<{ id: str
     }
   }
 
-  async function loadProjects() {
+  async function loadSpaces() {
+    try {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+      
+      const { data, error } = await supabase
+        .from('space_members')
+        .select('spaces:space_id (id, name)')
+        .eq('user_id', user.id)
+      
+      if (error) throw error
+      const spaceList = (data || [])
+        .map((sm: any) => sm.spaces)
+        .filter(Boolean)
+        .sort((a: any, b: any) => a.name.localeCompare(b.name))
+      setSpaces(spaceList)
+    } catch (error) {
+      console.error('Load spaces error:', error)
+    }
+  }
+
+  async function loadProjects(forSpaceId: string) {
     try {
       const { data, error } = await supabase
         .from('projects')
         .select('id, name, space_id')
+        .eq('space_id', forSpaceId)
         .eq('status', 'active')
         .order('name')
       
@@ -171,6 +208,7 @@ export default function DocumentEditPage({ params }: { params: Promise<{ id: str
         title: title.trim(),
         content,
         status,
+        space_id: spaceId || null,
         project_id: projectId === 'space' ? null : projectId,
         updated_at: new Date().toISOString(),
         version: (document?.version || 1) + 1,
@@ -288,23 +326,48 @@ export default function DocumentEditPage({ params }: { params: Promise<{ id: str
 
               <Select
                 size="sm"
-                selectedKeys={[projectId]}
-                onChange={(e) => setProjectId(e.target.value)}
-                className="w-48"
-                aria-label="Visibility"
-                startContent={projectId === 'space' ? <Globe className="w-3 h-3" /> : <Users className="w-3 h-3" />}
+                selectedKeys={spaceId ? [spaceId] : []}
+                onChange={(e) => {
+                  const newSpaceId = e.target.value
+                  setSpaceId(newSpaceId)
+                  setProjectId('space') // Reset project when space changes
+                  if (newSpaceId) {
+                    loadProjects(newSpaceId)
+                  } else {
+                    setProjects([])
+                  }
+                }}
+                className="w-40"
+                aria-label="Space"
+                placeholder="Select Space"
+                startContent={<Folder className="w-3 h-3" />}
               >
-                <SelectItem key="space" startContent={<Globe className="w-3 h-3" />}>
-                  Everyone in Space
-                </SelectItem>
-                <>
-                  {projects.map(p => (
-                    <SelectItem key={p.id} startContent={<Users className="w-3 h-3" />}>
-                      {p.name}
-                    </SelectItem>
-                  ))}
-                </>
+                {spaces.map(s => (
+                  <SelectItem key={s.id}>{s.name}</SelectItem>
+                ))}
               </Select>
+
+              {spaceId && (
+                <Select
+                  size="sm"
+                  selectedKeys={[projectId]}
+                  onChange={(e) => setProjectId(e.target.value)}
+                  className="w-48"
+                  aria-label="Visibility"
+                  startContent={projectId === 'space' ? <Globe className="w-3 h-3" /> : <Users className="w-3 h-3" />}
+                >
+                  <SelectItem key="space" startContent={<Globe className="w-3 h-3" />}>
+                    Everyone in Space
+                  </SelectItem>
+                  <>
+                    {projects.map(p => (
+                      <SelectItem key={p.id} startContent={<Users className="w-3 h-3" />}>
+                        {p.name}
+                      </SelectItem>
+                    ))}
+                  </>
+                </Select>
+              )}
             </div>
           </div>
 

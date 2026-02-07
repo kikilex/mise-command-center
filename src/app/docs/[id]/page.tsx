@@ -116,11 +116,21 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
   const [newComment, setNewComment] = useState('')
   const [sendingComment, setSendingComment] = useState(false)
   
+  // Recipients for revision requests
+  const RECIPIENTS = [
+    { id: 'alex', name: 'Alex', type: 'human' },
+    { id: 'mom', name: 'Mom', type: 'human' },
+    { id: 'ax', name: 'Ax', type: 'ai' },
+    { id: 'tony', name: 'Tony', type: 'ai' },
+    { id: 'neo', name: 'Neo', type: 'ai' },
+  ]
+  
   // Revision modal state
   const { isOpen: isRevisionOpen, onOpen: onRevisionOpen, onClose: onRevisionClose } = useDisclosure()
   const { isOpen: isDeleteOpen, onOpen: onDeleteOpen, onClose: onDeleteClose } = useDisclosure()
   const [deleting, setDeleting] = useState(false)
   const [revisionFeedback, setRevisionFeedback] = useState('')
+  const [revisionRecipient, setRevisionRecipient] = useState('ax')
   const [submittingRevision, setSubmittingRevision] = useState(false)
   
   // Approval state
@@ -427,6 +437,9 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
     
     setSubmittingRevision(true)
     try {
+      const recipient = RECIPIENTS.find(r => r.id === revisionRecipient) || RECIPIENTS[0]
+      const isAiRecipient = recipient.type === 'ai'
+      
       // 1. Update document status to needs_revision
       const { error: docError } = await supabase
         .from('documents')
@@ -440,7 +453,7 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
         .from('document_comments')
         .insert({
           document_id: id,
-          content: revisionFeedback.trim(),
+          content: `@${recipient.name}: ${revisionFeedback.trim()}`,
           author_id: user.id,
           author_name: user.name || user.email,
           comment_type: 'revision_request',
@@ -450,7 +463,7 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
 
       if (commentError) throw commentError
 
-      // 3. Create task for AI agent to revise
+      // 3. Create task for the selected recipient
       const { error: taskError } = await supabase
         .from('tasks')
         .insert({
@@ -458,25 +471,49 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
           description: `Revision requested for document "${document.title}":\n\n${revisionFeedback.trim()}\n\nDocument link: /docs/${id}`,
           status: 'todo',
           priority: 'high',
-          ai_flag: true,
-          ai_agent: 'ax',
+          ai_flag: isAiRecipient,
+          ai_agent: isAiRecipient ? recipient.id : null,
           created_by: user.id,
           business_id: document.business_id,
+          space_id: document.space_id,
           metadata: {
             document_id: id,
             revision_request: true,
+            assigned_to: recipient.id,
           },
         })
 
       if (taskError) throw taskError
 
+      // 4. Create notification for human recipients
+      if (!isAiRecipient) {
+        // Try to find user by name (simplified - in real app would need proper user lookup)
+        const { data: recipientUser } = await supabase
+          .from('users')
+          .select('id')
+          .ilike('name', recipient.name)
+          .single()
+        
+        if (recipientUser) {
+          await supabase.from('notifications').insert({
+            user_id: recipientUser.id,
+            type: 'revision_request',
+            title: `Revision requested: ${document.title}`,
+            message: revisionFeedback.trim(),
+            link: `/docs/${id}`,
+            metadata: { document_id: id },
+          })
+        }
+      }
+
       // Update local state
       setComments(prev => [...prev, commentData])
       setDocument(prev => prev ? { ...prev, status: 'needs_revision' } : null)
       setRevisionFeedback('')
+      setRevisionRecipient('ax')
       onRevisionClose()
       
-      showSuccessToast('Revision requested! A task has been created for Ax.')
+      showSuccessToast(`Revision requested! Sent to ${recipient.name}.`)
     } catch (error) {
       console.error('Request revision error:', error)
       showErrorToast(error, 'Failed to request revision')
@@ -1360,8 +1397,27 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
           </ModalHeader>
           <ModalBody>
             <p className="text-slate-600 dark:text-slate-300 mb-4">
-              What changes need to be made to this document? Your feedback will be saved as a comment and a task will be created for Ax to make the revisions.
+              What changes need to be made to this document? Select who should make the revisions.
             </p>
+            
+            <Select
+              label="Send to"
+              selectedKeys={[revisionRecipient]}
+              onChange={(e) => setRevisionRecipient(e.target.value)}
+              className="mb-4"
+              isRequired
+            >
+              {RECIPIENTS.map(r => (
+                <SelectItem key={r.id} startContent={
+                  <Chip size="sm" variant="flat" color={r.type === 'ai' ? 'secondary' : 'primary'}>
+                    {r.type === 'ai' ? 'AI' : 'Human'}
+                  </Chip>
+                }>
+                  {r.name}
+                </SelectItem>
+              ))}
+            </Select>
+            
             <Textarea
               label="Revision Feedback"
               placeholder="Describe what needs to be changed..."

@@ -4,7 +4,8 @@ import { useState, useEffect, useMemo, Suspense, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { 
   FileText, Search, Plus, Clock, Tag, Archive, Eye, EyeOff,
-  X, Check, Folder, Settings, Pencil, ListFilter, NotebookPen, Users, Globe
+  X, Check, Folder, Settings, Pencil, ListFilter, NotebookPen, Users, Globe,
+  MessageSquare, Send, RotateCcw
 } from 'lucide-react'
 import {
   Button,
@@ -21,10 +22,12 @@ import {
   ModalBody,
   ModalFooter,
   Textarea,
+  Divider,
 } from '@heroui/react'
 import { createClient } from '@/lib/supabase/client'
 import { useBusiness } from '@/lib/business-context'
 import Navbar from '@/components/Navbar'
+import RichTextEditor from '@/components/RichTextEditor'
 import { showErrorToast, showSuccessToast } from '@/lib/errors'
 import toast from 'react-hot-toast'
 
@@ -68,6 +71,16 @@ interface Space {
   name: string
   color: string
   icon: string
+}
+
+interface Comment {
+  id: string
+  document_id: string
+  content: string
+  author_id: string | null
+  author_name: string
+  comment_type: 'comment' | 'revision_request' | 'status_change'
+  created_at: string
 }
 
 const statusOptions = [
@@ -145,6 +158,25 @@ function DocsPageContent() {
   const [noteTitle, setNoteTitle] = useState('')
   const [noteContent, setNoteContent] = useState('')
   const [creatingNote, setCreatingNote] = useState(false)
+  
+  // Note view modal state (for viewing/editing existing notes)
+  const [isNoteViewOpen, setIsNoteViewOpen] = useState(false)
+  const [viewingNote, setViewingNote] = useState<Document | null>(null)
+  const [editNoteTitle, setEditNoteTitle] = useState('')
+  const [editNoteContent, setEditNoteContent] = useState('')
+  const [savingNote, setSavingNote] = useState(false)
+  const [noteHasChanges, setNoteHasChanges] = useState(false)
+  
+  // Comments state for note modal
+  const [noteComments, setNoteComments] = useState<Comment[]>([])
+  const [loadingNoteComments, setLoadingNoteComments] = useState(false)
+  const [newNoteComment, setNewNoteComment] = useState('')
+  const [sendingNoteComment, setSendingNoteComment] = useState(false)
+  
+  // @mention suggestions state
+  const [showMentions, setShowMentions] = useState(false)
+  const [mentionFilter, setMentionFilter] = useState('')
+  const MENTION_USERS = ['Alex', 'Mom', 'Ax', 'Tony', 'Neo']
   
   const supabase = createClient()
   const router = useRouter()
@@ -274,6 +306,151 @@ function DocsPageContent() {
     }
   }
 
+  // Open a note in the view modal
+  function handleOpenNote(doc: Document) {
+    setViewingNote(doc)
+    setEditNoteTitle(doc.title)
+    setEditNoteContent(doc.content)
+    setNoteHasChanges(false)
+    setIsNoteViewOpen(true)
+    loadNoteComments(doc.id)
+  }
+
+  // Load comments for a note
+  async function loadNoteComments(docId: string) {
+    setLoadingNoteComments(true)
+    try {
+      const { data, error } = await supabase
+        .from('document_comments')
+        .select('*')
+        .eq('document_id', docId)
+        .order('created_at', { ascending: true })
+      
+      if (error) throw error
+      setNoteComments(data || [])
+    } catch (error) {
+      console.error('Load comments error:', error)
+    } finally {
+      setLoadingNoteComments(false)
+    }
+  }
+
+  // Save note edits
+  async function handleSaveNoteEdit() {
+    if (!viewingNote || !user) return
+    
+    setSavingNote(true)
+    try {
+      const { error } = await supabase
+        .from('documents')
+        .update({
+          title: editNoteTitle.trim(),
+          content: editNoteContent,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', viewingNote.id)
+      
+      if (error) throw error
+      
+      showSuccessToast('Note saved')
+      setNoteHasChanges(false)
+      
+      // Update local documents list
+      setDocuments(prev => prev.map(d => 
+        d.id === viewingNote.id 
+          ? { ...d, title: editNoteTitle.trim(), content: editNoteContent, updated_at: new Date().toISOString() }
+          : d
+      ))
+      setViewingNote(prev => prev ? { ...prev, title: editNoteTitle.trim(), content: editNoteContent } : null)
+    } catch (error) {
+      showErrorToast(error, 'Failed to save note')
+    } finally {
+      setSavingNote(false)
+    }
+  }
+
+  // Add comment to note with @mention support
+  async function handleAddNoteComment() {
+    if (!newNoteComment.trim() || !user || !viewingNote) return
+    
+    setSendingNoteComment(true)
+    try {
+      const { data, error } = await supabase
+        .from('document_comments')
+        .insert({
+          document_id: viewingNote.id,
+          content: newNoteComment.trim(),
+          author_id: user.id,
+          author_name: user.name || user.email,
+          comment_type: 'comment',
+        })
+        .select()
+        .single()
+      
+      if (error) throw error
+      
+      setNoteComments(prev => [...prev, data])
+      setNewNoteComment('')
+      setShowMentions(false)
+    } catch (error) {
+      showErrorToast(error, 'Failed to add comment')
+    } finally {
+      setSendingNoteComment(false)
+    }
+  }
+
+  // Handle @mention input
+  function handleCommentChange(value: string) {
+    setNewNoteComment(value)
+    
+    // Check for @mention trigger
+    const lastAtIndex = value.lastIndexOf('@')
+    if (lastAtIndex !== -1) {
+      const textAfterAt = value.slice(lastAtIndex + 1)
+      // Show mentions if @ is the last char or if there's text after it that matches a user
+      if (textAfterAt === '' || !textAfterAt.includes(' ')) {
+        setMentionFilter(textAfterAt.toLowerCase())
+        setShowMentions(true)
+      } else {
+        setShowMentions(false)
+      }
+    } else {
+      setShowMentions(false)
+    }
+  }
+
+  // Insert @mention into comment
+  function insertMention(username: string) {
+    const lastAtIndex = newNoteComment.lastIndexOf('@')
+    const beforeAt = newNoteComment.slice(0, lastAtIndex)
+    setNewNoteComment(`${beforeAt}@${username} `)
+    setShowMentions(false)
+  }
+
+  // Track changes in note edit
+  useEffect(() => {
+    if (viewingNote) {
+      const changed = editNoteTitle !== viewingNote.title || editNoteContent !== viewingNote.content
+      setNoteHasChanges(changed)
+    }
+  }, [editNoteTitle, editNoteContent, viewingNote])
+
+  // Format comment date
+  const formatCommentDate = (dateStr: string) => {
+    const date = new Date(dateStr)
+    const now = new Date()
+    const diffMs = now.getTime() - date.getTime()
+    const diffMins = Math.floor(diffMs / 60000)
+    const diffHours = Math.floor(diffMs / 3600000)
+    const diffDays = Math.floor(diffMs / 86400000)
+    
+    if (diffMins < 1) return 'just now'
+    if (diffMins < 60) return `${diffMins}m ago`
+    if (diffHours < 24) return `${diffHours}h ago`
+    if (diffDays < 7) return `${diffDays}d ago`
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  }
+
   const allTags = useMemo(() => {
     const tagSet = new Set<string>()
     documents.forEach(doc => (doc.tags || []).forEach(tag => tagSet.add(tag)))
@@ -397,7 +574,13 @@ function DocsPageContent() {
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             {filteredDocuments.map((doc) => (
-              <Card key={doc.id} isPressable onPress={() => router.push(`/docs/${doc.id}`)} className="border border-slate-200 dark:border-slate-700">
+              <Card key={doc.id} isPressable onPress={() => {
+                if (doc.doc_type === 'note') {
+                  handleOpenNote(doc)
+                } else {
+                  router.push(`/docs/${doc.id}`)
+                }
+              }} className="border border-slate-200 dark:border-slate-700">
                 <CardBody className="p-4">
                   <div className="flex items-start justify-between gap-2 mb-2">
                     <h3 className="font-semibold line-clamp-1">{doc.title}</h3>
@@ -425,7 +608,7 @@ function DocsPageContent() {
         )}
 
         {/* Quick Note Modal */}
-        <Modal isOpen={isNoteModalOpen} onClose={() => setIsNoteModalOpen(false)} size="md">
+        <Modal isOpen={isNoteModalOpen} onClose={() => setIsNoteModalOpen(false)} size="2xl">
           <ModalContent>
             <ModalHeader className="flex items-center gap-2">
               <NotebookPen className="w-5 h-5" />
@@ -440,14 +623,15 @@ function DocsPageContent() {
                 className="mb-4"
                 isRequired
               />
-              <Textarea
-                label="Content"
-                placeholder="Write your note here..."
-                value={noteContent}
-                onChange={(e) => setNoteContent(e.target.value)}
-                minRows={6}
-                isRequired
-              />
+              <div className="space-y-1">
+                <label className="text-sm font-medium text-slate-700 dark:text-slate-300">Content</label>
+                <RichTextEditor
+                  content={noteContent}
+                  onChange={setNoteContent}
+                  placeholder="Write your note here..."
+                  minHeight="200px"
+                />
+              </div>
             </ModalBody>
             <ModalFooter>
               <Button variant="flat" onPress={() => setIsNoteModalOpen(false)}>
@@ -460,6 +644,202 @@ function DocsPageContent() {
                 isDisabled={!noteTitle.trim() || !noteContent.trim()}
               >
                 Save Note
+              </Button>
+            </ModalFooter>
+          </ModalContent>
+        </Modal>
+
+        {/* Note View/Edit Modal */}
+        <Modal 
+          isOpen={isNoteViewOpen} 
+          onClose={() => {
+            if (noteHasChanges) {
+              if (confirm('You have unsaved changes. Discard them?')) {
+                setIsNoteViewOpen(false)
+                setViewingNote(null)
+              }
+            } else {
+              setIsNoteViewOpen(false)
+              setViewingNote(null)
+            }
+          }} 
+          size="3xl"
+          scrollBehavior="inside"
+        >
+          <ModalContent>
+            <ModalHeader className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <NotebookPen className="w-5 h-5 text-violet-600" />
+                <span>Note</span>
+                {noteHasChanges && (
+                  <Chip size="sm" color="warning" variant="flat">Unsaved</Chip>
+                )}
+              </div>
+              <Button
+                color="primary"
+                size="sm"
+                onPress={handleSaveNoteEdit}
+                isLoading={savingNote}
+                isDisabled={!noteHasChanges}
+              >
+                Save
+              </Button>
+            </ModalHeader>
+            <ModalBody>
+              {viewingNote && (
+                <>
+                  {/* Title */}
+                  <Input
+                    value={editNoteTitle}
+                    onChange={(e) => setEditNoteTitle(e.target.value)}
+                    placeholder="Note title..."
+                    className="mb-4"
+                    classNames={{
+                      input: 'text-xl font-semibold',
+                    }}
+                    variant="underlined"
+                  />
+                  
+                  {/* Content with WYSIWYG */}
+                  <div className="mb-6">
+                    <RichTextEditor
+                      content={editNoteContent}
+                      onChange={setEditNoteContent}
+                      placeholder="Write your note..."
+                      minHeight="250px"
+                    />
+                  </div>
+
+                  <Divider className="my-4" />
+
+                  {/* Comments Section */}
+                  <div>
+                    <h4 className="text-sm font-semibold text-slate-700 dark:text-slate-300 mb-3 flex items-center gap-2">
+                      <MessageSquare className="w-4 h-4" />
+                      Comments
+                      {noteComments.length > 0 && (
+                        <Chip size="sm" variant="flat">{noteComments.length}</Chip>
+                      )}
+                    </h4>
+
+                    {/* Comments List */}
+                    <div className="space-y-3 mb-4 max-h-60 overflow-y-auto">
+                      {loadingNoteComments ? (
+                        <div className="flex items-center justify-center py-4">
+                          <Spinner size="sm" />
+                          <span className="ml-2 text-sm text-slate-500">Loading comments...</span>
+                        </div>
+                      ) : noteComments.length === 0 ? (
+                        <div className="text-center py-4 text-sm text-slate-400">
+                          No comments yet
+                        </div>
+                      ) : (
+                        noteComments.map((comment) => (
+                          <div
+                            key={comment.id}
+                            className={`p-3 rounded-lg text-sm ${
+                              comment.comment_type === 'revision_request'
+                                ? 'bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-700'
+                                : 'bg-slate-100 dark:bg-slate-800'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="font-medium text-slate-700 dark:text-slate-300">
+                                {comment.author_name}
+                              </span>
+                              {comment.comment_type === 'revision_request' && (
+                                <Chip size="sm" color="warning" variant="flat" className="h-4 text-[10px]">
+                                  <RotateCcw className="w-2 h-2 mr-0.5" />
+                                  Revision
+                                </Chip>
+                              )}
+                              <span className="text-xs text-slate-400">
+                                {formatCommentDate(comment.created_at)}
+                              </span>
+                            </div>
+                            <p className="text-slate-600 dark:text-slate-400 whitespace-pre-wrap">
+                              {comment.content}
+                            </p>
+                          </div>
+                        ))
+                      )}
+                    </div>
+
+                    {/* Add Comment */}
+                    {user && (
+                      <div className="relative">
+                        <div className="flex gap-2">
+                          <Input
+                            placeholder="Add a comment... (use @ to mention)"
+                            value={newNoteComment}
+                            onChange={(e) => handleCommentChange(e.target.value)}
+                            onKeyDown={(e) => {
+                              if (e.key === 'Enter' && !e.shiftKey) {
+                                e.preventDefault()
+                                handleAddNoteComment()
+                              }
+                              if (e.key === 'Escape') {
+                                setShowMentions(false)
+                              }
+                            }}
+                            isDisabled={sendingNoteComment}
+                            size="sm"
+                            className="flex-1"
+                          />
+                          <Button
+                            color="primary"
+                            isIconOnly
+                            size="sm"
+                            onPress={handleAddNoteComment}
+                            isDisabled={!newNoteComment.trim() || sendingNoteComment}
+                            isLoading={sendingNoteComment}
+                          >
+                            {!sendingNoteComment && <Send className="w-3 h-3" />}
+                          </Button>
+                        </div>
+                        
+                        {/* @mention dropdown */}
+                        {showMentions && (
+                          <div className="absolute bottom-full left-0 mb-1 w-48 bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg shadow-lg z-10 overflow-hidden">
+                            {MENTION_USERS
+                              .filter(u => u.toLowerCase().includes(mentionFilter))
+                              .map(username => (
+                                <button
+                                  key={username}
+                                  onClick={() => insertMention(username)}
+                                  className="w-full px-3 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
+                                >
+                                  @{username}
+                                </button>
+                              ))
+                            }
+                            {MENTION_USERS.filter(u => u.toLowerCase().includes(mentionFilter)).length === 0 && (
+                              <div className="px-3 py-2 text-sm text-slate-400">No matches</div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </ModalBody>
+            <ModalFooter>
+              <Button 
+                variant="flat" 
+                onPress={() => {
+                  if (noteHasChanges) {
+                    if (confirm('You have unsaved changes. Discard them?')) {
+                      setIsNoteViewOpen(false)
+                      setViewingNote(null)
+                    }
+                  } else {
+                    setIsNoteViewOpen(false)
+                    setViewingNote(null)
+                  }
+                }}
+              >
+                Close
               </Button>
             </ModalFooter>
           </ModalContent>
