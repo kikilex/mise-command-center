@@ -1001,7 +1001,7 @@ export default function Home() {
                       <div className="flex items-center justify-between mb-2">
                         <div className="flex items-center gap-3">
                           <div className="relative">
-                            <Avatar name={agent.name} size="sm" className="bg-gradient-to-br from-violet-500 to-purple-600 text-white font-black" />
+                            <Avatar src={agent.avatar_url} name={agent.name} size="sm" className="bg-gradient-to-br from-violet-500 to-purple-600 text-white font-black" />
                             <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white dark:border-slate-900 ${agent.is_active ? 'bg-emerald-500' : 'bg-slate-400'}`} />
                           </div>
                           <div>
@@ -1191,7 +1191,7 @@ export default function Home() {
           <ModalHeader className="flex flex-col gap-1">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-3">
-                <Avatar name={selectedAgent?.name} size="lg" className="bg-gradient-to-br from-violet-500 to-purple-600 text-white font-black" />
+                <Avatar src={selectedAgent?.avatar_url} name={selectedAgent?.name} size="lg" className="bg-gradient-to-br from-violet-500 to-purple-600 text-white font-black" />
                 <div>
                   <h2 className="text-lg font-bold">{selectedAgent?.name}</h2>
                   <p className="text-sm text-slate-400 capitalize">{selectedAgent?.role?.replace(/_/g, ' ')}</p>
