@@ -651,7 +651,7 @@ export default function Home() {
                   )}
                 </div>
               </CardHeader>
-              <CardBody className="p-6">
+              <CardBody className="p-6 overflow-hidden">
                 <div className="flex items-end gap-2 mb-6">
                   <Textarea 
                     placeholder="What's on your mind? Hit enter to capture..."
@@ -680,7 +680,7 @@ export default function Home() {
                     <p className="text-sm text-slate-400">No pending thoughts. Dump away.</p>
                   </div>
                 ) : (
-                  <div className="space-y-1 max-h-[400px] overflow-y-auto">
+                  <div className="space-y-1 max-h-[400px] overflow-y-auto overflow-x-hidden">
                     {inboxItems.map((item) => (
                       <div key={item.id} className="group">
                         {editingDump?.id === item.id ? (
@@ -702,12 +702,12 @@ export default function Home() {
                           </div>
                         ) : (
                           <div 
-                            className="flex items-start gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors"
+                            className="flex items-start gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors overflow-hidden"
                             onClick={() => { setViewingDump(item); onViewOpen(); }}
                           >
                             <div className="w-1.5 h-1.5 rounded-full bg-violet-400 flex-shrink-0 mt-2" />
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm text-slate-700 dark:text-slate-300 line-clamp-2 break-words">{item.content}</p>
+                            <div className="flex-1 min-w-0 overflow-hidden">
+                              <p className="text-sm text-slate-700 dark:text-slate-300 line-clamp-2 break-words overflow-hidden text-ellipsis">{item.content}</p>
                               {item.tags && item.tags.length > 0 && (
                                 <div className="flex flex-wrap gap-1 mt-1">
                                   {item.tags.map(tag => (
