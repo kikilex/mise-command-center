@@ -306,6 +306,7 @@ export default function DocumentEditPage({ params }: { params: Promise<{ id: str
               type="text"
               value={title}
               onChange={(e) => setTitle(e.target.value)}
+              onFocus={(e) => e.target.select()}
               placeholder="Untitled Document"
               className="w-full text-2xl font-bold bg-transparent border-none outline-none text-slate-900 dark:text-slate-50 placeholder:text-slate-400"
             />

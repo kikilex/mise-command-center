@@ -850,7 +850,7 @@ export default function SpaceDetailPage() {
                         .from('documents')
                         .insert({
                           title: 'Untitled Document',
-                          content: '# New Document\n\nStart writing here...',
+                          content: '',
                           status: 'draft',
                           created_by: user.id,
                           space_id: id,
