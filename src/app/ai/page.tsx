@@ -96,7 +96,21 @@ export default function AIWorkspacePage() {
     setLoading(true);
     try {
       const { data: { user: authUser } } = await supabase.auth.getUser()
-      setUser(authUser)
+      if (authUser) {
+        // Fetch full profile including avatar
+        const { data: profile } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', authUser.id)
+          .single()
+        
+        setUser({
+          id: authUser.id,
+          email: authUser.email || '',
+          name: profile?.name || authUser.email?.split('@')[0],
+          avatar_url: profile?.avatar_url,
+        })
+      }
 
       const [agentsRes, tasksRes, logsRes] = await Promise.all([
         supabase.from('ai_agents').select('*').order('created_at', { ascending: true }),

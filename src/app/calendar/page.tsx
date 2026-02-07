@@ -62,6 +62,7 @@ interface UserData {
   id: string
   email: string
   name?: string
+  avatar_url?: string
 }
 
 // Calendar colors
@@ -159,10 +160,18 @@ export default function CalendarPage() {
       }
       
       if (authUser) {
+        // Fetch full profile including avatar
+        const { data: profile } = await supabase
+          .from('users')
+          .select('*')
+          .eq('id', authUser.id)
+          .single()
+        
         setUser({
           id: authUser.id,
           email: authUser.email || '',
-          name: authUser.email?.split('@')[0],
+          name: profile?.name || authUser.email?.split('@')[0],
+          avatar_url: profile?.avatar_url,
         })
       }
 

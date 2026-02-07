@@ -213,7 +213,25 @@ function TasksPageContent() {
   }
 
   async function loadUser() {
-    // ... (rest of the code)
+    try {
+      const { data: { user: authUser } } = await supabase.auth.getUser()
+      if (!authUser) return
+      
+      const { data: profile } = await supabase
+        .from('users')
+        .select('*')
+        .eq('id', authUser.id)
+        .single()
+      
+      setUser({
+        id: authUser.id,
+        email: authUser.email || '',
+        name: profile?.name || authUser.email?.split('@')[0],
+        avatar_url: profile?.avatar_url,
+      })
+    } catch (error) {
+      console.error('Error loading user:', error)
+    }
   }
 
   async function loadTasks() {
