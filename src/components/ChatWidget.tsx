@@ -368,11 +368,20 @@ export default function ChatWidget() {
   }, [threads])
 
   useEffect(() => {
-    if (activeThread) loadMessages(activeThread.id)
+    if (activeThread) {
+      loadMessages(activeThread.id)
+      // Scroll to bottom after loading
+      setTimeout(() => {
+        if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+      }, 100)
+    }
   }, [activeThread?.id])
 
   useEffect(() => {
-    if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+    // Delay scroll to ensure DOM is rendered
+    setTimeout(() => {
+      if (scrollRef.current) scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+    }, 50)
   }, [messages])
 
   // Close header menu when clicking outside
