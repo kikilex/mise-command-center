@@ -18,6 +18,7 @@ import {
 import { Upload, X, Save } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { toast } from 'react-hot-toast'
+import ImageCropper from '@/components/ImageCropper'
 
 interface AIAgent {
   id: string
@@ -65,6 +66,8 @@ const CAPABILITY_OPTIONS = [
 export default function EditAgentModal({ isOpen, onClose, onSuccess, agent }: EditAgentModalProps) {
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [cropperOpen, setCropperOpen] = useState(false)
+  const [selectedImage, setSelectedImage] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const supabase = createClient()
 
@@ -98,7 +101,7 @@ export default function EditAgentModal({ isOpen, onClose, onSuccess, agent }: Ed
     }
   }, [agent])
 
-  const handleAvatarUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
     const file = event.target.files?.[0]
     if (!file || !agent) return
 
@@ -107,21 +110,36 @@ export default function EditAgentModal({ isOpen, onClose, onSuccess, agent }: Ed
       return
     }
 
+    // Create object URL for the cropper
+    const imageUrl = URL.createObjectURL(file)
+    setSelectedImage(imageUrl)
+    setCropperOpen(true)
+    
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }
+
+  const handleCroppedImage = async (croppedBlob: Blob) => {
+    if (!agent) return
+
     setUploading(true)
     try {
-      const fileExt = file.name.split('.').pop()
-      const fileName = `agent-${agent.id}-${Date.now()}.${fileExt}`
-      const filePath = `${fileName}`
+      const fileName = `agent-${agent.id}-${Date.now()}.jpg`
 
       const { error: uploadError } = await supabase.storage
         .from('avatars')
-        .upload(filePath, file)
+        .upload(fileName, croppedBlob, {
+          contentType: 'image/jpeg',
+          upsert: true
+        })
 
       if (uploadError) throw uploadError
 
       const { data: { publicUrl } } = supabase.storage
         .from('avatars')
-        .getPublicUrl(filePath)
+        .getPublicUrl(fileName)
 
       // Update local state
       setFormData({ ...formData, avatar_url: publicUrl })
@@ -138,6 +156,11 @@ export default function EditAgentModal({ isOpen, onClose, onSuccess, agent }: Ed
       toast.error('Failed to upload avatar')
     } finally {
       setUploading(false)
+      // Clean up object URL
+      if (selectedImage) {
+        URL.revokeObjectURL(selectedImage)
+        setSelectedImage(null)
+      }
     }
   }
 
@@ -224,7 +247,7 @@ export default function EditAgentModal({ isOpen, onClose, onSuccess, agent }: Ed
                 ref={fileInputRef}
                 className="hidden"
                 accept="image/*"
-                onChange={handleAvatarUpload}
+                onChange={handleFileSelect}
               />
               <Button 
                 size="sm" 
@@ -236,6 +259,24 @@ export default function EditAgentModal({ isOpen, onClose, onSuccess, agent }: Ed
                 Change Avatar
               </Button>
             </div>
+
+            {/* Image Cropper Modal */}
+            {selectedImage && (
+              <ImageCropper
+                isOpen={cropperOpen}
+                onClose={() => {
+                  setCropperOpen(false)
+                  if (selectedImage) {
+                    URL.revokeObjectURL(selectedImage)
+                    setSelectedImage(null)
+                  }
+                }}
+                imageSrc={selectedImage}
+                onCropComplete={handleCroppedImage}
+                aspectRatio={1}
+                cropShape="round"
+              />
+            )}
 
             {/* Basic Info */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">

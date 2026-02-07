@@ -15,6 +15,7 @@ import {
 } from '@heroui/react'
 import { toast } from 'react-hot-toast'
 import Navbar from '@/components/Navbar'
+import ImageCropper from '@/components/ImageCropper'
 
 interface Profile {
   id: string
@@ -34,6 +35,8 @@ export default function ProfilePage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [uploading, setUploading] = useState(false)
+  const [cropperOpen, setCropperOpen] = useState(false)
+  const [selectedImage, setSelectedImage] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
   const supabase = createClient()
 
@@ -90,7 +93,7 @@ export default function ProfilePage() {
     }
   }
 
-  async function handleAvatarUpload(event: React.ChangeEvent<HTMLInputElement>) {
+  function handleFileSelect(event: React.ChangeEvent<HTMLInputElement>) {
     const file = event.target.files?.[0]
     if (!file || !profile) return
 
@@ -99,21 +102,36 @@ export default function ProfilePage() {
       return
     }
 
+    // Create object URL for the cropper
+    const imageUrl = URL.createObjectURL(file)
+    setSelectedImage(imageUrl)
+    setCropperOpen(true)
+    
+    // Reset file input
+    if (fileInputRef.current) {
+      fileInputRef.current.value = ''
+    }
+  }
+
+  async function handleCroppedImage(croppedBlob: Blob) {
+    if (!profile) return
+
     setUploading(true)
     try {
-      const fileExt = file.name.split('.').pop()
-      const fileName = `${profile.id}-${Math.random()}.${fileExt}`
-      const filePath = `${fileName}`
+      const fileName = `${profile.id}-${Date.now()}.jpg`
 
       const { error: uploadError } = await supabase.storage
         .from('avatars')
-        .upload(filePath, file)
+        .upload(fileName, croppedBlob, {
+          contentType: 'image/jpeg',
+          upsert: true
+        })
 
       if (uploadError) throw uploadError
 
       const { data: { publicUrl } } = supabase.storage
         .from('avatars')
-        .getPublicUrl(filePath)
+        .getPublicUrl(fileName)
 
       const { error: updateError } = await supabase
         .from('users')
@@ -129,6 +147,11 @@ export default function ProfilePage() {
       toast.error('Failed to upload avatar')
     } finally {
       setUploading(false)
+      // Clean up object URL
+      if (selectedImage) {
+        URL.revokeObjectURL(selectedImage)
+        setSelectedImage(null)
+      }
     }
   }
 
@@ -168,7 +191,7 @@ export default function ProfilePage() {
                 ref={fileInputRef}
                 className="hidden"
                 accept="image/*"
-                onChange={handleAvatarUpload}
+                onChange={handleFileSelect}
               />
               <Button 
                 size="sm" 
@@ -179,6 +202,24 @@ export default function ProfilePage() {
                 Change Photo
               </Button>
             </div>
+
+            {/* Image Cropper Modal */}
+            {selectedImage && (
+              <ImageCropper
+                isOpen={cropperOpen}
+                onClose={() => {
+                  setCropperOpen(false)
+                  if (selectedImage) {
+                    URL.revokeObjectURL(selectedImage)
+                    setSelectedImage(null)
+                  }
+                }}
+                imageSrc={selectedImage}
+                onCropComplete={handleCroppedImage}
+                aspectRatio={1}
+                cropShape="round"
+              />
+            )}
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <Input 
