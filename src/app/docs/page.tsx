@@ -298,7 +298,13 @@ function DocsPageContent() {
   }, [documents, searchQuery, statusFilter, spaceFilter, docTypeFilter, selectedTags, showArchived, showHidden])
 
   const getPreview = (content: string) => {
-    const stripped = content.replace(/[#*`\[\]]/g, '').replace(/\n+/g, ' ').trim()
+    // Strip HTML tags and markdown symbols
+    const stripped = content
+      .replace(/<[^>]*>/g, '') // Remove HTML tags
+      .replace(/[#*`\[\]]/g, '') // Remove markdown symbols
+      .replace(/&nbsp;/g, ' ') // Replace HTML entities
+      .replace(/\n+/g, ' ')
+      .trim()
     return stripped.length > 150 ? stripped.slice(0, 150) + '...' : stripped
   }
 
