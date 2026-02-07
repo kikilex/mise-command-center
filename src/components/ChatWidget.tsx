@@ -288,10 +288,7 @@ export default function ChatWidget() {
       const currentUser = userRef.current
       if (!currentUser) return
       
-      // Refresh thread list
-      loadThreads(currentUser.id, userNameRef.current)
-      
-      // If viewing a thread, check for new messages
+      // If viewing a thread, mark messages as read FIRST
       const activeThread = activeThreadRef.current
       if (activeThread) {
         let query = supabase.from('inbox').select('*').eq('item_type', 'message')
@@ -331,6 +328,9 @@ export default function ChatWidget() {
           })
         }
       }
+      
+      // Refresh thread list AFTER marking messages as read
+      await loadThreads(currentUser.id, userNameRef.current)
     }, 3000)
 
     return () => { 
