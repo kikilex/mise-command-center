@@ -22,26 +22,25 @@ import {
   Select,
   SelectItem,
 } from "@heroui/react"
-import { Users, Mail, Calendar, MoreVertical, Trash2, UserPlus, CheckCircle, XCircle } from 'lucide-react'
+import { Users, Mail, Calendar, MoreVertical, Trash2, UserPlus, CheckCircle, XCircle, RotateCcw } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import Navbar from '@/components/Navbar'
 import SettingsNav from '@/components/SettingsNav'
 import { showErrorToast, showSuccessToast } from '@/lib/errors'
-import { useBusiness } from '@/lib/business-context'
-import { BusinessMember, BusinessRole, InviteMemberData } from '@/lib/types'
+import { useSpace } from '@/lib/space-context'
 
 export default function TeamPage() {
-  const [members, setMembers] = useState<BusinessMember[]>([])
+  const [members, setMembers] = useState<any[]>([])
   const [loading, setLoading] = useState(true)
   const [inviting, setInviting] = useState(false)
   const [updatingRole, setUpdatingRole] = useState<string | null>(null)
   const [removingMember, setRemovingMember] = useState<string | null>(null)
-  const [inviteData, setInviteData] = useState<InviteMemberData>({
+  const [inviteData, setInviteData] = useState<any>({
     email: '',
-    role: 'member'
+    role: 'viewer'
   })
   
-  const { selectedBusiness } = useBusiness()
+  const { selectedSpace: selectedBusiness } = useSpace()
   const supabase = createClient()
   
   const { 
@@ -56,7 +55,7 @@ export default function TeamPage() {
     onClose: onRemoveClose 
   } = useDisclosure()
 
-  const [memberToRemove, setMemberToRemove] = useState<BusinessMember | null>(null)
+  const [memberToRemove, setMemberToRemove] = useState<any>(null)
 
   useEffect(() => {
     if (selectedBusiness) {
@@ -72,13 +71,13 @@ export default function TeamPage() {
     setLoading(true)
     try {
       const { data, error } = await supabase
-        .from('business_members')
+        .from('space_members')
         .select(`
           *,
-          user:users(email, full_name)
+          user:users(email, name, display_name, avatar_url)
         `)
-        .eq('business_id', selectedBusiness.id)
-        .order('invited_at', { ascending: false })
+        .eq('space_id', selectedBusiness.id)
+        .order('joined_at', { ascending: false })
 
       if (error) throw error
       setMembers(data || [])
@@ -110,7 +109,7 @@ export default function TeamPage() {
           .from('users')
           .insert({
             email: inviteData.email,
-            full_name: inviteData.email.split('@')[0],
+            name: inviteData.email.split('@')[0],
           })
           .select('id')
           .single()
@@ -121,21 +120,19 @@ export default function TeamPage() {
         userId = userData.id
       }
 
-      // Add to business_members
+      // Add to space_members
       const { error: memberError } = await supabase
-        .from('business_members')
+        .from('space_members')
         .insert({
-          business_id: selectedBusiness.id,
+          space_id: selectedBusiness.id,
           user_id: userId,
           role: inviteData.role,
-          invited_at: new Date().toISOString(),
-          accepted_at: new Date().toISOString(), // Skip email flow for now
         })
 
       if (memberError) throw memberError
 
       showSuccessToast(`Invited ${inviteData.email} as ${inviteData.role}`)
-      setInviteData({ email: '', role: 'member' })
+      setInviteData({ email: '', role: 'viewer' })
       onInviteClose()
       loadTeamMembers()
     } catch (error) {
@@ -146,16 +143,16 @@ export default function TeamPage() {
     }
   }
 
-  async function handleUpdateRole(memberId: string, newRole: BusinessRole) {
+  async function handleUpdateRole(memberId: string, newRole: string) {
     if (!selectedBusiness) return
 
     setUpdatingRole(memberId)
     try {
       const { error } = await supabase
-        .from('business_members')
+        .from('space_members')
         .update({ role: newRole })
         .eq('id', memberId)
-        .eq('business_id', selectedBusiness.id)
+        .eq('space_id', selectedBusiness.id)
 
       if (error) throw error
 
@@ -175,10 +172,10 @@ export default function TeamPage() {
     setRemovingMember(memberToRemove.id)
     try {
       const { error } = await supabase
-        .from('business_members')
+        .from('space_members')
         .delete()
         .eq('id', memberToRemove.id)
-        .eq('business_id', selectedBusiness.id)
+        .eq('space_id', selectedBusiness.id)
 
       if (error) throw error
 
@@ -194,11 +191,11 @@ export default function TeamPage() {
     }
   }
 
-  function getRoleColor(role: BusinessRole): 'default' | 'primary' | 'secondary' | 'success' | 'warning' | 'danger' {
+  function getRoleColor(role: string): 'default' | 'primary' | 'secondary' | 'success' | 'warning' | 'danger' {
     switch (role) {
       case 'owner': return 'secondary'
       case 'admin': return 'primary'
-      case 'member': return 'success'
+      case 'editor': return 'success'
       case 'viewer': return 'default'
       default: return 'default'
     }
@@ -232,9 +229,9 @@ export default function TeamPage() {
               <Card>
                 <CardBody className="text-center py-12">
                   <Users className="w-12 h-12 mx-auto text-default-400 mb-4" />
-                  <h3 className="text-lg font-semibold mb-2">No Business Selected</h3>
+                  <h3 className="text-lg font-semibold mb-2">No Space Selected</h3>
                   <p className="text-default-500">
-                    Please select a business to manage team members.
+                    Please select a space to manage team members.
                   </p>
                 </CardBody>
               </Card>
@@ -273,7 +270,7 @@ export default function TeamPage() {
                 startContent={<UserPlus className="w-4 h-4" />}
                 onPress={onInviteOpen}
               >
-                Invite Member
+                Add Member
               </Button>
             </div>
 
@@ -294,7 +291,7 @@ export default function TeamPage() {
                 startContent={<UserPlus className="w-4 h-4" />}
                 onPress={onInviteOpen}
               >
-                Invite Your First Member
+                Add Your First Member
               </Button>
             </CardBody>
           </Card>
@@ -306,7 +303,7 @@ export default function TeamPage() {
                   <div className="flex justify-between items-start mb-3">
                     <div>
                       <h3 className="font-semibold">
-                        {member.user?.full_name || member.user?.email || 'Unknown User'}
+                        {member.user?.display_name || member.user?.name || member.user?.email || 'Unknown User'}
                       </h3>
                       <div className="flex items-center gap-2 mt-1">
                         <Mail className="w-3 h-3 text-default-400" />
@@ -363,10 +360,10 @@ export default function TeamPage() {
                             </DropdownTrigger>
                             <DropdownMenu
                               aria-label="Change role"
-                              onAction={(key) => handleUpdateRole(member.id, key as BusinessRole)}
+                              onAction={(key) => handleUpdateRole(member.id, key as string)}
                             >
                               <DropdownItem key="admin">Admin</DropdownItem>
-                              <DropdownItem key="member">Member</DropdownItem>
+                              <DropdownItem key="editor">Editor</DropdownItem>
                               <DropdownItem key="viewer">Viewer</DropdownItem>
                             </DropdownMenu>
                           </Dropdown>
@@ -377,10 +374,10 @@ export default function TeamPage() {
                     <div className="flex items-center justify-between">
                       <span className="text-sm text-default-500">Status</span>
                       <div className="flex items-center gap-1">
-                        {member.accepted_at ? (
+                        {member.user ? (
                           <>
                             <CheckCircle className="w-3 h-3 text-success" />
-                            <span className="text-xs text-success">Accepted</span>
+                            <span className="text-xs text-success">Active</span>
                           </>
                         ) : (
                           <>
@@ -396,7 +393,7 @@ export default function TeamPage() {
                       <div className="flex items-center gap-1">
                         <Calendar className="w-3 h-3 text-default-400" />
                         <span className="text-xs">
-                          {formatDate(member.accepted_at || member.invited_at)}
+                          {formatDate(member.joined_at)}
                         </span>
                       </div>
                     </div>
@@ -413,7 +410,7 @@ export default function TeamPage() {
       {/* Invite Member Modal */}
       <Modal isOpen={isInviteOpen} onClose={onInviteClose}>
         <ModalContent>
-          <ModalHeader className="flex flex-col gap-1">Invite Team Member</ModalHeader>
+          <ModalHeader className="flex flex-col gap-1">Add Team Member</ModalHeader>
           <ModalBody>
             <Input
               label="Email Address"
@@ -426,15 +423,15 @@ export default function TeamPage() {
             <Select
               label="Role"
               selectedKeys={[inviteData.role]}
-              onChange={(e) => setInviteData({ ...inviteData, role: e.target.value as BusinessRole })}
+              onChange={(e) => setInviteData({ ...inviteData, role: e.target.value })}
             >
               <SelectItem key="admin">Admin</SelectItem>
-              <SelectItem key="member">Member</SelectItem>
+              <SelectItem key="editor">Editor</SelectItem>
               <SelectItem key="viewer">Viewer</SelectItem>
             </Select>
             <p className="text-xs text-default-500">
-              Admins can manage team members and business settings. 
-              Members can create and edit content. 
+              Admins can manage team members and space settings. 
+              Editors can create and edit content. 
               Viewers have read-only access.
             </p>
           </ModalBody>
@@ -448,7 +445,7 @@ export default function TeamPage() {
               isLoading={inviting}
               isDisabled={!inviteData.email}
             >
-              Send Invite
+              Add Member
             </Button>
           </ModalFooter>
         </ModalContent>
@@ -462,12 +459,12 @@ export default function TeamPage() {
             <p>
               Are you sure you want to remove{' '}
               <span className="font-semibold">
-                {memberToRemove?.user?.full_name || memberToRemove?.user?.email || 'this member'}
+                {memberToRemove?.user?.display_name || memberToRemove?.user?.name || memberToRemove?.user?.email || 'this member'}
               </span>
               ?
             </p>
             <p className="text-sm text-default-500">
-              This action cannot be undone. The member will lose access to this business.
+              This action cannot be undone. The member will lose access to this space.
             </p>
           </ModalBody>
           <ModalFooter>

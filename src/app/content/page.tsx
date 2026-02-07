@@ -35,7 +35,7 @@ import {
 import { createClient } from '@/lib/supabase/client'
 import Navbar from '@/components/Navbar'
 import ContentDetailPanel from '@/components/ContentDetailPanel'
-import { useBusiness } from '@/lib/business-context'
+import { useSpace } from '@/lib/space-context'
 import { showErrorToast, showSuccessToast, getErrorMessage } from '@/lib/errors'
 import { ErrorFallback } from '@/components/ErrorBoundary'
 import {
@@ -179,7 +179,7 @@ function ContentPageContent() {
     custom_fields: {} as Record<string, any>,
   })
 
-  const { selectedBusinessId, selectedBusiness, businesses } = useBusiness()
+  const { selectedSpaceId: selectedBusinessId, selectedSpace: selectedBusiness, spaces: businesses } = useSpace()
   const supabase = createClient()
   const router = useRouter()
 

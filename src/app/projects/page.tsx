@@ -31,7 +31,7 @@ import {
 } from "@heroui/react"
 import { createClient } from '@/lib/supabase/client'
 import Navbar from '@/components/Navbar'
-import { useBusiness } from '@/lib/business-context'
+import { useSpace } from '@/lib/space-context'
 import { showErrorToast, showSuccessToast, getErrorMessage } from '@/lib/errors'
 import { ErrorFallback } from '@/components/ErrorBoundary'
 import { 
@@ -138,7 +138,7 @@ function ProjectsPageContent() {
     custom_fields: {} as Record<string, any>,
   })
   
-  const { selectedBusinessId, selectedBusiness } = useBusiness()
+  const { selectedSpaceId: selectedBusinessId, selectedSpace: selectedBusiness } = useSpace()
   const supabase = createClient()
   const router = useRouter()
 

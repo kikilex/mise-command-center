@@ -29,7 +29,7 @@ import {
 } from 'lucide-react'
 import Navbar from '@/components/Navbar'
 import { createClient } from '@/lib/supabase/client'
-import { useBusiness } from '@/lib/business-context'
+import { useSpace } from '@/lib/space-context'
 import { showErrorToast, showSuccessToast } from '@/lib/errors'
 import RunPlaybookModal from '@/components/RunPlaybookModal'
 
@@ -62,7 +62,7 @@ interface Space {
 export default function PlaybooksPage() {
   const router = useRouter()
   const supabase = createClient()
-  const { selectedBusinessId } = useBusiness()
+  const { selectedSpaceId: selectedBusinessId } = useSpace()
 
   const [playbooks, setPlaybooks] = useState<Playbook[]>([])
   const [spaces, setSpaces] = useState<Space[]>([])

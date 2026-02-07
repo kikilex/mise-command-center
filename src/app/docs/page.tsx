@@ -25,7 +25,7 @@ import {
   Divider,
 } from '@heroui/react'
 import { createClient } from '@/lib/supabase/client'
-import { useBusiness } from '@/lib/business-context'
+import { useSpace } from '@/lib/space-context'
 import Navbar from '@/components/Navbar'
 import RichTextEditor from '@/components/RichTextEditor'
 import { showErrorToast, showSuccessToast } from '@/lib/errors'
@@ -180,7 +180,7 @@ function DocsPageContent() {
   
   const supabase = createClient()
   const router = useRouter()
-  const { selectedBusinessId } = useBusiness()
+  const { selectedSpaceId } = useSpace()
 
   useEffect(() => {
     loadUser()
@@ -189,7 +189,7 @@ function DocsPageContent() {
   useEffect(() => {
     loadDocuments()
     loadSpaces()
-  }, [selectedBusinessId])
+  }, [selectedSpaceId])
 
   async function loadUser() {
     try {
@@ -259,7 +259,7 @@ function DocsPageContent() {
           content: '# New Document\n\nStart writing here...',
           status: 'draft',
           created_by: user.id,
-          space_id: selectedBusinessId,
+          space_id: selectedSpaceId,
           doc_type: 'document',
         })
         .select().single()
@@ -288,7 +288,7 @@ function DocsPageContent() {
           content: noteContent.trim(),
           status: 'approved',
           created_by: user.id,
-          space_id: selectedBusinessId,
+          space_id: selectedSpaceId,
           doc_type: 'note',
         })
         .select().single()

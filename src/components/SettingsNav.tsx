@@ -26,8 +26,8 @@ const settingsLinks = [
     icon: Palette,
   },
   {
-    href: '/settings/business',
-    label: 'Business',
+    href: '/settings/spaces',
+    label: 'Spaces',
     icon: Building,
   },
 ]
