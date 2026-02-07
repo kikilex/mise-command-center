@@ -157,6 +157,9 @@ export default function ChatWidget() {
   const [spaces, setSpaces] = useState<SpaceOption[]>([])
   const [projects, setProjects] = useState<ProjectOption[]>([])
 
+  /* ---- user avatars ---- */
+  const [avatarMap, setAvatarMap] = useState<Map<string, string>>(new Map())
+
   /* ---- thread management ---- */
   const [editingTitle, setEditingTitle] = useState(false)
   const [editTitleValue, setEditTitleValue] = useState('')
@@ -424,10 +427,20 @@ export default function ChatWidget() {
   }
 
   async function loadThreads(userId: string, userName?: string) {
-    // Load users for sender lookup
-    const { data: usersData } = await supabase.from('users').select('id, slug')
+    // Load users for sender lookup (including avatars)
+    const { data: usersData } = await supabase.from('users').select('id, slug, avatar_url')
     const userIdToSlug = new Map<string, string>()
-    usersData?.forEach(u => userIdToSlug.set(u.id, u.slug))
+    const userAvatars = new Map<string, string>()
+    usersData?.forEach(u => {
+      userIdToSlug.set(u.id, u.slug)
+      if (u.avatar_url) userAvatars.set(u.slug, u.avatar_url)
+    })
+    // Also load AI agent avatars
+    const { data: agentsData } = await supabase.from('ai_agents').select('slug, avatar_url')
+    agentsData?.forEach(a => {
+      if (a.avatar_url) userAvatars.set(a.slug, a.avatar_url)
+    })
+    setAvatarMap(userAvatars)
     
     const { data } = await supabase
       .from('inbox')
@@ -984,6 +997,7 @@ export default function ChatWidget() {
                     <div className="relative flex-shrink-0">
                       <Avatar
                         name={t.recipient}
+                        src={avatarMap.get(t.recipient.toLowerCase())}
                         size="sm"
                         className={`${active ? 'bg-white/20 text-white' : isAI(t.recipient) ? 'bg-gradient-to-br from-violet-500 to-purple-600' : 'bg-gradient-to-br from-blue-500 to-blue-600'} font-bold text-xs w-10 h-10 md:w-9 md:h-9`}
                       />
@@ -1386,7 +1400,7 @@ export default function ChatWidget() {
                           onMouseDown={(e) => { e.preventDefault(); insertMention(r.name) }}
                           className="w-full flex items-center gap-2 px-3 py-1.5 text-sm hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors text-slate-700 dark:text-slate-200"
                         >
-                          <Avatar name={r.name} className={`${isAI(r.id) ? 'bg-gradient-to-br from-violet-500 to-purple-600' : 'bg-gradient-to-br from-blue-500 to-blue-600'} w-6 h-6 text-[10px] text-white`} />
+                          <Avatar name={r.name} src={avatarMap.get(r.id.toLowerCase())} className={`${isAI(r.id) ? 'bg-gradient-to-br from-violet-500 to-purple-600' : 'bg-gradient-to-br from-blue-500 to-blue-600'} w-6 h-6 text-[10px] text-white`} />
                           <span className="font-medium">{r.name}</span>
                           <span className="text-xs text-slate-400 ml-auto">{r.type}</span>
                         </button>
