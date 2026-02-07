@@ -1296,13 +1296,13 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
         <div className="mb-6">
           <Button
             as={Link}
-            href={`/spaces/${project.space_id}`}
-            variant="flat"
+            href={`/spaces/${project.space_id}?tab=projects`}
+            variant="light"
             size="sm"
-            startContent={<ArrowLeft className="w-4 h-4" />}
+            isIconOnly
             className="mb-4"
           >
-            Back to Space
+            <ArrowLeft className="w-5 h-5" />
           </Button>
 
           <div>

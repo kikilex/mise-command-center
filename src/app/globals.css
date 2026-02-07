@@ -26,6 +26,16 @@
   background-color: rgb(71 85 105); /* slate-600 */
 }
 
+/* Hide scrollbar but allow scrolling */
+.scrollbar-hide {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+.scrollbar-hide::-webkit-scrollbar {
+  display: none;
+}
+
 /* Tiptap Editor Styles */
 .tiptap p.is-editor-empty:first-child::before {
   color: #9ca3af;

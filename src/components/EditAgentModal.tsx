@@ -123,8 +123,16 @@ export default function EditAgentModal({ isOpen, onClose, onSuccess, agent }: Ed
         .from('avatars')
         .getPublicUrl(filePath)
 
+      // Update local state
       setFormData({ ...formData, avatar_url: publicUrl })
-      toast.success('Avatar updated')
+
+      // Immediately sync avatar to both tables for consistency
+      await Promise.all([
+        supabase.from('ai_agents').update({ avatar_url: publicUrl }).eq('id', agent.id),
+        supabase.from('users').update({ avatar_url: publicUrl }).eq('slug', agent.slug),
+      ])
+
+      toast.success('Avatar updated everywhere')
     } catch (error) {
       console.error('Error uploading avatar:', error)
       toast.error('Failed to upload avatar')
@@ -137,6 +145,7 @@ export default function EditAgentModal({ isOpen, onClose, onSuccess, agent }: Ed
     if (!agent) return
     setSaving(true)
     try {
+      // Update ai_agents table
       const { error } = await supabase
         .from('ai_agents')
         .update({
@@ -152,6 +161,24 @@ export default function EditAgentModal({ isOpen, onClose, onSuccess, agent }: Ed
         .eq('id', agent.id)
 
       if (error) throw error
+
+      // ALSO update the users table (sync avatar across platform)
+      // Find user by slug (agents have matching slug in users table)
+      if (formData.avatar_url) {
+        const { error: userError } = await supabase
+          .from('users')
+          .update({ 
+            avatar_url: formData.avatar_url,
+            name: formData.name, // Keep name in sync too
+          })
+          .eq('slug', agent.slug)
+        
+        if (userError) {
+          console.error('Error syncing to users table:', userError)
+          // Don't fail the whole save, just log it
+        }
+      }
+
       toast.success('Agent profile updated')
       onSuccess()
       onClose()

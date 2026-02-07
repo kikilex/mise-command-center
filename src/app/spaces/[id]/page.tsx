@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { useParams, useRouter } from 'next/navigation'
+import { useParams, useRouter, useSearchParams } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { 
   Tabs, 
@@ -41,6 +41,7 @@ export default function SpaceDetailPage() {
   // ... rest
   const { id } = useParams()
   const router = useRouter()
+  const searchParams = useSearchParams()
   const { spaces } = useSpace()
   const [space, setSpace] = useState<any>(null)
   const [members, setMembers] = useState<any[]>([])
@@ -51,7 +52,7 @@ export default function SpaceDetailPage() {
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [showAllTasks, setShowAllTasks] = useState(false)
-  const [selectedTab, setSelectedTab] = useState<string>('overview')
+  const [selectedTab, setSelectedTab] = useState<string>(searchParams.get('tab') || 'overview')
   const [currentUserRole, setCurrentUserRole] = useState<string | null>(null)
   const [removingMemberId, setRemovingMemberId] = useState<string | null>(null)
   const [confirmingMemberId, setConfirmingMemberId] = useState<string | null>(null)
@@ -334,15 +335,17 @@ export default function SpaceDetailPage() {
           selectedKey={selectedTab}
           onSelectionChange={(key) => setSelectedTab(key as string)}
           classNames={{
-            tabList: "flex-wrap sm:flex-nowrap overflow-x-auto",
+            tabList: "gap-0 overflow-x-auto scrollbar-hide flex-nowrap",
+            tab: "px-3 min-w-fit",
+            cursor: "w-full",
           }}
         >
           <Tab 
             key="overview" 
             title={
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
                 <ListTodo className="w-4 h-4" />
-                <span>Overview</span>
+                <span className="hidden sm:inline">Overview</span>
               </div>
             }
           >
@@ -620,11 +623,11 @@ export default function SpaceDetailPage() {
           <Tab 
             key="projects"
             title={
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
                 <FolderKanban className="w-4 h-4" />
-                <span>Projects</span>
+                <span className="hidden sm:inline">Projects</span>
                 {projects.length > 0 && (
-                  <span className="text-xs bg-primary-100 text-primary-800 dark:bg-primary-900 dark:text-primary-300 px-2 py-0.5 rounded-full">
+                  <span className="text-xs bg-primary-100 text-primary-800 dark:bg-primary-900 dark:text-primary-300 px-1.5 py-0.5 rounded-full">
                     {projects.length}
                   </span>
                 )}
@@ -757,11 +760,11 @@ export default function SpaceDetailPage() {
           <Tab 
             key="tasks" 
             title={
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
                 <ListTodo className="w-4 h-4" />
-                <span>Tasks</span>
+                <span className="hidden sm:inline">Tasks</span>
                 {tasks.length > 0 && (
-                  <span className="text-xs bg-primary-100 text-primary-800 dark:bg-primary-900 dark:text-primary-300 px-2 py-0.5 rounded-full">
+                  <span className="text-xs bg-primary-100 text-primary-800 dark:bg-primary-900 dark:text-primary-300 px-1.5 py-0.5 rounded-full">
                     {tasks.length}
                   </span>
                 )}
@@ -820,11 +823,11 @@ export default function SpaceDetailPage() {
           <Tab 
             key="docs" 
             title={
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
                 <FileText className="w-4 h-4" />
-                <span>Documents</span>
+                <span className="hidden sm:inline">Docs</span>
                 {documents.length > 0 && (
-                  <span className="text-xs bg-default-100 text-default-600 px-2 py-0.5 rounded-full">
+                  <span className="text-xs bg-default-100 text-default-600 px-1.5 py-0.5 rounded-full">
                     {documents.length}
                   </span>
                 )}
@@ -876,15 +879,42 @@ export default function SpaceDetailPage() {
               ) : (
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                   {documents.map(doc => (
-                    <Card key={doc.id} isPressable onPress={() => router.push(`/docs/${doc.id}?from=space&spaceId=${id}&tab=docs`)}>
+                    <Card key={doc.id} className="group">
                       <CardBody className="p-4">
                         <div className="flex items-center justify-between mb-2">
-                          <h3 className="font-semibold text-foreground truncate">{doc.title}</h3>
-                          <Chip size="sm" variant="flat" color={doc.doc_type === 'note' ? 'secondary' : 'primary'}>
-                            {doc.doc_type}
-                          </Chip>
+                          <h3 
+                            className="font-semibold text-foreground truncate cursor-pointer hover:text-primary flex-1"
+                            onClick={() => router.push(`/docs/${doc.id}?from=space&spaceId=${id}&tab=docs`)}
+                          >
+                            {doc.title}
+                          </h3>
+                          <Button
+                            isIconOnly
+                            size="sm"
+                            variant="light"
+                            className="opacity-0 group-hover:opacity-100 transition-opacity min-w-7 w-7 h-7"
+                            onPress={async () => {
+                              if (!confirm('Delete this document?')) return
+                              try {
+                                const { error } = await supabase.from('documents').delete().eq('id', doc.id)
+                                if (error) throw error
+                                setDocuments(prev => prev.filter(d => d.id !== doc.id))
+                                toast.success('Document deleted')
+                              } catch (err) {
+                                console.error(err)
+                                toast.error('Failed to delete')
+                              }
+                            }}
+                          >
+                            <Trash2 className="w-4 h-4 text-danger" />
+                          </Button>
                         </div>
-                        <p className="text-xs text-default-500">Updated {new Date(doc.updated_at).toLocaleDateString()}</p>
+                        <p 
+                          className="text-xs text-default-500 cursor-pointer"
+                          onClick={() => router.push(`/docs/${doc.id}?from=space&spaceId=${id}&tab=docs`)}
+                        >
+                          Updated {new Date(doc.updated_at).toLocaleDateString()}
+                        </p>
                       </CardBody>
                     </Card>
                   ))}
@@ -896,11 +926,11 @@ export default function SpaceDetailPage() {
           <Tab 
             key="threads" 
             title={
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
                 <MessageSquare className="w-4 h-4" />
-                <span>Threads</span>
+                <span className="hidden sm:inline">Threads</span>
                 {threads.length > 0 && (
-                  <span className="text-xs bg-default-100 text-default-600 px-2 py-0.5 rounded-full">
+                  <span className="text-xs bg-default-100 text-default-600 px-1.5 py-0.5 rounded-full">
                     {threads.length}
                   </span>
                 )}
@@ -951,9 +981,9 @@ export default function SpaceDetailPage() {
           <Tab 
             key="members" 
             title={
-              <div className="flex items-center gap-2">
+              <div className="flex items-center gap-1.5">
                 <Users className="w-4 h-4" />
-                <span>Members</span>
+                <span className="hidden sm:inline">Members</span>
               </div>
             }
           >
