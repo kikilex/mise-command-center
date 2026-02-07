@@ -12,18 +12,11 @@ import {
   Spinner,
   RadioGroup,
   Radio,
-  useDisclosure,
 } from "@heroui/react"
-import { Sun, Moon, Monitor, Pencil, Trash2, Plus } from 'lucide-react'
+import { Sun, Moon, Monitor } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import Navbar from '@/components/Navbar'
-import SettingsNav from '@/components/SettingsNav'
 import { showErrorToast, showSuccessToast } from '@/lib/errors'
-import { useBusiness, Business } from '@/lib/business-context'
-import { useMenuSettings, PERSONAL_MENU_OPTIONS, BUSINESS_MENU_OPTIONS, DEFAULT_MENU_CONFIG, MenuConfig } from '@/lib/menu-settings'
-import AddBusinessModal from '@/components/AddBusinessModal'
-import EditBusinessModal from '@/components/EditBusinessModal'
-import DeleteBusinessModal from '@/components/DeleteBusinessModal'
 import { BUILD_VERSION } from '@/lib/version'
 
 interface UserData {
@@ -68,35 +61,11 @@ export default function SettingsPage() {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [savingTheme, setSavingTheme] = useState(false)
-  const [savingMenus, setSavingMenus] = useState(false)
   const [reminderSettings, setReminderSettings] = useState<ReminderSettings>(DEFAULT_REMINDER_SETTINGS)
   const [mounted, setMounted] = useState(false)
-  const [editingBusiness, setEditingBusiness] = useState<Business | null>(null)
-  const [deletingBusiness, setDeletingBusiness] = useState<Business | null>(null)
-  const [localMenuConfig, setLocalMenuConfig] = useState<MenuConfig>(DEFAULT_MENU_CONFIG)
   
   const { theme, setTheme } = useTheme()
   const supabase = createClient()
-  const { businesses, refreshBusinesses } = useBusiness()
-  const { menuConfig, updateMenuConfig, refreshMenuSettings } = useMenuSettings()
-  
-  const { 
-    isOpen: isAddOpen, 
-    onOpen: onAddOpen, 
-    onClose: onAddClose 
-  } = useDisclosure()
-  
-  const { 
-    isOpen: isEditOpen, 
-    onOpen: onEditOpen, 
-    onClose: onEditClose 
-  } = useDisclosure()
-  
-  const { 
-    isOpen: isDeleteOpen, 
-    onOpen: onDeleteOpen, 
-    onClose: onDeleteClose 
-  } = useDisclosure()
 
   useEffect(() => {
     setMounted(true)
@@ -105,11 +74,6 @@ export default function SettingsPage() {
   useEffect(() => {
     loadUserAndSettings()
   }, [])
-
-  // Sync local menu config with context
-  useEffect(() => {
-    setLocalMenuConfig(menuConfig)
-  }, [menuConfig])
 
   async function loadUserAndSettings() {
     setLoading(true)
@@ -122,7 +86,6 @@ export default function SettingsPage() {
         return
       }
 
-      // Fetch user profile with settings
       const { data: profile, error: profileError } = await supabase
         .from('users')
         .select('*')
@@ -140,7 +103,6 @@ export default function SettingsPage() {
         avatar_url: profile?.avatar_url,
       })
 
-      // Load reminder settings from profile.settings.reminders
       if (profile?.settings?.reminders) {
         setReminderSettings({
           ...DEFAULT_REMINDER_SETTINGS,
@@ -148,7 +110,6 @@ export default function SettingsPage() {
         })
       }
 
-      // Load theme setting from profile.settings.theme
       if (profile?.settings?.theme) {
         setTheme(profile.settings.theme)
       }
@@ -165,7 +126,6 @@ export default function SettingsPage() {
 
     setSaving(true)
     try {
-      // Get current settings first
       const { data: profile, error: fetchError } = await supabase
         .from('users')
         .select('settings')
@@ -174,7 +134,6 @@ export default function SettingsPage() {
 
       if (fetchError) throw fetchError
 
-      // Merge with existing settings
       const updatedSettings = {
         ...(profile?.settings || {}),
         reminders: reminderSettings,
@@ -199,61 +158,26 @@ export default function SettingsPage() {
   function updateHighPriority(key: '24h' | '6h' | '1h', value: boolean) {
     setReminderSettings(prev => ({
       ...prev,
-      high: { ...prev.high, [key]: value },
+      high: { ...prev.high, [key]: value }
     }))
   }
 
   function updateMediumPriority(key: '24h', value: boolean) {
     setReminderSettings(prev => ({
       ...prev,
-      medium: { ...prev.medium, [key]: value },
+      medium: { ...prev.medium, [key]: value }
     }))
   }
 
   function updateLowPriority(key: 'day_of', value: boolean) {
     setReminderSettings(prev => ({
       ...prev,
-      low: { ...prev.low, [key]: value },
+      low: { ...prev.low, [key]: value }
     }))
   }
 
   function resetToDefaults() {
     setReminderSettings(DEFAULT_REMINDER_SETTINGS)
-  }
-
-  function togglePersonalMenu(key: string) {
-    setLocalMenuConfig(prev => ({
-      ...prev,
-      personal: prev.personal.includes(key)
-        ? prev.personal.filter(k => k !== key)
-        : [...prev.personal, key],
-    }))
-  }
-
-  function toggleBusinessMenu(key: string) {
-    setLocalMenuConfig(prev => ({
-      ...prev,
-      business: prev.business.includes(key)
-        ? prev.business.filter(k => k !== key)
-        : [...prev.business, key],
-    }))
-  }
-
-  async function saveMenuSettings() {
-    setSavingMenus(true)
-    try {
-      await updateMenuConfig(localMenuConfig)
-      showSuccessToast('Menu settings saved')
-    } catch (error) {
-      console.error('Save menu settings error:', error)
-      showErrorToast(error, 'Failed to save menu settings')
-    } finally {
-      setSavingMenus(false)
-    }
-  }
-
-  function resetMenusToDefaults() {
-    setLocalMenuConfig(DEFAULT_MENU_CONFIG)
   }
 
   async function handleThemeChange(newTheme: ThemeValue) {
@@ -296,22 +220,10 @@ export default function SettingsPage() {
     return (
       <div className="min-h-screen bg-background">
         <Navbar />
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
-          <div className="flex flex-col lg:flex-row gap-8">
-            {/* Settings Sidebar */}
-            <div className="lg:w-64 flex-shrink-0">
-              <div className="sticky top-24">
-                <h1 className="text-2xl font-bold text-foreground mb-6">Settings</h1>
-                <SettingsNav />
-              </div>
-            </div>
-
-            {/* Settings Content */}
-            <div className="flex-1">
-              <div className="flex justify-center py-12">
-                <Spinner size="lg" />
-              </div>
-            </div>
+        <main className="max-w-3xl mx-auto px-4 sm:px-6 py-8">
+          <h1 className="text-2xl font-bold text-foreground mb-6">Settings</h1>
+          <div className="flex justify-center py-12">
+            <Spinner size="lg" />
           </div>
         </main>
       </div>
@@ -322,19 +234,8 @@ export default function SettingsPage() {
     <div className="min-h-screen bg-background">
       <Navbar user={user} />
 
-      <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
-        <div className="flex flex-col lg:flex-row gap-8">
-          {/* Settings Sidebar */}
-          <div className="lg:w-64 flex-shrink-0">
-            <div className="sticky top-24">
-              <h1 className="text-2xl font-bold text-foreground mb-6">Settings</h1>
-              <SettingsNav />
-            </div>
-          </div>
-
-          {/* Settings Content */}
-          <div className="flex-1">
-            <h2 className="text-xl font-semibold text-foreground mb-6">General Settings</h2>
+      <main className="max-w-3xl mx-auto px-4 sm:px-6 py-8">
+        <h1 className="text-2xl font-bold text-foreground mb-6">Settings</h1>
 
         {/* Theme Settings Card */}
         <Card className="mb-6">
@@ -353,7 +254,7 @@ export default function SettingsPage() {
                 onValueChange={(value) => handleThemeChange(value as ThemeValue)}
                 orientation="horizontal"
                 classNames={{
-                  wrapper: "gap-4",
+                  wrapper: "gap-4 flex-wrap",
                 }}
               >
                 <Radio
@@ -407,88 +308,6 @@ export default function SettingsPage() {
             {savingTheme && (
               <p className="text-sm text-default-500 mt-4">Saving...</p>
             )}
-          </CardBody>
-        </Card>
-
-        {/* Menu Customization Card */}
-        <Card className="mb-6">
-          <CardHeader className="flex flex-col items-start px-6 pt-6">
-            <h2 className="text-lg font-semibold">Menu Customization</h2>
-            <p className="text-sm text-default-500 mt-1">
-              Choose which modules appear in your navigation menu for each context
-            </p>
-          </CardHeader>
-          <Divider />
-          <CardBody className="px-6 py-6">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {/* Personal Menu */}
-              <div className="p-4 rounded-lg border border-default-200">
-                <div className="flex items-center gap-2 mb-4">
-                  <span className="text-lg">👤</span>
-                  <h3 className="font-semibold">Personal Menu</h3>
-                </div>
-                <p className="text-sm text-default-500 mb-4">
-                  Shown when no business is selected
-                </p>
-                <div className="space-y-3">
-                  {PERSONAL_MENU_OPTIONS.map((option) => (
-                    <Checkbox
-                      key={option.key}
-                      isSelected={localMenuConfig.personal.includes(option.key)}
-                      onValueChange={() => togglePersonalMenu(option.key)}
-                    >
-                      <span className="flex items-center gap-2">
-                        <span>{option.icon}</span>
-                        <span className="text-default-600">{option.label}</span>
-                      </span>
-                    </Checkbox>
-                  ))}
-                </div>
-              </div>
-
-              {/* Business Menu */}
-              <div className="p-4 rounded-lg border border-default-200">
-                <div className="flex items-center gap-2 mb-4">
-                  <span className="text-lg">💼</span>
-                  <h3 className="font-semibold">Business Menu</h3>
-                </div>
-                <p className="text-sm text-default-500 mb-4">
-                  Shown when a business is selected
-                </p>
-                <div className="space-y-3">
-                  {BUSINESS_MENU_OPTIONS.map((option) => (
-                    <Checkbox
-                      key={option.key}
-                      isSelected={localMenuConfig.business.includes(option.key)}
-                      onValueChange={() => toggleBusinessMenu(option.key)}
-                    >
-                      <span className="flex items-center gap-2">
-                        <span>{option.icon}</span>
-                        <span className="text-default-600">{option.label}</span>
-                      </span>
-                    </Checkbox>
-                  ))}
-                </div>
-              </div>
-            </div>
-
-            <Divider className="my-6" />
-
-            <div className="flex justify-between">
-              <Button
-                variant="flat"
-                onPress={resetMenusToDefaults}
-              >
-                Reset to Defaults
-              </Button>
-              <Button
-                color="primary"
-                onPress={saveMenuSettings}
-                isLoading={savingMenus}
-              >
-                Save Menu Settings
-              </Button>
-            </div>
           </CardBody>
         </Card>
 
@@ -584,93 +403,8 @@ export default function SettingsPage() {
           </CardBody>
         </Card>
 
-        {/* Business Management Card */}
-        <Card className="mb-6">
-          <CardHeader className="flex flex-row items-center justify-between px-6 pt-6">
-            <div>
-              <h2 className="text-lg font-semibold">Business Management</h2>
-              <p className="text-sm text-default-500 mt-1">
-                Manage your businesses and organizations
-              </p>
-            </div>
-            <Button
-              color="primary"
-              size="sm"
-              startContent={<Plus className="w-4 h-4" />}
-              onPress={onAddOpen}
-            >
-              Add Business
-            </Button>
-          </CardHeader>
-          <Divider />
-          <CardBody className="px-6 py-6">
-            {businesses.length === 0 ? (
-              <div className="text-center py-8 text-default-500">
-                <p className="mb-4">You don&apos;t have any businesses yet.</p>
-                <Button
-                  color="primary"
-                  variant="flat"
-                  startContent={<Plus className="w-4 h-4" />}
-                  onPress={onAddOpen}
-                >
-                  Create Your First Business
-                </Button>
-              </div>
-            ) : (
-              <div className="space-y-3">
-                {businesses.map((business) => (
-                  <div
-                    key={business.id}
-                    className="flex items-center justify-between p-4 rounded-lg border border-default-200 hover:border-default-300 transition-colors"
-                  >
-                    <div className="flex items-center gap-3">
-                      <div
-                        className="w-4 h-4 rounded-full flex-shrink-0"
-                        style={{ backgroundColor: business.color || '#3b82f6' }}
-                      />
-                      <div>
-                        <p className="font-medium">{business.name}</p>
-                        {business.description && (
-                          <p className="text-sm text-default-500 line-clamp-1">
-                            {business.description}
-                          </p>
-                        )}
-                      </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                      <Button
-                        isIconOnly
-                        size="sm"
-                        variant="light"
-                        onPress={() => {
-                          setEditingBusiness(business)
-                          onEditOpen()
-                        }}
-                      >
-                        <Pencil className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        isIconOnly
-                        size="sm"
-                        variant="light"
-                        color="danger"
-                        onPress={() => {
-                          setDeletingBusiness(business)
-                          onDeleteOpen()
-                        }}
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardBody>
-        </Card>
-
         {/* Info Card */}
-        <Card className="bg-secondary/10 border border-secondary/20">
+        <Card className="bg-secondary/10 border border-secondary/20 mb-6">
           <CardBody className="px-6 py-4">
             <div className="flex gap-3">
               <span className="text-xl">💡</span>
@@ -686,43 +420,14 @@ export default function SettingsPage() {
             </div>
           </CardBody>
         </Card>
-          </div>
+
+        {/* Build Version */}
+        <div className="pt-4 border-t border-default-200">
+          <p className="text-xs text-default-400 text-center">
+            Build: {BUILD_VERSION}
+          </p>
         </div>
       </main>
-
-      {/* Business Modals */}
-      <AddBusinessModal
-        isOpen={isAddOpen}
-        onClose={onAddClose}
-        onSuccess={refreshBusinesses}
-      />
-
-      <EditBusinessModal
-        isOpen={isEditOpen}
-        onClose={() => {
-          onEditClose()
-          setEditingBusiness(null)
-        }}
-        onSuccess={refreshBusinesses}
-        business={editingBusiness}
-      />
-
-      <DeleteBusinessModal
-        isOpen={isDeleteOpen}
-        onClose={() => {
-          onDeleteClose()
-          setDeletingBusiness(null)
-        }}
-        onSuccess={refreshBusinesses}
-        business={deletingBusiness}
-      />
-
-      {/* Build Version */}
-      <div className="mt-8 pt-4 border-t border-slate-200 dark:border-slate-700">
-        <p className="text-xs text-slate-400 dark:text-slate-500 text-center">
-          Build: {BUILD_VERSION}
-        </p>
-      </div>
     </div>
   )
 }
