@@ -288,9 +288,10 @@ export default function ChatWidget() {
       const currentUser = userRef.current
       if (!currentUser) return
       
-      // If viewing a thread, mark messages as read FIRST
+      // If chat is OPEN and viewing a thread, mark messages as read FIRST
       const activeThread = activeThreadRef.current
-      if (activeThread) {
+      const isChatOpen = isOpenRef.current
+      if (activeThread && isChatOpen) {
         let query = supabase.from('inbox').select('*').eq('item_type', 'message')
         
         if (activeThread.id.startsWith('dm-')) {
