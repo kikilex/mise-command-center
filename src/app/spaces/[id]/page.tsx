@@ -892,7 +892,7 @@ export default function SpaceDetailPage() {
                             isIconOnly
                             size="sm"
                             variant="light"
-                            className="opacity-0 group-hover:opacity-100 transition-opacity min-w-7 w-7 h-7"
+                            className="sm:opacity-0 sm:group-hover:opacity-100 transition-opacity min-w-7 w-7 h-7"
                             onPress={async () => {
                               if (!confirm('Delete this document?')) return
                               try {
