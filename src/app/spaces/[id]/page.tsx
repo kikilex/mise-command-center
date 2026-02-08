@@ -37,7 +37,7 @@ import EditProjectModal from '@/components/EditProjectModal'
 import InviteMemberModal from '@/components/InviteMemberModal'
 import { showErrorToast, showSuccessToast } from '@/lib/errors'
 
-// TasksByProject component - groups tasks by project with collapsible sections
+// TasksByProject component - groups tasks by project, separates done tasks
 function TasksByProject({ 
   tasks, 
   projects, 
@@ -49,27 +49,18 @@ function TasksByProject({
   onTaskClick: (taskId: string) => void
   getPriorityColor: (priority: string) => string
 }) {
-  // Start with all projects expanded
-  const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set(['unassigned']))
-  
-  // Expand all projects when they load
-  useEffect(() => {
-    if (projects.length > 0) {
-      setExpandedProjects(prev => {
-        const next = new Set(prev)
-        next.add('unassigned')
-        projects.forEach(p => next.add(p.id))
-        return next
-      })
-    }
-  }, [projects])
+  const [showCompleted, setShowCompleted] = useState(false)
 
-  // Group tasks by project
+  // Separate active and done tasks
+  const activeTasks = tasks.filter(t => t.status !== 'done')
+  const doneTasks = tasks.filter(t => t.status === 'done')
+
+  // Group active tasks by project
   const groupedTasks = useMemo(() => {
     const groups: Record<string, any[]> = { unassigned: [] }
     projects.forEach(p => { groups[p.id] = [] })
     
-    tasks.forEach(task => {
+    activeTasks.forEach(task => {
       if (task.project_id && groups[task.project_id]) {
         groups[task.project_id].push(task)
       } else {
@@ -78,128 +69,105 @@ function TasksByProject({
     })
     
     return groups
-  }, [tasks, projects])
-
-  const toggleProject = (projectId: string) => {
-    setExpandedProjects(prev => {
-      const next = new Set(prev)
-      if (next.has(projectId)) {
-        next.delete(projectId)
-      } else {
-        next.add(projectId)
-      }
-      return next
-    })
-  }
+  }, [activeTasks, projects])
 
   const projectsWithTasks = projects.filter(p => groupedTasks[p.id]?.length > 0)
   const unassignedTasks = groupedTasks.unassigned || []
 
+  const renderTask = (task: any) => (
+    <div 
+      key={task.id}
+      onClick={() => onTaskClick(task.id)}
+      className="flex items-center justify-between px-4 py-3 hover:bg-default-50 dark:hover:bg-default-100 cursor-pointer transition-colors border-b border-default-100 last:border-b-0"
+    >
+      <div className="flex items-center gap-3">
+        <div className={`w-2 h-2 rounded-full ${getPriorityColor(task.priority)}`} />
+        <span className={task.status === 'done' ? 'line-through text-default-400' : ''}>{task.title}</span>
+      </div>
+      <div className="flex items-center gap-2">
+        {task.status !== 'done' && task.status !== 'todo' && (
+          <Chip size="sm" variant="flat" color="warning">{task.status}</Chip>
+        )}
+      </div>
+    </div>
+  )
+
   return (
-    <div className="space-y-4">
-      {/* Projects with tasks */}
+    <div className="space-y-6">
+      {/* Active Tasks by Project */}
       {projectsWithTasks.map(project => (
-        <div key={project.id} className="border border-default-200 dark:border-default-100 rounded-lg overflow-hidden">
-          <button
-            onClick={() => toggleProject(project.id)}
-            className="w-full flex items-center justify-between px-4 py-3 bg-default-50 dark:bg-default-100 hover:bg-default-100 dark:hover:bg-default-200 transition-colors"
-          >
-            <div className="flex items-center gap-3">
-              {expandedProjects.has(project.id) ? (
-                <ChevronDown className="w-4 h-4 text-default-500" />
-              ) : (
-                <ChevronRight className="w-4 h-4 text-default-500" />
-              )}
-              <FolderKanban className="w-4 h-4 text-primary" />
-              <span className="font-medium">{project.name}</span>
-            </div>
-            <Chip size="sm" variant="flat">
-              {groupedTasks[project.id]?.filter(t => t.status !== 'done').length || 0} active
-            </Chip>
-          </button>
-          
-          {expandedProjects.has(project.id) && (
-            <div className="divide-y divide-default-100">
-              {groupedTasks[project.id]?.map(task => (
-                <div 
-                  key={task.id}
-                  onClick={() => onTaskClick(task.id)}
-                  className="flex items-center justify-between px-4 py-3 pl-11 hover:bg-default-50 dark:hover:bg-default-100 cursor-pointer transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className={`w-2 h-2 rounded-full ${getPriorityColor(task.priority)}`} />
-                    <span className={task.status === 'done' ? 'line-through text-default-400' : ''}>{task.title}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Chip size="sm" variant="flat" color={task.status === 'done' ? 'success' : 'default'}>
-                      {task.status}
-                    </Chip>
-                    {task.assignee && (
-                      <Avatar size="sm" src={task.assignee.avatar_url} name={task.assignee.name} className="w-6 h-6" />
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+        <div key={project.id}>
+          <div className="flex items-center gap-2 mb-2">
+            <FolderKanban className="w-4 h-4 text-primary" />
+            <span className="font-medium text-sm">{project.name}</span>
+            <span className="text-xs text-default-400">({groupedTasks[project.id]?.length || 0})</span>
+          </div>
+          <div className="bg-white dark:bg-default-100 rounded-lg border border-default-200 overflow-hidden">
+            {groupedTasks[project.id]?.map(renderTask)}
+          </div>
         </div>
       ))}
 
-      {/* Unassigned tasks */}
+      {/* Unassigned active tasks */}
       {unassignedTasks.length > 0 && (
-        <div className="border border-default-200 dark:border-default-100 rounded-lg overflow-hidden">
-          <button
-            onClick={() => toggleProject('unassigned')}
-            className="w-full flex items-center justify-between px-4 py-3 bg-default-50 dark:bg-default-100 hover:bg-default-100 dark:hover:bg-default-200 transition-colors"
-          >
-            <div className="flex items-center gap-3">
-              {expandedProjects.has('unassigned') ? (
-                <ChevronDown className="w-4 h-4 text-default-500" />
-              ) : (
-                <ChevronRight className="w-4 h-4 text-default-500" />
-              )}
-              <ListTodo className="w-4 h-4 text-default-400" />
-              <span className="font-medium text-default-600">No Project</span>
-            </div>
-            <Chip size="sm" variant="flat">
-              {unassignedTasks.filter(t => t.status !== 'done').length} active
-            </Chip>
-          </button>
-          
-          {expandedProjects.has('unassigned') && (
-            <div className="divide-y divide-default-100">
-              {unassignedTasks.map(task => (
-                <div 
-                  key={task.id}
-                  onClick={() => onTaskClick(task.id)}
-                  className="flex items-center justify-between px-4 py-3 pl-11 hover:bg-default-50 dark:hover:bg-default-100 cursor-pointer transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className={`w-2 h-2 rounded-full ${getPriorityColor(task.priority)}`} />
-                    <span className={task.status === 'done' ? 'line-through text-default-400' : ''}>{task.title}</span>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Chip size="sm" variant="flat" color={task.status === 'done' ? 'success' : 'default'}>
-                      {task.status}
-                    </Chip>
-                    {task.assignee && (
-                      <Avatar size="sm" src={task.assignee.avatar_url} name={task.assignee.name} className="w-6 h-6" />
-                    )}
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+        <div>
+          <div className="flex items-center gap-2 mb-2">
+            <ListTodo className="w-4 h-4 text-default-400" />
+            <span className="font-medium text-sm text-default-600">No Project</span>
+            <span className="text-xs text-default-400">({unassignedTasks.length})</span>
+          </div>
+          <div className="bg-white dark:bg-default-100 rounded-lg border border-default-200 overflow-hidden">
+            {unassignedTasks.map(renderTask)}
+          </div>
         </div>
       )}
 
-      {projectsWithTasks.length === 0 && unassignedTasks.length === 0 && (
+      {/* Empty state for active tasks */}
+      {projectsWithTasks.length === 0 && unassignedTasks.length === 0 && doneTasks.length === 0 && (
         <Card className="py-12">
           <CardBody className="text-center text-default-400">
             <ListTodo className="w-12 h-12 mx-auto mb-4" />
             <p>No tasks in this space yet.</p>
           </CardBody>
         </Card>
+      )}
+
+      {/* Completed Tasks - Collapsed by default */}
+      {doneTasks.length > 0 && (
+        <div className="pt-4 border-t border-default-200">
+          <button
+            onClick={() => setShowCompleted(!showCompleted)}
+            className="flex items-center gap-2 text-sm text-default-500 hover:text-default-700 transition-colors"
+          >
+            {showCompleted ? (
+              <ChevronDown className="w-4 h-4" />
+            ) : (
+              <ChevronRight className="w-4 h-4" />
+            )}
+            <span>Completed ({doneTasks.length})</span>
+          </button>
+          
+          {showCompleted && (
+            <div className="mt-3 bg-default-50 dark:bg-default-100 rounded-lg border border-default-200 overflow-hidden">
+              {doneTasks.map(task => (
+                <div 
+                  key={task.id}
+                  onClick={() => onTaskClick(task.id)}
+                  className="flex items-center justify-between px-4 py-2 hover:bg-default-100 dark:hover:bg-default-200 cursor-pointer transition-colors border-b border-default-200 last:border-b-0"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className="w-4 h-4 rounded-full bg-green-500 flex items-center justify-center">
+                      <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                      </svg>
+                    </div>
+                    <span className="line-through text-default-400">{task.title}</span>
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
       )}
     </div>
   )
@@ -518,118 +486,6 @@ export default function SpaceDetailPage() {
             }
           >
             <div className="mt-6 space-y-8">
-              {/* What's Next Section - Focused, ADHD-friendly */}
-              <div className="bg-white dark:bg-default-100 rounded-2xl p-6 border border-default-200">
-                <div className="flex items-center justify-between mb-6">
-                  <div>
-                    <h2 className="text-xl font-semibold text-foreground">What&apos;s Next</h2>
-                    <p className="text-sm text-default-500 mt-1">Top priorities for this space</p>
-                  </div>
-                  <Button 
-                    color="primary" 
-                    variant="flat" 
-                    size="sm"
-                    startContent={<Plus className="w-4 h-4" />}
-                    onPress={onTaskOpen}
-                  >
-                    Add Task
-                  </Button>
-                </div>
-                
-                {whatsNextTasks.length === 0 ? (
-                  <div className="text-center py-12">
-                    <ListTodo className="w-12 h-12 text-default-300 mx-auto mb-4" />
-                    <p className="text-default-500">No tasks yet. Add one to get started!</p>
-                  </div>
-                ) : (
-                  <div className="space-y-3">
-                    {whatsNextTasks.map(task => (
-                      <Card 
-                        key={task.id} 
-                        isPressable 
-                        className="hover:shadow-sm transition-shadow"
-                        onPress={() => router.push(`/tasks?task=${task.id}`)}
-                      >
-                        <CardBody className="py-3">
-                          <div className="flex items-center justify-between">
-                            <div className="flex items-center gap-3">
-                              <div className={`w-2 h-2 rounded-full ${getPriorityColor(task.priority)}`} />
-                              <span className="font-medium text-foreground">{task.title}</span>
-                            </div>
-                            <div className="flex items-center gap-3">
-                              <Chip 
-                                size="sm" 
-                                variant="flat" 
-                                className={`text-xs ${getStatusColor(task.status)}`}
-                              >
-                                {task.status.replace('_', ' ')}
-                              </Chip>
-                              {task.assignee && (
-                                <Avatar 
-                                  size="sm" 
-                                  src={task.assignee.avatar_url} 
-                                  name={task.assignee.display_name || task.assignee.name} 
-                                />
-                              )}
-                            </div>
-                          </div>
-                          {task.due_date && (
-                            <div className="flex items-center gap-2 mt-2 text-xs text-default-500">
-                              <Calendar className="w-3 h-3" />
-                              <span>Due {new Date(task.due_date).toLocaleDateString()}</span>
-                            </div>
-                          )}
-                        </CardBody>
-                      </Card>
-                    ))}
-                    
-                    {/* View All Tasks Button */}
-                    {hasMoreTasks && (
-                      <div className="pt-4 border-t border-default-200">
-                        <Button
-                          variant="light"
-                          className="w-full"
-                          onPress={() => setShowAllTasks(!showAllTasks)}
-                          endContent={<ChevronRight className={`w-4 h-4 transition-transform ${showAllTasks ? 'rotate-90' : ''}`} />}
-                        >
-                          {showAllTasks ? 'Show Less' : `View All ${tasks.length} Tasks`}
-                        </Button>
-                        
-                        {/* Expanded task list */}
-                        {showAllTasks && tasks.length > 5 && (
-                          <div className="mt-4 space-y-3">
-                            {tasks.slice(5).map(task => (
-                              <Card 
-                                key={task.id} 
-                                isPressable 
-                                className="hover:shadow-sm transition-shadow"
-                                onPress={() => router.push(`/tasks?task=${task.id}`)}
-                              >
-                                <CardBody className="py-3">
-                                  <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-3">
-                                      <div className={`w-2 h-2 rounded-full ${getPriorityColor(task.priority)}`} />
-                                      <span className="font-medium text-foreground">{task.title}</span>
-                                    </div>
-                                    <Chip 
-                                      size="sm" 
-                                      variant="flat" 
-                                      className={`text-xs ${getStatusColor(task.status)}`}
-                                    >
-                                      {task.status.replace('_', ' ')}
-                                    </Chip>
-                                  </div>
-                                </CardBody>
-                              </Card>
-                            ))}
-                          </div>
-                        )}
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-
               {/* Projects Section - Overview cards */}
               {projects.length > 0 && (
                 <div className="bg-white dark:bg-default-100 rounded-2xl p-6 border border-default-200">
