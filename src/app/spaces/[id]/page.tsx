@@ -278,8 +278,6 @@ export default function SpaceDetailPage() {
       ])
 
       if (spaceRes.error) throw spaceRes.error
-      if (tasksRes.error) console.error('Tasks query error:', tasksRes.error)
-      console.log('Tasks loaded:', tasksRes.data?.length || 0)
       setSpace(spaceRes.data)
       setMembers(membersWithUsers)
       setTasks(tasksRes.data || [])
