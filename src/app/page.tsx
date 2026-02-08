@@ -717,8 +717,8 @@ export default function Home() {
                             onClick={() => { setViewingDump(item); onViewOpen(); }}
                           >
                             <div className="w-1.5 h-1.5 rounded-full bg-violet-400 flex-shrink-0 mt-2" />
-                            <div className="flex-1 min-w-0 overflow-hidden">
-                              <p className="text-sm text-slate-700 dark:text-slate-300 line-clamp-2 break-words overflow-hidden text-ellipsis">{item.content}</p>
+                            <div className="flex-1 min-w-0 overflow-hidden" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
+                              <p className="text-sm text-slate-700 dark:text-slate-300 line-clamp-2 whitespace-pre-wrap" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{item.content}</p>
                               {item.tags && item.tags.length > 0 && (
                                 <div className="flex flex-wrap gap-1 mt-1">
                                   {item.tags.map(tag => (
@@ -765,7 +765,7 @@ export default function Home() {
                   Thought
                 </ModalHeader>
                 <ModalBody className="pb-6">
-                  <p className="text-slate-700 dark:text-slate-300 whitespace-pre-wrap break-words">{viewingDump?.content}</p>
+                  <p className="text-slate-700 dark:text-slate-300 whitespace-pre-wrap" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{viewingDump?.content}</p>
                   
                   {/* Tags */}
                   <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
