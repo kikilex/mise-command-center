@@ -766,24 +766,52 @@ export default function Home() {
                 </div>
               </CardHeader>
               <CardBody className="px-6 py-5">
-                {/* Fire Emoji Progress Bar */}
+                {/* Fire Emoji Progress Bar with Animated Background */}
                 <div className="relative">
-                  <div className="flex items-center justify-between h-10 bg-slate-100 dark:bg-slate-800 rounded-xl px-2 overflow-hidden">
+                  {/* Background track */}
+                  <div className="h-12 bg-slate-100 dark:bg-slate-800 rounded-xl overflow-hidden">
+                    {/* Animated flame progress bar */}
+                    <div 
+                      className={`h-full transition-all duration-500 ease-out relative ${todayCompletedCount > 0 ? 'flame-shimmer' : ''}`}
+                      style={{ 
+                        width: `${Math.min(todayCompletedCount * 10, 100)}%`,
+                        background: 'linear-gradient(90deg, #f97316, #ea580c, #f97316, #fb923c)',
+                        backgroundSize: '200% 100%',
+                      }}
+                    >
+                      {/* Flame glow overlay */}
+                      <div 
+                        className={`absolute inset-0 ${todayCompletedCount > 0 ? 'flame-pulse' : ''}`}
+                        style={{
+                          background: 'linear-gradient(180deg, rgba(255,255,255,0.3) 0%, transparent 50%, rgba(0,0,0,0.1) 100%)',
+                        }}
+                      />
+                    </div>
+                  </div>
+                  
+                  {/* Fire emojis overlay */}
+                  <div className="absolute inset-0 flex items-center justify-between px-2">
                     {Array.from({ length: 10 }).map((_, i) => (
                       <div 
                         key={i} 
-                        className={`flex-1 flex items-center justify-center transition-all duration-300 ${i < todayCompletedCount ? 'scale-110' : 'opacity-30'}`}
+                        className={`flex-1 flex items-center justify-center transition-all duration-300 ${i < todayCompletedCount ? 'fire-float' : 'opacity-20'}`}
+                        style={{
+                          animationDelay: `${i * 0.1}s`,
+                          animationDuration: `${0.8 + (i % 3) * 0.2}s`
+                        }}
                       >
                         {i < todayCompletedCount ? (
-                          <span className="text-xl">🔥</span>
+                          <span className="text-2xl drop-shadow-lg" style={{ filter: 'drop-shadow(0 0 4px rgba(249, 115, 22, 0.8))' }}>🔥</span>
                         ) : (
-                          <div className="w-2 h-2 rounded-full bg-slate-300 dark:bg-slate-600" />
+                          <div className="w-2 h-2 rounded-full bg-slate-300 dark:bg-slate-500" />
                         )}
                       </div>
                     ))}
                   </div>
+                  
+                  {/* Overflow badge */}
                   {todayCompletedCount > 10 && (
-                    <div className="absolute -right-1 -top-1 bg-orange-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                    <div className="absolute -right-1 -top-1 bg-orange-500 text-white text-xs font-bold px-2 py-0.5 rounded-full shadow-lg animate-pulse">
                       +{todayCompletedCount - 10}
                     </div>
                   )}

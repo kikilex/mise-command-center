@@ -81,3 +81,31 @@
 .dark .tiptap mark {
   background-color: #854d0e;
 }
+
+/* Fire Progress Bar Animations */
+@keyframes flameShimmer {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 100% 50%; }
+}
+
+@keyframes flamePulse {
+  0%, 100% { opacity: 0.4; }
+  50% { opacity: 0.7; }
+}
+
+@keyframes fireFloat {
+  0%, 100% { transform: translateY(0px) scale(1); }
+  50% { transform: translateY(-3px) scale(1.1); }
+}
+
+.flame-shimmer {
+  animation: flameShimmer 2s ease-in-out infinite;
+}
+
+.flame-pulse {
+  animation: flamePulse 1.5s ease-in-out infinite;
+}
+
+.fire-float {
+  animation: fireFloat 0.8s ease-in-out infinite;
+}
