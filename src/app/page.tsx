@@ -748,178 +748,7 @@ export default function Home() {
       <main className="max-w-7xl mx-auto px-4 sm:px-6 py-8">
         <div className="flex flex-col lg:flex-row gap-8">
           <div className="flex-1 space-y-8">
-            {/* 🧠 Brain Dump System */}
-            <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-              <CardHeader className="bg-slate-50 dark:bg-slate-800/50 px-6 py-4 border-b border-slate-200 dark:border-slate-800">
-                <div className="flex items-center justify-between w-full">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-violet-600 flex items-center justify-center">
-                      <Brain className="w-6 h-6 text-white" />
-                    </div>
-                    <div>
-                      <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100">Brain Dump</h2>
-                      <p className="text-xs text-slate-500">{inboxItems.length} pending thought{inboxItems.length !== 1 ? 's' : ''}</p>
-                    </div>
-                  </div>
-                  {inboxItems.length > 0 && (
-                    <Button 
-                      size="sm" 
-                      color="primary" 
-                      variant="flat" 
-                      onPress={handleOrganize}
-                      isLoading={submitting}
-                      endContent={<ArrowRight className="w-4 h-4" />}
-                    >
-                      Ask Ax to Organize
-                    </Button>
-                  )}
-                </div>
-              </CardHeader>
-              <CardBody className="p-6 overflow-hidden">
-                <div className="flex items-end gap-2 mb-6">
-                  <Textarea 
-                    placeholder="What's on your mind? Hit enter to capture..."
-                    value={brainDump}
-                    onChange={(e) => setBrainDump(e.target.value)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' && !e.shiftKey) {
-                        e.preventDefault();
-                        handleBrainDump();
-                      }
-                    }}
-                    minRows={1}
-                    maxRows={6}
-                    className="flex-1"
-                    classNames={{
-                      inputWrapper: "bg-slate-100 dark:bg-slate-800 border-none shadow-none"
-                    }}
-                  />
-                  <Button isIconOnly color="primary" className="h-10 w-10 min-w-10 mb-0.5" radius="full" onPress={handleBrainDump} isLoading={submitting}>
-                    <Plus className="w-5 h-5" />
-                  </Button>
-                </div>
-
-                {inboxItems.length === 0 ? (
-                  <div className="text-center py-8 bg-slate-50 dark:bg-slate-800/30 rounded-2xl border-2 border-dashed border-slate-100 dark:border-slate-800">
-                    <p className="text-sm text-slate-400">No pending thoughts. Dump away.</p>
-                  </div>
-                ) : (
-                  <div className="space-y-1 max-h-[400px] overflow-y-auto overflow-x-hidden">
-                    {inboxItems.map((item) => (
-                      <div key={item.id} className="group">
-                        {editingDump?.id === item.id ? (
-                          <div className="flex items-center gap-2 p-2 rounded-xl bg-slate-50 dark:bg-slate-800">
-                            <Input
-                              value={editContent}
-                              onChange={(e) => setEditContent(e.target.value)}
-                              onKeyDown={(e) => e.key === 'Enter' && handleSaveEdit()}
-                              size="sm"
-                              autoFocus
-                              className="flex-1"
-                            />
-                            <Button isIconOnly size="sm" color="primary" variant="flat" onPress={handleSaveEdit}>
-                              <Check className="w-4 h-4" />
-                            </Button>
-                            <Button isIconOnly size="sm" variant="light" onPress={() => setEditingDump(null)}>
-                              <X className="w-4 h-4" />
-                            </Button>
-                          </div>
-                        ) : (
-                          <div 
-                            className="flex items-start gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors overflow-hidden"
-                            onClick={() => { setViewingDump(item); onViewOpen(); }}
-                          >
-                            <div className="w-1.5 h-1.5 rounded-full bg-violet-400 flex-shrink-0 mt-2" />
-                            <div className="flex-1 min-w-0 overflow-hidden" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
-                              <p className="text-sm text-slate-700 dark:text-slate-300 line-clamp-2 whitespace-pre-wrap" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{item.content}</p>
-                              {item.tags && item.tags.length > 0 && (
-                                <div className="flex flex-wrap gap-1 mt-1">
-                                  {item.tags.map(tag => (
-                                    <Chip key={tag} size="sm" variant="flat" color="secondary" className="h-5 text-[10px]">{tag}</Chip>
-                                  ))}
-                                </div>
-                              )}
-                            </div>
-                            <div className="flex md:hidden md:group-hover:flex items-center gap-1 flex-shrink-0">
-                              <Button 
-                                isIconOnly size="sm" variant="light" 
-                                className="w-7 h-7 min-w-7"
-                                onPress={() => handleEditDump(item)}
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                <Pencil className="w-3.5 h-3.5 text-slate-400" />
-                              </Button>
-                              <Button 
-                                isIconOnly size="sm" variant="light" color="danger"
-                                className="w-7 h-7 min-w-7"
-                                onPress={() => handleDeleteDump(item.id)}
-                                onClick={(e) => e.stopPropagation()}
-                              >
-                                <Trash2 className="w-3.5 h-3.5" />
-                              </Button>
-                            </div>
-                            <span className="text-[10px] text-slate-400 flex-shrink-0 hidden md:block md:group-hover:hidden mt-1">
-                              {new Date(item.created_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
-                            </span>
-                          </div>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </CardBody>
-            </Card>
-
-            {/* Brain Dump View Modal */}
-            <Modal isOpen={isViewOpen} onClose={onViewClose} size="md">
-              <ModalContent>
-                <ModalHeader className="flex items-center gap-2">
-                  <Brain className="w-5 h-5 text-violet-500" />
-                  Thought
-                </ModalHeader>
-                <ModalBody className="pb-6">
-                  <p className="text-slate-700 dark:text-slate-300 whitespace-pre-wrap" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{viewingDump?.content}</p>
-                  
-                  {/* Tags */}
-                  <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
-                    <p className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Tags</p>
-                    <div className="flex flex-wrap gap-1.5 mb-2">
-                      {(viewingDump?.tags || []).map(tag => (
-                        <Chip 
-                          key={tag} 
-                          size="sm" 
-                          variant="flat" 
-                          color="secondary" 
-                          onClose={() => viewingDump && handleRemoveTag(viewingDump.id, tag)}
-                        >
-                          {tag}
-                        </Chip>
-                      ))}
-                      {(!viewingDump?.tags || viewingDump.tags.length === 0) && (
-                        <span className="text-xs text-slate-400">No tags yet</span>
-                      )}
-                    </div>
-                    <Input
-                      size="sm"
-                      placeholder="Add a tag and press Enter..."
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && viewingDump) {
-                          handleAddTag(viewingDump.id, (e.target as HTMLInputElement).value);
-                          (e.target as HTMLInputElement).value = '';
-                        }
-                      }}
-                      classNames={{ inputWrapper: "bg-slate-50 dark:bg-slate-800 border-none shadow-none h-9" }}
-                    />
-                  </div>
-
-                  <p className="text-xs text-slate-400 mt-3">
-                    {viewingDump && new Date(viewingDump.created_at).toLocaleString()}
-                  </p>
-                </ModalBody>
-              </ModalContent>
-            </Modal>
-
-            {/* 🔥 Today's Progress */}
+            {/* 🔥 Today's Progress - Fire Bar */}
             <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
               <CardHeader className="bg-slate-50 dark:bg-slate-800/50 px-6 py-4 border-b border-slate-200 dark:border-slate-800">
                 <div className="flex items-center justify-between w-full">
@@ -929,28 +758,36 @@ export default function Home() {
                     </div>
                     <div>
                       <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100">Today's Progress</h2>
-                      <p className="text-xs text-slate-500">Keep the momentum going</p>
+                      <p className="text-xs text-slate-500">
+                        {todayCompletedCount === 0 ? 'Light your first fire!' : todayCompletedCount < 3 ? 'Good start!' : todayCompletedCount < 5 ? 'On fire!' : 'Legendary! 🏆'}
+                      </p>
                     </div>
-                  </div>
-                  <div className="text-right">
-                    <p className="text-3xl font-black text-orange-500">{todayCompletedCount}</p>
-                    <p className="text-xs text-slate-500">task{todayCompletedCount !== 1 ? 's' : ''} done</p>
                   </div>
                 </div>
               </CardHeader>
-              <CardBody className="px-6 py-4">
-                <div className="flex items-center gap-3">
-                  <Progress 
-                    value={Math.min(todayCompletedCount * 20, 100)} 
-                    color="warning"
-                    size="md"
-                    className="flex-1"
-                  />
-                  <span className="text-2xl">{todayCompletedCount >= 5 ? '🔥🔥🔥' : todayCompletedCount >= 3 ? '🔥🔥' : todayCompletedCount >= 1 ? '🔥' : '💪'}</span>
+              <CardBody className="px-6 py-5">
+                {/* Fire Emoji Progress Bar */}
+                <div className="relative">
+                  <div className="flex items-center justify-between h-10 bg-slate-100 dark:bg-slate-800 rounded-xl px-2 overflow-hidden">
+                    {Array.from({ length: 10 }).map((_, i) => (
+                      <div 
+                        key={i} 
+                        className={`flex-1 flex items-center justify-center transition-all duration-300 ${i < todayCompletedCount ? 'scale-110' : 'opacity-30'}`}
+                      >
+                        {i < todayCompletedCount ? (
+                          <span className="text-xl">🔥</span>
+                        ) : (
+                          <div className="w-2 h-2 rounded-full bg-slate-300 dark:bg-slate-600" />
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  {todayCompletedCount > 10 && (
+                    <div className="absolute -right-1 -top-1 bg-orange-500 text-white text-xs font-bold px-2 py-0.5 rounded-full">
+                      +{todayCompletedCount - 10}
+                    </div>
+                  )}
                 </div>
-                <p className="text-xs text-slate-400 mt-2">
-                  {todayCompletedCount === 0 ? 'Start your first task!' : todayCompletedCount < 3 ? 'Good start! Keep it up.' : todayCompletedCount < 5 ? 'On fire! Almost there.' : 'Legendary! You\'re crushing it! 🏆'}
-                </p>
               </CardBody>
             </Card>
 
@@ -1080,6 +917,177 @@ export default function Home() {
                 )}
               </CardBody>
             </Card>
+
+            {/* 🧠 Brain Dump System - MOVED TO BOTTOM */}
+            <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+              <CardHeader className="bg-slate-50 dark:bg-slate-800/50 px-6 py-4 border-b border-slate-200 dark:border-slate-800">
+                <div className="flex items-center justify-between w-full">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-violet-600 flex items-center justify-center">
+                      <Brain className="w-6 h-6 text-white" />
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100">Brain Dump</h2>
+                      <p className="text-xs text-slate-500">{inboxItems.length} pending thought{inboxItems.length !== 1 ? 's' : ''}</p>
+                    </div>
+                  </div>
+                  {inboxItems.length > 0 && (
+                    <Button 
+                      size="sm" 
+                      color="primary" 
+                      variant="flat" 
+                      onPress={handleOrganize}
+                      isLoading={submitting}
+                      endContent={<ArrowRight className="w-4 h-4" />}
+                    >
+                      Ask Ax to Organize
+                    </Button>
+                  )}
+                </div>
+              </CardHeader>
+              <CardBody className="p-6 overflow-hidden">
+                <div className="flex items-end gap-2 mb-6">
+                  <Textarea 
+                    placeholder="What's on your mind? Hit enter to capture..."
+                    value={brainDump}
+                    onChange={(e) => setBrainDump(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' && !e.shiftKey) {
+                        e.preventDefault();
+                        handleBrainDump();
+                      }
+                    }}
+                    minRows={1}
+                    maxRows={6}
+                    className="flex-1"
+                    classNames={{
+                      inputWrapper: "bg-slate-100 dark:bg-slate-800 border-none shadow-none"
+                    }}
+                  />
+                  <Button isIconOnly color="primary" className="h-10 w-10 min-w-10 mb-0.5" radius="full" onPress={handleBrainDump} isLoading={submitting}>
+                    <Plus className="w-5 h-5" />
+                  </Button>
+                </div>
+
+                {inboxItems.length === 0 ? (
+                  <div className="text-center py-8 bg-slate-50 dark:bg-slate-800/30 rounded-2xl border-2 border-dashed border-slate-100 dark:border-slate-800">
+                    <p className="text-sm text-slate-400">No pending thoughts. Dump away.</p>
+                  </div>
+                ) : (
+                  <div className="space-y-1 max-h-[300px] overflow-y-auto overflow-x-hidden">
+                    {inboxItems.map((item) => (
+                      <div key={item.id} className="group">
+                        {editingDump?.id === item.id ? (
+                          <div className="flex items-center gap-2 p-2 rounded-xl bg-slate-50 dark:bg-slate-800">
+                            <Input
+                              value={editContent}
+                              onChange={(e) => setEditContent(e.target.value)}
+                              onKeyDown={(e) => e.key === 'Enter' && handleSaveEdit()}
+                              size="sm"
+                              autoFocus
+                              className="flex-1"
+                            />
+                            <Button isIconOnly size="sm" color="primary" variant="flat" onPress={handleSaveEdit}>
+                              <Check className="w-4 h-4" />
+                            </Button>
+                            <Button isIconOnly size="sm" variant="light" onPress={() => setEditingDump(null)}>
+                              <X className="w-4 h-4" />
+                            </Button>
+                          </div>
+                        ) : (
+                          <div 
+                            className="flex items-start gap-3 px-3 py-2.5 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors overflow-hidden"
+                            onClick={() => { setViewingDump(item); onViewOpen(); }}
+                          >
+                            <div className="w-1.5 h-1.5 rounded-full bg-violet-400 flex-shrink-0 mt-2" />
+                            <div className="flex-1 min-w-0 overflow-hidden" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>
+                              <p className="text-sm text-slate-700 dark:text-slate-300 line-clamp-2 whitespace-pre-wrap" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{item.content}</p>
+                              {item.tags && item.tags.length > 0 && (
+                                <div className="flex flex-wrap gap-1 mt-1">
+                                  {item.tags.map(tag => (
+                                    <Chip key={tag} size="sm" variant="flat" color="secondary" className="h-5 text-[10px]">{tag}</Chip>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex md:hidden md:group-hover:flex items-center gap-1 flex-shrink-0">
+                              <Button 
+                                isIconOnly size="sm" variant="light" 
+                                className="w-7 h-7 min-w-7"
+                                onPress={() => handleEditDump(item)}
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <Pencil className="w-3.5 h-3.5 text-slate-400" />
+                              </Button>
+                              <Button 
+                                isIconOnly size="sm" variant="light" color="danger"
+                                className="w-7 h-7 min-w-7"
+                                onPress={() => handleDeleteDump(item.id)}
+                                onClick={(e) => e.stopPropagation()}
+                              >
+                                <Trash2 className="w-3.5 h-3.5" />
+                              </Button>
+                            </div>
+                            <span className="text-[10px] text-slate-400 flex-shrink-0 hidden md:block md:group-hover:hidden mt-1">
+                              {new Date(item.created_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
+                            </span>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </CardBody>
+            </Card>
+
+            {/* Brain Dump View Modal */}
+            <Modal isOpen={isViewOpen} onClose={onViewClose} size="md">
+              <ModalContent>
+                <ModalHeader className="flex items-center gap-2">
+                  <Brain className="w-5 h-5 text-violet-500" />
+                  Thought
+                </ModalHeader>
+                <ModalBody className="pb-6">
+                  <p className="text-slate-700 dark:text-slate-300 whitespace-pre-wrap" style={{ wordBreak: 'break-word', overflowWrap: 'anywhere' }}>{viewingDump?.content}</p>
+                  
+                  {/* Tags */}
+                  <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
+                    <p className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-2">Tags</p>
+                    <div className="flex flex-wrap gap-1.5 mb-2">
+                      {(viewingDump?.tags || []).map(tag => (
+                        <Chip 
+                          key={tag} 
+                          size="sm" 
+                          variant="flat" 
+                          color="secondary" 
+                          onClose={() => viewingDump && handleRemoveTag(viewingDump.id, tag)}
+                        >
+                          {tag}
+                        </Chip>
+                      ))}
+                      {(!viewingDump?.tags || viewingDump.tags.length === 0) && (
+                        <span className="text-xs text-slate-400">No tags yet</span>
+                      )}
+                    </div>
+                    <Input
+                      size="sm"
+                      placeholder="Add a tag and press Enter..."
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && viewingDump) {
+                          handleAddTag(viewingDump.id, (e.target as HTMLInputElement).value);
+                          (e.target as HTMLInputElement).value = '';
+                        }
+                      }}
+                      classNames={{ inputWrapper: "bg-slate-50 dark:bg-slate-800 border-none shadow-none h-9" }}
+                    />
+                  </div>
+
+                  <p className="text-xs text-slate-400 mt-3">
+                    {viewingDump && new Date(viewingDump.created_at).toLocaleString()}
+                  </p>
+                </ModalBody>
+              </ModalContent>
+            </Modal>
           </div>
 
           <div className="w-full lg:w-96 space-y-8">
