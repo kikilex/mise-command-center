@@ -22,6 +22,7 @@ import {
   ScrollShadow,
   Tabs,
   Tab,
+  Progress,
 } from "@heroui/react";
 import { useState, useEffect, useMemo } from "react";
 import { createClient } from '@/lib/supabase/client'
@@ -44,6 +45,9 @@ import {
   X,
   Clock,
   Settings,
+  Flame,
+  FolderKanban,
+  Target,
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
@@ -69,6 +73,7 @@ interface Task {
   status: string
   priority: string
   space_id: string | null
+  project_id?: string | null
   due_date: string | null
   assignee_id?: string | null
   updated_at?: string
@@ -117,6 +122,22 @@ interface WorkLogEntry {
   created_at: string
 }
 
+interface Project {
+  id: string
+  name: string
+  icon?: string
+  space_id: string
+  created_at: string
+}
+
+interface ProjectStats {
+  project: Project
+  totalTasks: number
+  completedTasks: number
+  percentComplete: number
+  nextAction: Task | null
+}
+
 const priorityOptions = [
   { key: 'critical', label: 'Critical' },
   { key: 'high', label: 'High' },
@@ -132,6 +153,8 @@ export default function Home() {
   const [messages, setMessages] = useState<InboxItem[]>([]);
   const [agents, setAgents] = useState<AIAgent[]>([]);
   const [completedTasks, setCompletedTasks] = useState<Task[]>([]);
+  const [projectStats, setProjectStats] = useState<ProjectStats[]>([]);
+  const [todayCompletedCount, setTodayCompletedCount] = useState(0);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [brainDump, setBrainDump] = useState('');
@@ -207,7 +230,7 @@ export default function Home() {
         is_admin: profile?.is_admin || false
       });
 
-      const [spacesRes, tasksRes, completedRes, inboxRes, messagesRes, agentsRes, workLogRes] = await Promise.all([
+      const [spacesRes, tasksRes, completedRes, inboxRes, messagesRes, agentsRes, workLogRes, projectsRes, allTasksRes] = await Promise.all([
         supabase.from('spaces').select('id, name, color, space_members!inner(user_id)').eq('space_members.user_id', authUser.id),
         supabase.from('tasks')
           .select('*')
@@ -232,7 +255,9 @@ export default function Home() {
           .order('created_at', { ascending: false })
           .limit(30),
         supabase.from('ai_agents').select('*').order('created_at', { ascending: true }),
-        supabase.from('ai_work_log').select('agent_name,action,created_at').order('created_at', { ascending: false }).limit(10)
+        supabase.from('ai_work_log').select('agent_name,action,created_at').order('created_at', { ascending: false }).limit(10),
+        supabase.from('projects').select('*').order('created_at', { ascending: false }),
+        supabase.from('tasks').select('*').not('project_id', 'is', null)
       ]);
 
       // Merge latest work log action into agents
@@ -252,6 +277,54 @@ export default function Home() {
       setInboxItems(inboxRes.data || []);
       setMessages(messagesRes.data || []);
       setAgents(agentsWithActions);
+
+      // Calculate project stats
+      const projects: Project[] = projectsRes.data || [];
+      const allTasks: Task[] = allTasksRes.data || [];
+      const priorityOrder: Record<string, number> = { critical: 4, high: 3, medium: 2, low: 1 };
+      
+      const stats: ProjectStats[] = projects.map(project => {
+        const projectTasks = allTasks.filter(t => t.project_id === project.id);
+        const completed = projectTasks.filter(t => t.status === 'done').length;
+        const total = projectTasks.length;
+        const incomplete = projectTasks
+          .filter(t => t.status !== 'done')
+          .sort((a, b) => {
+            const pDiff = (priorityOrder[b.priority] || 0) - (priorityOrder[a.priority] || 0);
+            if (pDiff !== 0) return pDiff;
+            if (a.due_date && b.due_date) return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
+            if (a.due_date) return -1;
+            if (b.due_date) return 1;
+            return 0;
+          });
+        
+        return {
+          project,
+          totalTasks: total,
+          completedTasks: completed,
+          percentComplete: total > 0 ? Math.round((completed / total) * 100) : 0,
+          nextAction: incomplete[0] || null
+        };
+      }).filter(s => s.totalTasks > 0) // Only show projects with tasks
+        .sort((a, b) => {
+          // Sort: incomplete projects first (by most progress), then complete ones
+          if (a.percentComplete === 100 && b.percentComplete !== 100) return 1;
+          if (b.percentComplete === 100 && a.percentComplete !== 100) return -1;
+          return b.percentComplete - a.percentComplete;
+        });
+      
+      setProjectStats(stats);
+
+      // Count tasks completed today
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const todayDone = allTasks.filter(t => {
+        if (t.status !== 'done' || !t.updated_at) return false;
+        const updated = new Date(t.updated_at);
+        updated.setHours(0, 0, 0, 0);
+        return updated.getTime() === today.getTime();
+      }).length;
+      setTodayCompletedCount(todayDone);
 
     } catch (error) {
       console.error('Dashboard load error:', error);
@@ -806,106 +879,124 @@ export default function Home() {
               </ModalContent>
             </Modal>
 
-            {/* ✅ What's Next */}
+            {/* 🔥 Daily Streak Banner */}
+            <Card className="bg-gradient-to-r from-orange-500 to-amber-500 border-0 shadow-lg shadow-orange-500/20">
+              <CardBody className="py-4 px-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
+                      <Flame className="w-7 h-7 text-white" />
+                    </div>
+                    <div>
+                      <p className="text-white/80 text-sm font-medium">Today's Progress</p>
+                      <p className="text-white text-2xl font-black">{todayCompletedCount} task{todayCompletedCount !== 1 ? 's' : ''} crushed</p>
+                    </div>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-white/80 text-xs">Keep going!</p>
+                    <p className="text-white text-lg font-bold">{todayCompletedCount >= 5 ? '🔥🔥🔥' : todayCompletedCount >= 3 ? '🔥🔥' : todayCompletedCount >= 1 ? '🔥' : '💪'}</p>
+                  </div>
+                </div>
+              </CardBody>
+            </Card>
+
+            {/* 📊 Project Progress Cards */}
             <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
               <CardHeader className="px-6 py-5 flex items-center justify-between border-b border-slate-200 dark:border-slate-800">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center text-white">
-                    <Zap className="w-6 h-6" />
+                    <Target className="w-6 h-6" />
                   </div>
                   <div>
                     <h2 className="text-lg font-bold">What's Next</h2>
-                    <p className="text-xs text-slate-500">{whatsNextTab === 'top3' ? 'Top 3 priorities' : 'Due today'}</p>
+                    <p className="text-xs text-slate-500">{projectStats.length} active project{projectStats.length !== 1 ? 's' : ''}</p>
                   </div>
                 </div>
-                <div className="flex items-center gap-2">
-                  <Tabs 
-                    selectedKey={whatsNextTab} 
-                    onSelectionChange={(key) => setWhatsNextTab(key as 'top3' | 'dueToday')}
-                    size="sm"
-                    classNames={{
-                      tabList: "gap-0 bg-slate-100 dark:bg-slate-800 p-1 rounded-lg",
-                      tab: "px-3 h-7 data-[selected=true]:bg-white dark:data-[selected=true]:bg-slate-900",
-                      cursor: "hidden"
-                    }}
-                  >
-                    <Tab key="top3" title="Top 3" />
-                    <Tab key="dueToday" title="Due Today" />
-                  </Tabs>
-                  <Button variant="light" color="primary" onPress={() => router.push('/tasks')}>View All</Button>
-                </div>
+                <Button variant="light" color="primary" onPress={() => router.push('/tasks')}>All Tasks</Button>
               </CardHeader>
               <CardBody className="p-4">
                 {loading ? (
-                  <div className="space-y-2">
-                    {[1, 2, 3].map(i => <Skeleton key={i} className="h-16 rounded-xl w-full" />)}
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-40 rounded-xl w-full" />)}
                   </div>
-                ) : displayedTasks.length === 0 && completedTasks.length === 0 ? (
+                ) : projectStats.length === 0 ? (
                   <div className="text-center py-12">
-                    <CheckCircle2 className="w-12 h-12 text-emerald-500 mx-auto mb-3" />
-                    <p className="text-slate-500">The hit list is empty.</p>
+                    <FolderKanban className="w-12 h-12 text-slate-300 dark:text-slate-600 mx-auto mb-3" />
+                    <p className="text-slate-500">No active projects with tasks.</p>
+                    <p className="text-xs text-slate-400 mt-1">Create a project and add tasks to get started.</p>
                   </div>
                 ) : (
-                  <>
-                    {/* Active tasks - flat list */}
-                    <div className="space-y-2">
-                      {displayedTasks.map((task) => (
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    {projectStats.slice(0, 6).map((stat) => {
+                      const isComplete = stat.percentComplete === 100;
+                      return (
                         <div 
-                          key={task.id}
-                          onClick={() => handleTaskClick(task)}
-                          className="group flex items-center gap-4 p-4 rounded-xl hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer transition-all border border-transparent hover:border-slate-200 dark:hover:border-slate-700"
+                          key={stat.project.id}
+                          className={`relative p-4 rounded-xl border-2 transition-all cursor-pointer hover:shadow-md ${
+                            isComplete 
+                              ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800' 
+                              : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 hover:border-emerald-300 dark:hover:border-emerald-700'
+                          }`}
+                          onClick={() => router.push(`/projects/${stat.project.id}`)}
                         >
-                          <div className={`w-3 h-3 rounded-full flex-shrink-0 ${getPriorityColor(task.priority)} shadow-lg shadow-current/20`} />
-                          <div className="flex-1 min-w-0">
-                            <p className="font-bold text-slate-800 dark:text-slate-200 truncate">{task.title}</p>
-                            <div className="flex items-center gap-2 mt-1">
-                              <Chip size="sm" variant="flat" color="default" className="h-5 text-[10px] uppercase font-bold tracking-tight">
-                                {task.priority}
+                          {/* Header */}
+                          <div className="flex items-start justify-between mb-3">
+                            <div className="flex items-center gap-2">
+                              <span className="text-xl">{stat.project.icon || '📁'}</span>
+                              <div>
+                                <h3 className="font-bold text-slate-800 dark:text-slate-200 line-clamp-1">{stat.project.name}</h3>
+                                <p className="text-xs text-slate-500">{stat.completedTasks}/{stat.totalTasks} tasks</p>
+                              </div>
+                            </div>
+                            {isComplete && (
+                              <Chip size="sm" color="success" variant="flat" className="h-6">
+                                <CheckCircle2 className="w-3 h-3 mr-1" />
+                                Done
                               </Chip>
-                              {task.due_date && (
-                                <div className="flex items-center gap-1 text-[10px] text-slate-400">
-                                  <Clock className="w-3 h-3" />
-                                  {new Date(task.due_date).toLocaleDateString()}
-                                </div>
-                              )}
-                              {task.space_id && (
-                                <Chip size="sm" variant="flat" color="secondary" className="h-5 text-[10px]">
-                                  {spaces.find(s => s.id === task.space_id)?.name || 'General'}
-                                </Chip>
-                              )}
-                            </div>
+                            )}
                           </div>
-                          <button 
-                            onClick={(e) => { e.stopPropagation(); toggleTaskDone(task.id); }}
-                            className="w-10 h-10 rounded-xl border-2 border-slate-200 dark:border-slate-700 flex items-center justify-center group-hover:border-emerald-500 group-hover:bg-emerald-50 dark:group-hover:bg-emerald-900/20 transition-all"
-                          >
-                            <CheckCircle2 className="w-5 h-5 text-transparent group-hover:text-emerald-500" />
-                          </button>
-                        </div>
-                      ))}
-                    </div>
 
-                    {/* Completed tasks */}
-                    {completedTasks.length > 0 && (
-                      <div className="mt-4 pt-4 border-t border-slate-100 dark:border-slate-800">
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400 mb-2 px-1">Completed</p>
-                        <div className="space-y-1">
-                          {completedTasks.slice(0, 3).map(task => (
-                            <div 
-                              key={task.id} 
-                              className="group/done flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer transition-colors"
-                              onClick={() => revertTask(task.id)}
-                              title="Click to reopen"
-                            >
-                              <CheckCircle2 className="w-4 h-4 text-emerald-500 flex-shrink-0 group-hover/done:text-orange-400 transition-colors" />
-                              <span className="text-sm text-slate-400 line-through truncate group-hover/done:text-slate-600 dark:group-hover/done:text-slate-300 transition-colors">{task.title}</span>
-                              <span className="text-[10px] text-transparent group-hover/done:text-orange-400 ml-auto transition-colors">undo</span>
+                          {/* Progress Bar */}
+                          <div className="mb-3">
+                            <div className="flex items-center justify-between text-xs mb-1">
+                              <span className="text-slate-500">Progress</span>
+                              <span className={`font-bold ${isComplete ? 'text-emerald-600' : 'text-slate-700 dark:text-slate-300'}`}>{stat.percentComplete}%</span>
                             </div>
-                          ))}
+                            <Progress 
+                              value={stat.percentComplete} 
+                              color={isComplete ? 'success' : 'primary'}
+                              size="sm"
+                              className="h-2"
+                            />
+                          </div>
+
+                          {/* Next Action */}
+                          {stat.nextAction ? (
+                            <div className="bg-white dark:bg-slate-900 rounded-lg p-3 border border-slate-100 dark:border-slate-700">
+                              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Next Up</p>
+                              <p className="text-sm text-slate-700 dark:text-slate-300 line-clamp-2">{stat.nextAction.title}</p>
+                              <Button 
+                                size="sm" 
+                                color="primary" 
+                                variant="flat" 
+                                className="mt-2 w-full"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  router.push(`/projects/${stat.project.id}`);
+                                }}
+                              >
+                                Jump In <ArrowRight className="w-3 h-3 ml-1" />
+                              </Button>
+                            </div>
+                          ) : (
+                            <div className="bg-emerald-100 dark:bg-emerald-900/30 rounded-lg p-3 text-center">
+                              <p className="text-sm text-emerald-700 dark:text-emerald-400 font-medium">🎉 All tasks complete!</p>
+                            </div>
+                          )}
                         </div>
-                      </div>
-                    )}
-                  </>
+                      );
+                    })}
+                  </div>
                 )}
               </CardBody>
             </Card>
