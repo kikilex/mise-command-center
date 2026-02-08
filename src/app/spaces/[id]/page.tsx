@@ -49,7 +49,20 @@ function TasksByProject({
   onTaskClick: (taskId: string) => void
   getPriorityColor: (priority: string) => string
 }) {
+  // Start with all projects expanded
   const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set(['unassigned']))
+  
+  // Expand all projects when they load
+  useEffect(() => {
+    if (projects.length > 0) {
+      setExpandedProjects(prev => {
+        const next = new Set(prev)
+        next.add('unassigned')
+        projects.forEach(p => next.add(p.id))
+        return next
+      })
+    }
+  }, [projects])
 
   // Group tasks by project
   const groupedTasks = useMemo(() => {
