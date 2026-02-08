@@ -37,7 +37,7 @@ import EditProjectModal from '@/components/EditProjectModal'
 import InviteMemberModal from '@/components/InviteMemberModal'
 import { showErrorToast, showSuccessToast } from '@/lib/errors'
 
-// TasksByProject component - groups tasks by project, separates done tasks
+// TasksByProject component - groups tasks by project, collapsible, separates done tasks
 function TasksByProject({ 
   tasks, 
   projects, 
@@ -50,6 +50,17 @@ function TasksByProject({
   getPriorityColor: (priority: string) => string
 }) {
   const [showCompleted, setShowCompleted] = useState(false)
+  const [expandedProjects, setExpandedProjects] = useState<Record<string, boolean>>({})
+  const defaultCollapsed = true // All collapsed by default
+
+  const toggleProject = (projectId: string) => {
+    setExpandedProjects(prev => ({
+      ...prev,
+      [projectId]: !(prev[projectId] ?? !defaultCollapsed)
+    }))
+  }
+
+  const isExpanded = (projectId: string) => expandedProjects[projectId] ?? !defaultCollapsed
 
   // Separate active and done tasks
   const activeTasks = tasks.filter(t => t.status !== 'done')
@@ -82,7 +93,7 @@ function TasksByProject({
     >
       <div className="flex items-center gap-3">
         <div className={`w-2 h-2 rounded-full ${getPriorityColor(task.priority)}`} />
-        <span className={task.status === 'done' ? 'line-through text-default-400' : ''}>{task.title}</span>
+        <span>{task.title}</span>
       </div>
       <div className="flex items-center gap-2">
         {task.status !== 'done' && task.status !== 'todo' && (
@@ -93,36 +104,64 @@ function TasksByProject({
   )
 
   return (
-    <div className="space-y-6">
-      {/* Active Tasks by Project */}
+    <div className="space-y-3">
+      {/* Active Tasks by Project - Collapsible */}
       {projectsWithTasks.map(project => (
-        <div key={project.id}>
-          <div className="flex items-center gap-2 mb-2">
-            <FolderKanban className="w-4 h-4 text-primary" />
-            <span className="font-medium text-sm">{project.name}</span>
-            <span className="text-xs text-default-400">({groupedTasks[project.id]?.length || 0})</span>
-          </div>
-          <div className="bg-white dark:bg-default-100 rounded-lg border border-default-200 overflow-hidden">
-            {groupedTasks[project.id]?.map(renderTask)}
-          </div>
+        <div key={project.id} className="bg-white dark:bg-default-100 rounded-lg border border-default-200 overflow-hidden">
+          <button
+            onClick={() => toggleProject(project.id)}
+            className="w-full flex items-center justify-between px-4 py-3 hover:bg-default-50 dark:hover:bg-default-50 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              {isExpanded(project.id) ? (
+                <ChevronDown className="w-4 h-4 text-default-400" />
+              ) : (
+                <ChevronRight className="w-4 h-4 text-default-400" />
+              )}
+              <FolderKanban className="w-4 h-4 text-primary" />
+              <span className="font-medium text-sm">{project.name}</span>
+            </div>
+            <span className="text-xs text-default-400 bg-default-100 px-2 py-0.5 rounded-full">
+              {groupedTasks[project.id]?.length || 0}
+            </span>
+          </button>
+          {isExpanded(project.id) && (
+            <div className="border-t border-default-200">
+              {groupedTasks[project.id]?.map(renderTask)}
+            </div>
+          )}
         </div>
       ))}
 
-      {/* Unassigned active tasks */}
+      {/* Unassigned active tasks - Collapsible */}
       {unassignedTasks.length > 0 && (
-        <div>
-          <div className="flex items-center gap-2 mb-2">
-            <ListTodo className="w-4 h-4 text-default-400" />
-            <span className="font-medium text-sm text-default-600">No Project</span>
-            <span className="text-xs text-default-400">({unassignedTasks.length})</span>
-          </div>
-          <div className="bg-white dark:bg-default-100 rounded-lg border border-default-200 overflow-hidden">
-            {unassignedTasks.map(renderTask)}
-          </div>
+        <div className="bg-white dark:bg-default-100 rounded-lg border border-default-200 overflow-hidden">
+          <button
+            onClick={() => toggleProject('unassigned')}
+            className="w-full flex items-center justify-between px-4 py-3 hover:bg-default-50 dark:hover:bg-default-50 transition-colors"
+          >
+            <div className="flex items-center gap-2">
+              {isExpanded('unassigned') ? (
+                <ChevronDown className="w-4 h-4 text-default-400" />
+              ) : (
+                <ChevronRight className="w-4 h-4 text-default-400" />
+              )}
+              <ListTodo className="w-4 h-4 text-default-400" />
+              <span className="font-medium text-sm text-default-600">No Project</span>
+            </div>
+            <span className="text-xs text-default-400 bg-default-100 px-2 py-0.5 rounded-full">
+              {unassignedTasks.length}
+            </span>
+          </button>
+          {isExpanded('unassigned') && (
+            <div className="border-t border-default-200">
+              {unassignedTasks.map(renderTask)}
+            </div>
+          )}
         </div>
       )}
 
-      {/* Empty state for active tasks */}
+      {/* Empty state */}
       {projectsWithTasks.length === 0 && unassignedTasks.length === 0 && doneTasks.length === 0 && (
         <Card className="py-12">
           <CardBody className="text-center text-default-400">
@@ -134,35 +173,37 @@ function TasksByProject({
 
       {/* Completed Tasks - Collapsed by default */}
       {doneTasks.length > 0 && (
-        <div className="pt-4 border-t border-default-200">
+        <div className="bg-white dark:bg-default-100 rounded-lg border border-default-200 overflow-hidden">
           <button
             onClick={() => setShowCompleted(!showCompleted)}
-            className="flex items-center gap-2 text-sm text-default-500 hover:text-default-700 transition-colors"
+            className="w-full flex items-center justify-between px-4 py-3 hover:bg-default-50 dark:hover:bg-default-50 transition-colors"
           >
-            {showCompleted ? (
-              <ChevronDown className="w-4 h-4" />
-            ) : (
-              <ChevronRight className="w-4 h-4" />
-            )}
-            <span>Completed ({doneTasks.length})</span>
+            <div className="flex items-center gap-2">
+              {showCompleted ? (
+                <ChevronDown className="w-4 h-4 text-default-400" />
+              ) : (
+                <ChevronRight className="w-4 h-4 text-default-400" />
+              )}
+              <span className="font-medium text-sm text-green-600">Completed</span>
+            </div>
+            <span className="text-xs text-default-400 bg-green-100 dark:bg-green-900/30 text-green-600 px-2 py-0.5 rounded-full">
+              {doneTasks.length}
+            </span>
           </button>
-          
           {showCompleted && (
-            <div className="mt-3 bg-default-50 dark:bg-default-100 rounded-lg border border-default-200 overflow-hidden">
+            <div className="border-t border-default-200">
               {doneTasks.map(task => (
                 <div 
                   key={task.id}
                   onClick={() => onTaskClick(task.id)}
-                  className="flex items-center justify-between px-4 py-2 hover:bg-default-100 dark:hover:bg-default-200 cursor-pointer transition-colors border-b border-default-200 last:border-b-0"
+                  className="flex items-center gap-3 px-4 py-2 hover:bg-default-50 cursor-pointer transition-colors border-b border-default-100 last:border-b-0"
                 >
-                  <div className="flex items-center gap-3">
-                    <div className="w-4 h-4 rounded-full bg-green-500 flex items-center justify-center">
-                      <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
-                      </svg>
-                    </div>
-                    <span className="line-through text-default-400">{task.title}</span>
+                  <div className="w-4 h-4 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
+                    <svg className="w-3 h-3 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                    </svg>
                   </div>
+                  <span className="line-through text-default-400">{task.title}</span>
                 </div>
               ))}
             </div>
