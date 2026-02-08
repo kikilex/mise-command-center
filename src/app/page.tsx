@@ -48,6 +48,9 @@ import {
   Flame,
   FolderKanban,
   Target,
+  Star,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
@@ -155,6 +158,8 @@ export default function Home() {
   const [completedTasks, setCompletedTasks] = useState<Task[]>([]);
   const [projectStats, setProjectStats] = useState<ProjectStats[]>([]);
   const [todayCompletedCount, setTodayCompletedCount] = useState(0);
+  const [pinnedProjects, setPinnedProjects] = useState<string[]>([]);
+  const [showAllProjects, setShowAllProjects] = useState(false);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [brainDump, setBrainDump] = useState('');
@@ -199,6 +204,16 @@ export default function Home() {
 
   useEffect(() => {
     loadData();
+
+    // Load pinned projects from localStorage
+    const saved = localStorage.getItem('pinnedProjects');
+    if (saved) {
+      try {
+        setPinnedProjects(JSON.parse(saved));
+      } catch (e) {
+        console.error('Failed to parse pinned projects');
+      }
+    }
 
     // Listen for auth changes (login/logout)
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
@@ -653,6 +668,31 @@ export default function Home() {
     }
   };
 
+  // Toggle project pin
+  const togglePinProject = (projectId: string) => {
+    setPinnedProjects(prev => {
+      const newPinned = prev.includes(projectId)
+        ? prev.filter(id => id !== projectId)
+        : [...prev, projectId];
+      localStorage.setItem('pinnedProjects', JSON.stringify(newPinned));
+      return newPinned;
+    });
+  };
+
+  // Sort projects: pinned first, then by progress
+  const sortedProjectStats = useMemo(() => {
+    return [...projectStats].sort((a, b) => {
+      const aPinned = pinnedProjects.includes(a.project.id);
+      const bPinned = pinnedProjects.includes(b.project.id);
+      if (aPinned && !bPinned) return -1;
+      if (!aPinned && bPinned) return 1;
+      // Then by completion (incomplete first)
+      if (a.percentComplete === 100 && b.percentComplete !== 100) return 1;
+      if (b.percentComplete === 100 && a.percentComplete !== 100) return -1;
+      return b.percentComplete - a.percentComplete;
+    });
+  }, [projectStats, pinnedProjects]);
+
   // Get top 3 highest priority tasks
   const top3Tasks = useMemo(() => {
     // Sort by priority (critical > high > medium > low) and then by due date
@@ -879,124 +919,164 @@ export default function Home() {
               </ModalContent>
             </Modal>
 
-            {/* 🔥 Daily Streak Banner */}
-            <Card className="bg-gradient-to-r from-orange-500 to-amber-500 border-0 shadow-lg shadow-orange-500/20">
-              <CardBody className="py-4 px-6">
-                <div className="flex items-center justify-between">
+            {/* 🔥 Today's Progress */}
+            <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+              <CardHeader className="bg-slate-50 dark:bg-slate-800/50 px-6 py-4 border-b border-slate-200 dark:border-slate-800">
+                <div className="flex items-center justify-between w-full">
                   <div className="flex items-center gap-3">
-                    <div className="w-12 h-12 rounded-xl bg-white/20 flex items-center justify-center">
-                      <Flame className="w-7 h-7 text-white" />
+                    <div className="w-10 h-10 rounded-xl bg-orange-500 flex items-center justify-center">
+                      <Flame className="w-6 h-6 text-white" />
                     </div>
                     <div>
-                      <p className="text-white/80 text-sm font-medium">Today's Progress</p>
-                      <p className="text-white text-2xl font-black">{todayCompletedCount} task{todayCompletedCount !== 1 ? 's' : ''} crushed</p>
+                      <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100">Today's Progress</h2>
+                      <p className="text-xs text-slate-500">Keep the momentum going</p>
                     </div>
                   </div>
                   <div className="text-right">
-                    <p className="text-white/80 text-xs">Keep going!</p>
-                    <p className="text-white text-lg font-bold">{todayCompletedCount >= 5 ? '🔥🔥🔥' : todayCompletedCount >= 3 ? '🔥🔥' : todayCompletedCount >= 1 ? '🔥' : '💪'}</p>
+                    <p className="text-3xl font-black text-orange-500">{todayCompletedCount}</p>
+                    <p className="text-xs text-slate-500">task{todayCompletedCount !== 1 ? 's' : ''} done</p>
                   </div>
                 </div>
+              </CardHeader>
+              <CardBody className="px-6 py-4">
+                <div className="flex items-center gap-3">
+                  <Progress 
+                    value={Math.min(todayCompletedCount * 20, 100)} 
+                    color="warning"
+                    size="md"
+                    className="flex-1"
+                  />
+                  <span className="text-2xl">{todayCompletedCount >= 5 ? '🔥🔥🔥' : todayCompletedCount >= 3 ? '🔥🔥' : todayCompletedCount >= 1 ? '🔥' : '💪'}</span>
+                </div>
+                <p className="text-xs text-slate-400 mt-2">
+                  {todayCompletedCount === 0 ? 'Start your first task!' : todayCompletedCount < 3 ? 'Good start! Keep it up.' : todayCompletedCount < 5 ? 'On fire! Almost there.' : 'Legendary! You\'re crushing it! 🏆'}
+                </p>
               </CardBody>
             </Card>
 
             {/* 📊 Project Progress Cards */}
-            <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm">
-              <CardHeader className="px-6 py-5 flex items-center justify-between border-b border-slate-200 dark:border-slate-800">
-                <div className="flex items-center gap-3">
-                  <div className="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center text-white">
-                    <Target className="w-6 h-6" />
+            <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+              <CardHeader className="bg-slate-50 dark:bg-slate-800/50 px-6 py-4 border-b border-slate-200 dark:border-slate-800">
+                <div className="flex items-center justify-between w-full">
+                  <div className="flex items-center gap-3">
+                    <div className="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center">
+                      <Target className="w-6 h-6 text-white" />
+                    </div>
+                    <div>
+                      <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100">What's Next</h2>
+                      <p className="text-xs text-slate-500">{sortedProjectStats.length} project{sortedProjectStats.length !== 1 ? 's' : ''} with tasks</p>
+                    </div>
                   </div>
-                  <div>
-                    <h2 className="text-lg font-bold">What's Next</h2>
-                    <p className="text-xs text-slate-500">{projectStats.length} active project{projectStats.length !== 1 ? 's' : ''}</p>
-                  </div>
+                  <Button variant="light" color="primary" onPress={() => router.push('/tasks')}>All Tasks</Button>
                 </div>
-                <Button variant="light" color="primary" onPress={() => router.push('/tasks')}>All Tasks</Button>
               </CardHeader>
               <CardBody className="p-4">
                 {loading ? (
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-40 rounded-xl w-full" />)}
                   </div>
-                ) : projectStats.length === 0 ? (
+                ) : sortedProjectStats.length === 0 ? (
                   <div className="text-center py-12">
                     <FolderKanban className="w-12 h-12 text-slate-300 dark:text-slate-600 mx-auto mb-3" />
                     <p className="text-slate-500">No active projects with tasks.</p>
                     <p className="text-xs text-slate-400 mt-1">Create a project and add tasks to get started.</p>
                   </div>
                 ) : (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {projectStats.slice(0, 6).map((stat) => {
-                      const isComplete = stat.percentComplete === 100;
-                      return (
-                        <div 
-                          key={stat.project.id}
-                          className={`relative p-4 rounded-xl border-2 transition-all cursor-pointer hover:shadow-md ${
-                            isComplete 
-                              ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800' 
-                              : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 hover:border-emerald-300 dark:hover:border-emerald-700'
-                          }`}
-                          onClick={() => router.push(`/projects/${stat.project.id}`)}
-                        >
-                          {/* Header */}
-                          <div className="flex items-start justify-between mb-3">
-                            <div className="flex items-center gap-2">
+                  <>
+                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                      {(showAllProjects ? sortedProjectStats : sortedProjectStats.slice(0, 4)).map((stat) => {
+                        const isComplete = stat.percentComplete === 100;
+                        const isPinned = pinnedProjects.includes(stat.project.id);
+                        return (
+                          <div 
+                            key={stat.project.id}
+                            className={`relative p-4 rounded-xl border-2 transition-all cursor-pointer hover:shadow-md ${
+                              isComplete 
+                                ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800' 
+                                : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 hover:border-emerald-300 dark:hover:border-emerald-700'
+                            }`}
+                            onClick={() => router.push(`/projects/${stat.project.id}`)}
+                          >
+                            {/* Pin Button */}
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                togglePinProject(stat.project.id);
+                              }}
+                              className={`absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center transition-all ${
+                                isPinned 
+                                  ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-500' 
+                                  : 'bg-slate-100 dark:bg-slate-700 text-slate-400 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20'
+                              }`}
+                            >
+                              <Star className={`w-4 h-4 ${isPinned ? 'fill-amber-500' : ''}`} />
+                            </button>
+
+                            {/* Header */}
+                            <div className="flex items-start gap-2 mb-3 pr-8">
                               <span className="text-xl">{stat.project.icon || '📁'}</span>
-                              <div>
+                              <div className="min-w-0">
                                 <h3 className="font-bold text-slate-800 dark:text-slate-200 line-clamp-1">{stat.project.name}</h3>
                                 <p className="text-xs text-slate-500">{stat.completedTasks}/{stat.totalTasks} tasks</p>
                               </div>
                             </div>
-                            {isComplete && (
-                              <Chip size="sm" color="success" variant="flat" className="h-6">
-                                <CheckCircle2 className="w-3 h-3 mr-1" />
-                                Done
-                              </Chip>
+
+                            {/* Progress Bar */}
+                            <div className="mb-3">
+                              <div className="flex items-center justify-between text-xs mb-1">
+                                <span className="text-slate-500">Progress</span>
+                                <span className={`font-bold ${isComplete ? 'text-emerald-600' : 'text-slate-700 dark:text-slate-300'}`}>{stat.percentComplete}%</span>
+                              </div>
+                              <Progress 
+                                value={stat.percentComplete} 
+                                color={isComplete ? 'success' : 'primary'}
+                                size="sm"
+                                className="h-2"
+                              />
+                            </div>
+
+                            {/* Next Action */}
+                            {stat.nextAction ? (
+                              <div className="bg-white dark:bg-slate-900 rounded-lg p-3 border border-slate-100 dark:border-slate-700">
+                                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Next Up</p>
+                                <p className="text-sm text-slate-700 dark:text-slate-300 line-clamp-2">{stat.nextAction.title}</p>
+                                <Button 
+                                  size="sm" 
+                                  color="primary" 
+                                  variant="flat" 
+                                  className="mt-2 w-full"
+                                  onClick={(e) => {
+                                    e.stopPropagation();
+                                    router.push(`/projects/${stat.project.id}`);
+                                  }}
+                                >
+                                  Jump In <ArrowRight className="w-3 h-3 ml-1" />
+                                </Button>
+                              </div>
+                            ) : (
+                              <div className="bg-emerald-100 dark:bg-emerald-900/30 rounded-lg p-3 text-center">
+                                <p className="text-sm text-emerald-700 dark:text-emerald-400 font-medium">🎉 All tasks complete!</p>
+                              </div>
                             )}
                           </div>
+                        );
+                      })}
+                    </div>
 
-                          {/* Progress Bar */}
-                          <div className="mb-3">
-                            <div className="flex items-center justify-between text-xs mb-1">
-                              <span className="text-slate-500">Progress</span>
-                              <span className={`font-bold ${isComplete ? 'text-emerald-600' : 'text-slate-700 dark:text-slate-300'}`}>{stat.percentComplete}%</span>
-                            </div>
-                            <Progress 
-                              value={stat.percentComplete} 
-                              color={isComplete ? 'success' : 'primary'}
-                              size="sm"
-                              className="h-2"
-                            />
-                          </div>
-
-                          {/* Next Action */}
-                          {stat.nextAction ? (
-                            <div className="bg-white dark:bg-slate-900 rounded-lg p-3 border border-slate-100 dark:border-slate-700">
-                              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Next Up</p>
-                              <p className="text-sm text-slate-700 dark:text-slate-300 line-clamp-2">{stat.nextAction.title}</p>
-                              <Button 
-                                size="sm" 
-                                color="primary" 
-                                variant="flat" 
-                                className="mt-2 w-full"
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  router.push(`/projects/${stat.project.id}`);
-                                }}
-                              >
-                                Jump In <ArrowRight className="w-3 h-3 ml-1" />
-                              </Button>
-                            </div>
-                          ) : (
-                            <div className="bg-emerald-100 dark:bg-emerald-900/30 rounded-lg p-3 text-center">
-                              <p className="text-sm text-emerald-700 dark:text-emerald-400 font-medium">🎉 All tasks complete!</p>
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
+                    {/* Show More/Less */}
+                    {sortedProjectStats.length > 4 && (
+                      <div className="mt-4 text-center">
+                        <Button 
+                          variant="light" 
+                          size="sm"
+                          onPress={() => setShowAllProjects(!showAllProjects)}
+                          endContent={showAllProjects ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                        >
+                          {showAllProjects ? 'Show Less' : `Show All ${sortedProjectStats.length} Projects`}
+                        </Button>
+                      </div>
+                    )}
+                  </>
                 )}
               </CardBody>
             </Card>
