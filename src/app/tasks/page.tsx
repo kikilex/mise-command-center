@@ -246,7 +246,7 @@ function TasksPageContent() {
       let query = supabase
         .from('tasks')
         .select('*')
-        .or(`created_by.eq.${authUser.id},assignee_id.eq.${authUser.id}`)
+        .eq('assignee_id', authUser.id)
       
       if (localSpaceId && localSpaceId !== 'all') {
         query = query.eq('space_id', localSpaceId)
