@@ -205,9 +205,9 @@ export default function EditAgentModal({ isOpen, onClose, onSuccess, agent }: Ed
       toast.success('Agent profile updated')
       onSuccess()
       onClose()
-    } catch (error) {
+    } catch (error: any) {
       console.error('Error saving agent:', error)
-      toast.error('Failed to save agent profile')
+      toast.error(error?.message || 'Failed to save agent profile')
     } finally {
       setSaving(false)
     }
