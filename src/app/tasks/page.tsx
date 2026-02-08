@@ -446,7 +446,7 @@ function TasksPageContent() {
   const displayTasks = showAllTasks ? allActiveTasks : focusTasks
   const hiddenCount = allActiveTasks.length - focusTasks.length
 
-  // State for collapsed project sections
+  // State for collapsed project sections - empty means all expanded
   const [collapsedProjects, setCollapsedProjects] = useState<Record<string, boolean>>({})
 
   // Group tasks by project
