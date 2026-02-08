@@ -446,8 +446,11 @@ function TasksPageContent() {
   const displayTasks = showAllTasks ? allActiveTasks : focusTasks
   const hiddenCount = allActiveTasks.length - focusTasks.length
 
-  // State for collapsed project sections - empty means all expanded
-  const [collapsedProjects, setCollapsedProjects] = useState<Record<string, boolean>>({})
+  // State for collapsed project sections - default all to collapsed (true)
+  const [collapsedProjects, setCollapsedProjects] = useState<Record<string, boolean>>(() => {
+    return {} // Will use defaultCollapsed below
+  })
+  const defaultCollapsed = true // Projects start collapsed
 
   // Group tasks by project
   const tasksByProject = useMemo(() => {
@@ -677,7 +680,7 @@ function TasksPageContent() {
               ) : (
                 Object.entries(tasksByProject).map(([projectId, projectTasks]) => {
                   const project = projects.find(p => p.id === projectId)
-                  const isCollapsed = collapsedProjects[projectId]
+                  const isCollapsed = collapsedProjects[projectId] ?? defaultCollapsed
                   const projectName = project ? project.name : 'Unassigned'
                   
                   return (
