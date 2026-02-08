@@ -25,7 +25,7 @@ import {
   ModalBody,
   ModalFooter,
 } from '@heroui/react'
-import { Plus, Settings, ArrowRight, ListTodo, Calendar, Users, FileText, MessageSquare, ChevronRight, FolderKanban, X, MoreVertical, Edit, Trash2 } from 'lucide-react'
+import { Plus, Settings, ArrowRight, ListTodo, Calendar, Users, FileText, MessageSquare, ChevronRight, ChevronDown, FolderKanban, X, MoreVertical, Edit, Trash2 } from 'lucide-react'
 import * as LucideIcons from 'lucide-react'
 import Link from 'next/link'
 import Navbar from '@/components/Navbar'
@@ -36,6 +36,161 @@ import AddProjectModal from '@/components/AddProjectModal'
 import EditProjectModal from '@/components/EditProjectModal'
 import InviteMemberModal from '@/components/InviteMemberModal'
 import { showErrorToast, showSuccessToast } from '@/lib/errors'
+
+// TasksByProject component - groups tasks by project with collapsible sections
+function TasksByProject({ 
+  tasks, 
+  projects, 
+  onTaskClick, 
+  getPriorityColor 
+}: { 
+  tasks: any[]
+  projects: any[]
+  onTaskClick: (taskId: string) => void
+  getPriorityColor: (priority: string) => string
+}) {
+  const [expandedProjects, setExpandedProjects] = useState<Set<string>>(new Set(['unassigned']))
+
+  // Group tasks by project
+  const groupedTasks = useMemo(() => {
+    const groups: Record<string, any[]> = { unassigned: [] }
+    projects.forEach(p => { groups[p.id] = [] })
+    
+    tasks.forEach(task => {
+      if (task.project_id && groups[task.project_id]) {
+        groups[task.project_id].push(task)
+      } else {
+        groups.unassigned.push(task)
+      }
+    })
+    
+    return groups
+  }, [tasks, projects])
+
+  const toggleProject = (projectId: string) => {
+    setExpandedProjects(prev => {
+      const next = new Set(prev)
+      if (next.has(projectId)) {
+        next.delete(projectId)
+      } else {
+        next.add(projectId)
+      }
+      return next
+    })
+  }
+
+  const projectsWithTasks = projects.filter(p => groupedTasks[p.id]?.length > 0)
+  const unassignedTasks = groupedTasks.unassigned || []
+
+  return (
+    <div className="space-y-4">
+      {/* Projects with tasks */}
+      {projectsWithTasks.map(project => (
+        <div key={project.id} className="border border-default-200 dark:border-default-100 rounded-lg overflow-hidden">
+          <button
+            onClick={() => toggleProject(project.id)}
+            className="w-full flex items-center justify-between px-4 py-3 bg-default-50 dark:bg-default-100 hover:bg-default-100 dark:hover:bg-default-200 transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              {expandedProjects.has(project.id) ? (
+                <ChevronDown className="w-4 h-4 text-default-500" />
+              ) : (
+                <ChevronRight className="w-4 h-4 text-default-500" />
+              )}
+              <FolderKanban className="w-4 h-4 text-primary" />
+              <span className="font-medium">{project.name}</span>
+            </div>
+            <Chip size="sm" variant="flat">
+              {groupedTasks[project.id]?.filter(t => t.status !== 'done').length || 0} active
+            </Chip>
+          </button>
+          
+          {expandedProjects.has(project.id) && (
+            <div className="divide-y divide-default-100">
+              {groupedTasks[project.id]?.map(task => (
+                <div 
+                  key={task.id}
+                  onClick={() => onTaskClick(task.id)}
+                  className="flex items-center justify-between px-4 py-3 pl-11 hover:bg-default-50 dark:hover:bg-default-100 cursor-pointer transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`w-2 h-2 rounded-full ${getPriorityColor(task.priority)}`} />
+                    <span className={task.status === 'done' ? 'line-through text-default-400' : ''}>{task.title}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Chip size="sm" variant="flat" color={task.status === 'done' ? 'success' : 'default'}>
+                      {task.status}
+                    </Chip>
+                    {task.assignee && (
+                      <Avatar size="sm" src={task.assignee.avatar_url} name={task.assignee.name} className="w-6 h-6" />
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      ))}
+
+      {/* Unassigned tasks */}
+      {unassignedTasks.length > 0 && (
+        <div className="border border-default-200 dark:border-default-100 rounded-lg overflow-hidden">
+          <button
+            onClick={() => toggleProject('unassigned')}
+            className="w-full flex items-center justify-between px-4 py-3 bg-default-50 dark:bg-default-100 hover:bg-default-100 dark:hover:bg-default-200 transition-colors"
+          >
+            <div className="flex items-center gap-3">
+              {expandedProjects.has('unassigned') ? (
+                <ChevronDown className="w-4 h-4 text-default-500" />
+              ) : (
+                <ChevronRight className="w-4 h-4 text-default-500" />
+              )}
+              <ListTodo className="w-4 h-4 text-default-400" />
+              <span className="font-medium text-default-600">No Project</span>
+            </div>
+            <Chip size="sm" variant="flat">
+              {unassignedTasks.filter(t => t.status !== 'done').length} active
+            </Chip>
+          </button>
+          
+          {expandedProjects.has('unassigned') && (
+            <div className="divide-y divide-default-100">
+              {unassignedTasks.map(task => (
+                <div 
+                  key={task.id}
+                  onClick={() => onTaskClick(task.id)}
+                  className="flex items-center justify-between px-4 py-3 pl-11 hover:bg-default-50 dark:hover:bg-default-100 cursor-pointer transition-colors"
+                >
+                  <div className="flex items-center gap-3">
+                    <div className={`w-2 h-2 rounded-full ${getPriorityColor(task.priority)}`} />
+                    <span className={task.status === 'done' ? 'line-through text-default-400' : ''}>{task.title}</span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Chip size="sm" variant="flat" color={task.status === 'done' ? 'success' : 'default'}>
+                      {task.status}
+                    </Chip>
+                    {task.assignee && (
+                      <Avatar size="sm" src={task.assignee.avatar_url} name={task.assignee.name} className="w-6 h-6" />
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {projectsWithTasks.length === 0 && unassignedTasks.length === 0 && (
+        <Card className="py-12">
+          <CardBody className="text-center text-default-400">
+            <ListTodo className="w-12 h-12 mx-auto mb-4" />
+            <p>No tasks in this space yet.</p>
+          </CardBody>
+        </Card>
+      )}
+    </div>
+  )
+}
 
 export default function SpaceDetailPage() {
   // ... rest
@@ -794,28 +949,12 @@ export default function SpaceDetailPage() {
                   </CardBody>
                 </Card>
               ) : (
-                <div className="space-y-3">
-                  {tasks.map(task => (
-                    <Card key={task.id} isPressable onPress={() => router.push(`/tasks?task=${task.id}`)}>
-                      <CardBody className="flex-row items-center justify-between py-3">
-                        <div className="flex items-center gap-3">
-                          <div className={`w-2 h-2 rounded-full ${getPriorityColor(task.priority)}`} />
-                          <span className="font-medium">{task.title}</span>
-                        </div>
-                        <div className="flex items-center gap-4">
-                          <Chip size="sm" variant="flat">{task.status}</Chip>
-                          {task.assignee && (
-                            <Avatar 
-                              size="sm" 
-                              src={task.assignee.avatar_url} 
-                              name={task.assignee.display_name || task.assignee.name} 
-                            />
-                          )}
-                        </div>
-                      </CardBody>
-                    </Card>
-                  ))}
-                </div>
+                <TasksByProject 
+                  tasks={tasks} 
+                  projects={projects} 
+                  onTaskClick={(taskId) => router.push(`/tasks?task=${taskId}`)}
+                  getPriorityColor={getPriorityColor}
+                />
               )}
             </div>
           </Tab>
