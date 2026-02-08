@@ -251,6 +251,17 @@ function InboxPageInner() {
     }
 
     loadData()
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_IN') {
+        loadData()
+      }
+    })
+
+    return () => {
+      subscription.unsubscribe()
+    }
   }, [supabase])
 
   // Add quick thought (no recipient)

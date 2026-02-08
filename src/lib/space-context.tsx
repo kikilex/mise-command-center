@@ -45,6 +45,23 @@ export function SpaceProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     loadSpaces()
+    
+    // Listen for auth changes (login/logout)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === 'SIGNED_IN') {
+        // User just logged in - reload spaces
+        loadSpaces()
+      } else if (event === 'SIGNED_OUT') {
+        // User logged out - clear spaces
+        setSpaces([])
+        setSelectedSpaceIdState(null)
+        setInitialized(false)
+      }
+    })
+
+    return () => {
+      subscription.unsubscribe()
+    }
   }, [])
 
   useEffect(() => {
