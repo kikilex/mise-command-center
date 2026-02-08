@@ -286,10 +286,8 @@ export default function SpaceDetailPage() {
       const [spaceRes, tasksRes, projectsRes, docsRes, threadsRes, userRoleRes] = await Promise.all([
         supabase.from('spaces').select('*').eq('id', id).single(),
         supabase.from('tasks')
-          .select('*, assignee:users(*)')
+          .select('*')
           .eq('space_id', id)
-          .order('due_date', { ascending: true, nullsFirst: false })
-          .order('priority', { ascending: false })
           .order('created_at', { ascending: false }),
         supabase.from('projects')
           .select('*')
@@ -312,6 +310,8 @@ export default function SpaceDetailPage() {
       ])
 
       if (spaceRes.error) throw spaceRes.error
+      if (tasksRes.error) console.error('Tasks query error:', tasksRes.error)
+      console.log('Tasks loaded:', tasksRes.data?.length || 0)
       setSpace(spaceRes.data)
       setMembers(membersWithUsers)
       setTasks(tasksRes.data || [])
