@@ -208,12 +208,12 @@ export default function FloatingNoteWidget() {
   // Don't render until mounted (avoids hydration mismatch)
   if (!mounted) return null
   
-  // FAB button (always visible)
+  // FAB button (always visible) - positioned left of ChatWidget
   if (!isOpen) {
     return (
       <button
         onClick={() => setIsOpen(true)}
-        className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full bg-amber-500 hover:bg-amber-600 text-white shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center group"
+        className="fixed bottom-6 right-24 z-50 w-14 h-14 rounded-full bg-amber-500 hover:bg-amber-600 text-white shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center group"
         title="Quick Notes"
       >
         <StickyNote className="w-6 h-6 group-hover:scale-110 transition-transform" />
@@ -226,7 +226,7 @@ export default function FloatingNoteWidget() {
     return (
       <button
         onClick={() => setIsMinimized(false)}
-        className="fixed bottom-6 right-6 z-50 w-14 h-14 rounded-full bg-amber-500 hover:bg-amber-600 text-white shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center"
+        className="fixed bottom-6 right-24 z-50 w-14 h-14 rounded-full bg-amber-500 hover:bg-amber-600 text-white shadow-lg hover:shadow-xl transition-all duration-200 flex items-center justify-center"
         title={selectedNote?.title || 'Quick Notes'}
       >
         <StickyNote className="w-6 h-6" />
