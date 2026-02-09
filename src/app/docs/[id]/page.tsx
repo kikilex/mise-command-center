@@ -29,6 +29,7 @@ import {
   Popover,
   PopoverTrigger,
   PopoverContent,
+  Avatar,
 } from '@heroui/react'
 import { createClient } from '@/lib/supabase/client'
 import Navbar from '@/components/Navbar'
