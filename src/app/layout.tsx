@@ -5,6 +5,7 @@ import { Providers } from "./providers";
 import { Toaster } from "react-hot-toast";
 import { ErrorBoundary } from "@/components/ErrorBoundary";
 import ChatWidget from "@/components/ChatWidget";
+import FloatingNoteWidget from "@/components/FloatingNoteWidget";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -57,6 +58,7 @@ export default function RootLayout({
             }}
           />
           <ChatWidget />
+          <FloatingNoteWidget />
         </Providers>
       </body>
     </html>
