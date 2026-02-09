@@ -15,6 +15,7 @@ import {
   LayoutGrid,
   List,
   User,
+  Users,
 } from 'lucide-react'
 import { 
   Button, 
@@ -146,6 +147,8 @@ function TasksPageContent() {
   const [loadError, setLoadError] = useState<string | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [showAllTasks, setShowAllTasks] = useState(false)
+  const [viewMode, setViewMode] = useState<'mine' | 'all'>('mine')
+  const [isAdmin, setIsAdmin] = useState(false)
   const [localSpaceId, setLocalSpaceId] = useState<string>('all')
   const { isOpen, onOpen, onClose } = useDisclosure()
   const { isOpen: isDetailOpen, onOpen: onDetailOpen, onClose: onDetailClose } = useDisclosure()
@@ -183,7 +186,7 @@ function TasksPageContent() {
   useEffect(() => {
     loadTasks()
     loadDropdownData()
-  }, [localSpaceId])
+  }, [localSpaceId, viewMode])
 
   async function loadDropdownData() {
     try {
@@ -229,6 +232,7 @@ function TasksPageContent() {
         name: profile?.name || authUser.email?.split('@')[0],
         avatar_url: profile?.avatar_url,
       })
+      setIsAdmin(profile?.is_admin === true)
     } catch (error) {
       console.error('Error loading user:', error)
     }
@@ -246,7 +250,11 @@ function TasksPageContent() {
       let query = supabase
         .from('tasks')
         .select('*')
-        .eq('assignee_id', authUser.id)
+      
+      // Only filter by assignee if viewing "My Tasks"
+      if (viewMode === 'mine') {
+        query = query.eq('assignee_id', authUser.id)
+      }
       
       if (localSpaceId && localSpaceId !== 'all') {
         query = query.eq('space_id', localSpaceId)
@@ -593,7 +601,7 @@ function TasksPageContent() {
             <div className="flex items-center gap-3">
               <Target className="w-6 h-6 text-violet-600 dark:text-violet-400" />
               <h1 className="text-2xl font-semibold text-slate-900 dark:text-slate-100">
-                {showAllTasks ? 'All Tasks' : 'My Focus'}
+                {viewMode === 'all' ? 'Team Tasks' : (showAllTasks ? 'All Tasks' : 'My Focus')}
               </h1>
             </div>
             
@@ -646,6 +654,35 @@ function TasksPageContent() {
               </Button>
             ))}
           </div>
+
+          {/* Admin toggle: My Tasks vs All Tasks */}
+          {isAdmin && (
+            <div className="flex items-center gap-2 pt-2 border-t border-slate-200 dark:border-slate-700">
+              <span className="text-xs text-slate-500 dark:text-slate-400">View:</span>
+              <div className="flex rounded-lg bg-slate-100 dark:bg-slate-800 p-0.5">
+                <Button
+                  size="sm"
+                  variant={viewMode === 'mine' ? 'solid' : 'light'}
+                  color={viewMode === 'mine' ? 'primary' : 'default'}
+                  onPress={() => setViewMode('mine')}
+                  className="rounded-md min-w-0 px-3"
+                  startContent={<User className="w-3 h-3" />}
+                >
+                  My Tasks
+                </Button>
+                <Button
+                  size="sm"
+                  variant={viewMode === 'all' ? 'solid' : 'light'}
+                  color={viewMode === 'all' ? 'primary' : 'default'}
+                  onPress={() => setViewMode('all')}
+                  className="rounded-md min-w-0 px-3"
+                  startContent={<Users className="w-3 h-3" />}
+                >
+                  All Tasks
+                </Button>
+              </div>
+            </div>
+          )}
         </div>
 
         {/* Error State */}
