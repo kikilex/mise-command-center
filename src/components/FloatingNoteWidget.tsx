@@ -33,6 +33,10 @@ export default function FloatingNoteWidget() {
   const supabase = createClient()
   const nodeRef = useRef(null)
   
+  // Hydration check
+  const [mounted, setMounted] = useState(false)
+  useEffect(() => { setMounted(true) }, [])
+  
   // Widget state
   const [isOpen, setIsOpen] = useState(false)
   const [isPinned, setIsPinned] = useState(false)
@@ -200,6 +204,9 @@ export default function FloatingNoteWidget() {
     const text = content.replace(/<[^>]*>/g, '').trim()
     return text.length > 60 ? text.slice(0, 60) + '...' : text
   }
+  
+  // Don't render until mounted (avoids hydration mismatch)
+  if (!mounted) return null
   
   // FAB button (always visible)
   if (!isOpen) {
