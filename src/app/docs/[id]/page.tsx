@@ -1320,9 +1320,11 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
                           {formatCommentDate(comment.created_at)}
                         </span>
                       </div>
-                      <p className="text-slate-700 dark:text-slate-300 whitespace-pre-wrap">
-                        {comment.content}
-                      </p>
+                      <div className="text-slate-700 dark:text-slate-300 prose prose-sm dark:prose-invert max-w-none">
+                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                          {comment.content}
+                        </ReactMarkdown>
+                      </div>
                     </div>
                   </div>
                 </div>
