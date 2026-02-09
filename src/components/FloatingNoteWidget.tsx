@@ -241,12 +241,16 @@ export default function FloatingNoteWidget() {
   const panelWidth = isExpanded ? 'w-[500px]' : 'w-[360px]'
   const panelHeight = isExpanded ? 'h-[600px]' : 'h-[450px]'
   
+  // Calculate position safely (only on client)
+  const defaultX = typeof window !== 'undefined' ? Math.max(0, window.innerWidth - 400) : 100
+  const defaultY = typeof window !== 'undefined' ? Math.max(0, window.innerHeight - 500) : 100
+  
   return (
     <Draggable 
       handle=".drag-handle" 
       nodeRef={nodeRef}
       bounds="parent"
-      defaultPosition={{ x: window.innerWidth - 400, y: window.innerHeight - 500 }}
+      defaultPosition={{ x: defaultX, y: defaultY }}
     >
       <div 
         ref={nodeRef}
