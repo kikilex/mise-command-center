@@ -998,7 +998,7 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
                   size="sm" 
                   className="w-5 h-5" 
                 />
-                <span>Created by {(document as any).creator.display_name || (document as any).creator.name}</span>
+                <span>Created by {((document as any).creator.display_name || (document as any).creator.name || '').split(' ')[0]}</span>
               </div>
             )}
             <span>Updated {formatDate(document.updated_at)}</span>

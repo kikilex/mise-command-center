@@ -1607,8 +1607,8 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                         )}
                         {pin.creator && (
                           <div className="flex items-center gap-1 mt-1">
-                            <Avatar src={pin.creator.avatar_url} name={pin.creator.display_name || pin.creator.name} size="sm" className="w-3 h-3" />
-                            <span className="text-[10px] text-default-400">{pin.creator.display_name || pin.creator.name}</span>
+                            <Avatar src={pin.creator.avatar_url} name={(pin.creator.display_name || pin.creator.name || '').split(' ')[0]} size="sm" className="w-3 h-3" />
+                            <span className="text-[10px] text-default-400">{(pin.creator.display_name || pin.creator.name || '').split(' ')[0]}</span>
                           </div>
                         )}
                       </div>

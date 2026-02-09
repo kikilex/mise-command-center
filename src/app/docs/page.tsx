@@ -594,7 +594,7 @@ function DocsPageContent() {
                       {doc.creator && (
                         <div className="flex items-center gap-1">
                           <Avatar src={doc.creator.avatar_url} name={doc.creator.display_name || doc.creator.name} size="sm" className="w-4 h-4" />
-                          <span>{doc.creator.display_name || doc.creator.name}</span>
+                          <span>{(doc.creator.display_name || doc.creator.name || '').split(' ')[0]}</span>
                         </div>
                       )}
                       <span>{new Date(doc.updated_at).toLocaleDateString()}</span>
