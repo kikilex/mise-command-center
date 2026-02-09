@@ -278,7 +278,7 @@ export default function AIWorkspacePage() {
   async function handleQuickStatusChange(task: Task, newStatus: string) {
     const { error } = await supabase
       .from('tasks')
-      .update({ status: newStatus, modified_by: 'ax' })
+      .update({ status: newStatus, modified_by: user?.name?.toLowerCase() || 'unknown' })
       .eq('id', task.id)
     
     if (error) {
@@ -319,7 +319,7 @@ export default function AIWorkspacePage() {
         priority: taskFormData.priority,
         status: taskFormData.status,
         due_date: taskFormData.due_date || null,
-        modified_by: 'ax'
+        modified_by: user?.name?.toLowerCase() || 'unknown'
       })
       .eq('id', editingTask.id)
     
