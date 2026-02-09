@@ -23,6 +23,7 @@ import {
   ModalFooter,
   Textarea,
   Divider,
+  Avatar,
 } from '@heroui/react'
 import { createClient } from '@/lib/supabase/client'
 import { useSpace } from '@/lib/space-context'
