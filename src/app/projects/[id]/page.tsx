@@ -39,7 +39,7 @@ import {
   CheckCircle2, Circle, MessageSquare, GripVertical,
   User, Calendar, ChevronDown, ChevronUp, Users,
   Bold, Italic, Highlighter, RotateCcw, Save,
-  Upload, File, Image as ImageIcon, Search, StickyNote
+  Upload, File, Image as ImageIcon, Search, StickyNote, CheckSquare
 } from 'lucide-react'
 import * as LucideIcons from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
@@ -202,6 +202,10 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   const [newDocTitle, setNewDocTitle] = useState('')
   const [creatingDoc, setCreatingDoc] = useState(false)
   const [docSearch, setDocSearch] = useState('')
+  
+  // Project Tasks
+  const [projectTasks, setProjectTasks] = useState<any[]>([])
+  const [showAllTasks, setShowAllTasks] = useState(true) // Default to ALL for project visibility
   
   // Note modal (for quick notes as resources)
   const { isOpen: isNoteOpen, onOpen: onNoteOpen, onClose: onNoteClose } = useDisclosure()
@@ -391,6 +395,14 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
           .eq('space_id', projectData.space_id)
         setMembers((membersData || []).map((m: any) => m.users).filter(Boolean))
       }
+
+      // Load project tasks (from tasks table, synced from phase_items)
+      const { data: tasksData } = await supabase
+        .from('tasks')
+        .select('*, assignee:assignee_id (id, name, display_name, avatar_url)')
+        .eq('project_id', id)
+        .order('created_at', { ascending: false })
+      setProjectTasks(tasksData || [])
 
     } catch (error) {
       console.error('Load error:', error)
@@ -1523,6 +1535,104 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                 })}
               </div>
             )}
+          </CardBody>
+        </Card>
+
+        {/* Project Tasks */}
+        <Card className="mb-6">
+          <CardBody className="p-4">
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold text-default-700 flex items-center gap-2">
+                <CheckSquare className="w-4 h-4" />
+                Tasks
+                {projectTasks.length > 0 && (
+                  <Chip size="sm" variant="flat">{projectTasks.length}</Chip>
+                )}
+              </h3>
+              <div className="flex items-center gap-2">
+                <Button
+                  size="sm"
+                  variant={showAllTasks ? 'solid' : 'bordered'}
+                  color={showAllTasks ? 'primary' : 'default'}
+                  onPress={() => setShowAllTasks(true)}
+                >
+                  All Tasks
+                </Button>
+                <Button
+                  size="sm"
+                  variant={!showAllTasks ? 'solid' : 'bordered'}
+                  color={!showAllTasks ? 'primary' : 'default'}
+                  onPress={() => setShowAllTasks(false)}
+                >
+                  My Tasks
+                </Button>
+              </div>
+            </div>
+            {(() => {
+              const filteredTasks = showAllTasks 
+                ? projectTasks 
+                : projectTasks.filter(t => t.assignee_id === user?.id)
+              
+              if (filteredTasks.length === 0) {
+                return (
+                  <p className="text-sm text-default-400 text-center py-6">
+                    {showAllTasks ? 'No tasks for this project yet.' : 'No tasks assigned to you.'}
+                  </p>
+                )
+              }
+              
+              const todoTasks = filteredTasks.filter(t => t.status === 'todo')
+              const inProgressTasks = filteredTasks.filter(t => t.status === 'in_progress')
+              const blockedTasks = filteredTasks.filter(t => t.status === 'blocked')
+              const reviewTasks = filteredTasks.filter(t => t.status === 'review')
+              const doneTasks = filteredTasks.filter(t => t.status === 'done')
+              
+              const renderTaskGroup = (tasks: any[], label: string, color: string) => {
+                if (tasks.length === 0) return null
+                return (
+                  <div className="mb-4">
+                    <div className="flex items-center gap-2 mb-2">
+                      <Chip size="sm" color={color as any} variant="flat">{label}</Chip>
+                      <span className="text-xs text-default-400">{tasks.length}</span>
+                    </div>
+                    <div className="space-y-2">
+                      {tasks.map(task => (
+                        <div key={task.id} className="flex items-center gap-3 p-2 rounded-lg bg-default-50 hover:bg-default-100 transition-colors">
+                          <div className="flex-1 min-w-0">
+                            <p className="text-sm font-medium truncate">{task.title}</p>
+                            {task.assignee && (
+                              <div className="flex items-center gap-1 mt-1">
+                                <Avatar src={task.assignee.avatar_url} name={task.assignee.display_name || task.assignee.name} size="sm" className="w-4 h-4" />
+                                <span className="text-xs text-default-400">{task.assignee.display_name || task.assignee.name}</span>
+                              </div>
+                            )}
+                          </div>
+                          {task.priority && (
+                            <Chip size="sm" variant="flat" color={
+                              task.priority === 'critical' ? 'danger' :
+                              task.priority === 'high' ? 'warning' :
+                              task.priority === 'medium' ? 'primary' : 'default'
+                            }>
+                              {task.priority}
+                            </Chip>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )
+              }
+              
+              return (
+                <div>
+                  {renderTaskGroup(blockedTasks, 'Blocked', 'danger')}
+                  {renderTaskGroup(inProgressTasks, 'In Progress', 'primary')}
+                  {renderTaskGroup(todoTasks, 'Todo', 'default')}
+                  {renderTaskGroup(reviewTasks, 'Review', 'warning')}
+                  {renderTaskGroup(doneTasks, 'Done', 'success')}
+                </div>
+              )
+            })()}
           </CardBody>
         </Card>
 
