@@ -498,11 +498,11 @@ function DocsPageContent() {
             <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Docs</h1>
           </div>
           <div className="flex gap-2">
-            <Button color="primary" size="sm" onPress={handleCreateDocument} startContent={<Plus className="w-4 h-4" />}>
-              + Doc
+            <Button color="primary" size="sm" onPress={handleCreateDocument} startContent={<FileText className="w-4 h-4" />}>
+              New Doc
             </Button>
             <Button color="secondary" size="sm" variant="flat" onPress={handleCreateNote} startContent={<NotebookPen className="w-4 h-4" />}>
-              + Note
+              New Note
             </Button>
           </div>
         </div>
@@ -605,9 +605,9 @@ function DocsPageContent() {
                         </span>
                       )}
                     </div>
-                    <Chip size="sm" variant="dot" color={doc.doc_type === 'note' ? 'secondary' : 'primary'}>
-                      {doc.doc_type === 'note' ? 'Note' : 'Document'}
-                    </Chip>
+                    {doc.doc_type === 'note' 
+                      ? <NotebookPen className="w-4 h-4 text-secondary" />
+                      : <FileText className="w-4 h-4 text-primary" />}
                   </div>
                 </CardBody>
               </Card>
