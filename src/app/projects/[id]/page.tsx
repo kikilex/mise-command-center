@@ -228,6 +228,11 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   const [isEditingDoc, setIsEditingDoc] = useState(false)
   const [editDocContent, setEditDocContent] = useState('')
   const [savingDoc, setSavingDoc] = useState(false)
+  const [previewDocStatus, setPreviewDocStatus] = useState<string>('draft')
+  const [previewDocComments, setPreviewDocComments] = useState<any[]>([])
+  const [newDocComment, setNewDocComment] = useState('')
+  const [postingComment, setPostingComment] = useState(false)
+  const [updatingDocStatus, setUpdatingDocStatus] = useState(false)
   
   // Update editing
   const [editingUpdateId, setEditingUpdateId] = useState<string | null>(null)
@@ -1049,23 +1054,106 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
     setPreviewDocUrl(`/docs/${docId}`)
     setLoadingDocContent(true)
     setIsEditingDoc(false)
+    setNewDocComment('')
     onDocPreviewOpen()
     
     try {
+      // Load doc content and status
       const { data, error } = await supabase
         .from('documents')
-        .select('content')
+        .select('content, status')
         .eq('id', docId)
         .single()
       
       if (error) throw error
       setPreviewDocContent(data?.content || '')
       setEditDocContent(data?.content || '')
+      setPreviewDocStatus(data?.status || 'draft')
+      
+      // Load comments
+      const { data: commentsData } = await supabase
+        .from('document_comments')
+        .select('*')
+        .eq('document_id', docId)
+        .order('created_at', { ascending: true })
+      setPreviewDocComments(commentsData || [])
     } catch (error) {
       console.error('Failed to load doc:', error)
       setPreviewDocContent('Failed to load document content.')
     } finally {
       setLoadingDocContent(false)
+    }
+  }
+  
+  // Post comment on doc
+  async function handlePostDocComment() {
+    if (!previewDocId || !newDocComment.trim()) return
+    setPostingComment(true)
+    try {
+      const { data, error } = await supabase
+        .from('document_comments')
+        .insert({
+          document_id: previewDocId,
+          content: newDocComment.trim(),
+          author_id: user?.id,
+          author_name: user?.display_name || user?.name,
+          comment_type: 'comment'
+        })
+        .select()
+        .single()
+      
+      if (error) throw error
+      setPreviewDocComments(prev => [...prev, data])
+      setNewDocComment('')
+      showSuccessToast('Comment added')
+    } catch (error) {
+      showErrorToast(error, 'Failed to post comment')
+    } finally {
+      setPostingComment(false)
+    }
+  }
+  
+  // Update doc status (approve/revision)
+  async function handleUpdateDocStatus(newStatus: string) {
+    if (!previewDocId) return
+    setUpdatingDocStatus(true)
+    try {
+      const { error } = await supabase
+        .from('documents')
+        .update({ status: newStatus })
+        .eq('id', previewDocId)
+      
+      if (error) throw error
+      setPreviewDocStatus(newStatus)
+      
+      // Add a comment about the status change
+      const statusMessage = newStatus === 'approved' 
+        ? '✅ Approved this document'
+        : newStatus === 'needs_revision'
+        ? '🔄 Sent back for revision'
+        : `Changed status to ${newStatus}`
+      
+      const { data: commentData } = await supabase
+        .from('document_comments')
+        .insert({
+          document_id: previewDocId,
+          content: statusMessage,
+          author_id: user?.id,
+          author_name: user?.display_name || user?.name,
+          comment_type: 'status_change'
+        })
+        .select()
+        .single()
+      
+      if (commentData) {
+        setPreviewDocComments(prev => [...prev, commentData])
+      }
+      
+      showSuccessToast(newStatus === 'approved' ? 'Document approved!' : 'Sent back for revision')
+    } catch (error) {
+      showErrorToast(error, 'Failed to update status')
+    } finally {
+      setUpdatingDocStatus(false)
     }
   }
   
@@ -2145,42 +2233,163 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
       </Modal>
 
       {/* Doc Preview/Edit Modal */}
-      <Modal isOpen={isDocPreviewOpen} onClose={onDocPreviewClose} size="3xl" scrollBehavior="inside">
-        <ModalContent>
-          <ModalHeader className="flex items-center gap-2">
-            <FileText className="w-5 h-5 text-primary" />
-            {previewDocTitle}
+      <Modal isOpen={isDocPreviewOpen} onClose={onDocPreviewClose} size="4xl" scrollBehavior="inside">
+        <ModalContent className="max-h-[90vh]">
+          <ModalHeader className="flex items-center justify-between border-b">
+            <div className="flex items-center gap-2">
+              <FileText className="w-5 h-5 text-primary" />
+              <span className="truncate">{previewDocTitle}</span>
+              <Chip 
+                size="sm" 
+                variant="flat" 
+                color={
+                  previewDocStatus === 'approved' ? 'success' :
+                  previewDocStatus === 'needs_revision' ? 'danger' :
+                  previewDocStatus === 'in_review' ? 'warning' : 'default'
+                }
+              >
+                {previewDocStatus === 'needs_revision' ? 'Needs Revision' : 
+                 previewDocStatus === 'in_review' ? 'In Review' :
+                 previewDocStatus.charAt(0).toUpperCase() + previewDocStatus.slice(1)}
+              </Chip>
+            </div>
+            <Button
+              as={Link}
+              href={`/docs/${previewDocId}/edit`}
+              size="sm"
+              variant="flat"
+              startContent={<ExternalLink className="w-4 h-4" />}
+            >
+              Open Full Page
+            </Button>
           </ModalHeader>
-          <ModalBody className="py-4">
+          <ModalBody className="py-4 overflow-y-auto">
             {loadingDocContent ? (
               <div className="flex justify-center py-8">
                 <Spinner size="lg" />
               </div>
-            ) : isEditingDoc ? (
-              <RichTextEditor
-                content={editDocContent}
-                onChange={setEditDocContent}
-                placeholder="Start writing your document..."
-                minHeight="300px"
-              />
             ) : (
-              renderContent(previewDocContent, 'prose prose-sm dark:prose-invert max-w-none')
+              <div className="space-y-6">
+                {/* Document Content */}
+                <div className="max-h-[400px] overflow-y-auto border rounded-lg p-4 bg-default-50">
+                  {isEditingDoc ? (
+                    <RichTextEditor
+                      content={editDocContent}
+                      onChange={setEditDocContent}
+                      placeholder="Start writing your document..."
+                      minHeight="300px"
+                    />
+                  ) : (
+                    renderContent(previewDocContent, 'prose prose-sm dark:prose-invert max-w-none')
+                  )}
+                </div>
+                
+                {/* Comments Section */}
+                {!isEditingDoc && (
+                  <div className="border-t pt-4">
+                    <h4 className="text-sm font-semibold mb-3 flex items-center gap-2">
+                      <MessageSquare className="w-4 h-4" />
+                      Comments ({previewDocComments.length})
+                    </h4>
+                    
+                    {/* Comments List */}
+                    {previewDocComments.length > 0 && (
+                      <div className="space-y-3 max-h-[200px] overflow-y-auto mb-4">
+                        {previewDocComments.map((comment) => (
+                          <div 
+                            key={comment.id} 
+                            className={`p-3 rounded-lg ${
+                              comment.comment_type === 'status_change' 
+                                ? 'bg-primary-50 dark:bg-primary-900/20 border border-primary-200 dark:border-primary-800' 
+                                : 'bg-default-100'
+                            }`}
+                          >
+                            <div className="flex items-center gap-2 mb-1">
+                              <span className="text-sm font-medium">{comment.author_name}</span>
+                              <span className="text-xs text-default-400">
+                                {new Date(comment.created_at).toLocaleDateString()}
+                              </span>
+                            </div>
+                            <p className="text-sm text-default-600">{comment.content}</p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                    
+                    {/* Add Comment */}
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="Add a comment..."
+                        value={newDocComment}
+                        onValueChange={setNewDocComment}
+                        size="sm"
+                        className="flex-1"
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' && newDocComment.trim()) {
+                            handlePostDocComment()
+                          }
+                        }}
+                      />
+                      <Button 
+                        size="sm" 
+                        color="primary" 
+                        isIconOnly
+                        isLoading={postingComment}
+                        isDisabled={!newDocComment.trim()}
+                        onPress={handlePostDocComment}
+                      >
+                        <Send className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  </div>
+                )}
+              </div>
             )}
           </ModalBody>
-          <ModalFooter>
-            <Button variant="flat" onPress={onDocPreviewClose}>Close</Button>
-            {isEditingDoc ? (
-              <>
-                <Button variant="flat" onPress={() => setIsEditingDoc(false)}>Cancel</Button>
-                <Button color="primary" onPress={handleSaveDocContent} isLoading={savingDoc}>
-                  Save
-                </Button>
-              </>
-            ) : (
-              <Button color="primary" onPress={() => { setEditDocContent(previewDocContent); setIsEditingDoc(true) }}>
-                Edit
-              </Button>
-            )}
+          <ModalFooter className="border-t">
+            <div className="flex items-center justify-between w-full">
+              <div className="flex gap-2">
+                {!isEditingDoc && previewDocStatus !== 'approved' && (
+                  <>
+                    <Button 
+                      size="sm"
+                      color="warning" 
+                      variant="flat"
+                      startContent={<RotateCcw className="w-4 h-4" />}
+                      isLoading={updatingDocStatus}
+                      onPress={() => handleUpdateDocStatus('needs_revision')}
+                    >
+                      Send for Revision
+                    </Button>
+                    <Button 
+                      size="sm"
+                      color="success" 
+                      variant="flat"
+                      startContent={<CheckCircle2 className="w-4 h-4" />}
+                      isLoading={updatingDocStatus}
+                      onPress={() => handleUpdateDocStatus('approved')}
+                    >
+                      Approve
+                    </Button>
+                  </>
+                )}
+              </div>
+              <div className="flex gap-2">
+                <Button variant="flat" onPress={onDocPreviewClose}>Close</Button>
+                {isEditingDoc ? (
+                  <>
+                    <Button variant="flat" onPress={() => setIsEditingDoc(false)}>Cancel</Button>
+                    <Button color="primary" onPress={handleSaveDocContent} isLoading={savingDoc}>
+                      Save
+                    </Button>
+                  </>
+                ) : (
+                  <Button color="primary" variant="flat" onPress={() => { setEditDocContent(previewDocContent); setIsEditingDoc(true) }}>
+                    Edit in Modal
+                  </Button>
+                )}
+              </div>
+            </div>
           </ModalFooter>
         </ModalContent>
       </Modal>
