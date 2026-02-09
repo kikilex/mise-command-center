@@ -251,7 +251,8 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
         .from('documents')
         .select(`
           *,
-          tasks:task_id (id, title)
+          tasks:task_id (id, title),
+          creator:created_by (id, name, display_name, avatar_url)
         `)
         .eq('id', id)
         .single()
@@ -988,6 +989,17 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
           </h1>
           
           <div className="flex flex-wrap items-center gap-4 text-sm text-slate-500 dark:text-slate-400">
+            {(document as any).creator && (
+              <div className="flex items-center gap-2">
+                <Avatar 
+                  src={(document as any).creator.avatar_url} 
+                  name={(document as any).creator.display_name || (document as any).creator.name} 
+                  size="sm" 
+                  className="w-5 h-5" 
+                />
+                <span>Created by {(document as any).creator.display_name || (document as any).creator.name}</span>
+              </div>
+            )}
             <span>Updated {formatDate(document.updated_at)}</span>
           </div>
         </div>

@@ -51,6 +51,7 @@ interface Document {
   doc_type: 'document' | 'note'
   tasks?: { title: string } | null
   projects?: { name: string } | null
+  creator?: { id: string; name: string; display_name: string; avatar_url: string } | null
 }
 
 interface Project {
@@ -228,7 +229,7 @@ function DocsPageContent() {
     try {
       const { data, error } = await supabase
         .from('documents')
-        .select(`*, tasks:task_id (title), projects:project_id (name)`)
+        .select(`*, tasks:task_id (title), projects:project_id (name), creator:created_by (id, name, display_name, avatar_url)`)
         .order('updated_at', { ascending: false })
 
       if (error) throw error
@@ -588,7 +589,13 @@ function DocsPageContent() {
                   </div>
                   <p className="text-sm text-slate-500 line-clamp-3 mb-3">{getPreview(doc.content)}</p>
                   <div className="flex items-center justify-between text-[10px] text-slate-400">
-                    <div className="flex items-center gap-2">
+                    <div className="flex items-center gap-3">
+                      {doc.creator && (
+                        <div className="flex items-center gap-1">
+                          <Avatar src={doc.creator.avatar_url} name={doc.creator.display_name || doc.creator.name} size="sm" className="w-4 h-4" />
+                          <span>{doc.creator.display_name || doc.creator.name}</span>
+                        </div>
+                      )}
                       <span>{new Date(doc.updated_at).toLocaleDateString()}</span>
                       {doc.project_id && doc.projects && (
                         <span className="flex items-center gap-1 text-violet-500">
