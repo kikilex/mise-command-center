@@ -127,6 +127,8 @@ interface ProjectPin {
   pin_type: string
   url: string | null
   notes?: string | null
+  created_by?: string | null
+  creator?: { id: string; name: string; display_name: string; avatar_url: string } | null
 }
 
 interface Project {
@@ -375,10 +377,10 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
       }))
       setPhases(sortedPhases)
 
-      // Load pins
+      // Load pins with creator info
       const { data: pinsData } = await supabase
         .from('project_pins')
-        .select('*')
+        .select('*, creator:created_by (id, name, display_name, avatar_url)')
         .eq('project_id', id)
         .order('position')
       setPins(pinsData || [])
@@ -1602,6 +1604,12 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                         )}
                         {isNote && noteSnippet && (
                           <p className="text-xs text-default-500 mt-1 line-clamp-2">{noteSnippet}</p>
+                        )}
+                        {pin.creator && (
+                          <div className="flex items-center gap-1 mt-1">
+                            <Avatar src={pin.creator.avatar_url} name={pin.creator.display_name || pin.creator.name} size="sm" className="w-3 h-3" />
+                            <span className="text-[10px] text-default-400">{pin.creator.display_name || pin.creator.name}</span>
+                          </div>
                         )}
                       </div>
                       <div 
