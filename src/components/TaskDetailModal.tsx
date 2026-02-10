@@ -188,17 +188,28 @@ export default function TaskDetailModal({
   // Load task data and dropdown options when modal opens
   useEffect(() => {
     if (task && isOpen) {
-      setFormData({
-        title: task.title || '',
-        description: task.description || '',
-        status: task.status || 'todo',
-        priority: task.priority || 'medium',
-        due_date: task.due_date ? task.due_date.split('T')[0] : '',
-        assignee_id: task.assignee_id || '',
-        ai_agent: task.ai_agent || '',
-        project_id: task.project_id || '',
-        space_id: task.space_id || '',
-      })
+      // Fetch fresh task data to ensure we have latest notes/description
+      const loadFreshTask = async () => {
+        const { data: freshTask } = await supabase
+          .from('tasks')
+          .select('*')
+          .eq('id', task.id)
+          .single()
+        
+        const taskData = freshTask || task
+        setFormData({
+          title: taskData.title || '',
+          description: taskData.description || '',
+          status: taskData.status || 'todo',
+          priority: taskData.priority || 'medium',
+          due_date: taskData.due_date ? taskData.due_date.split('T')[0] : '',
+          assignee_id: taskData.assignee_id || '',
+          ai_agent: taskData.ai_agent || '',
+          project_id: taskData.project_id || '',
+          space_id: taskData.space_id || '',
+        })
+      }
+      loadFreshTask()
       setIsEditing(false) // Reset to read-only mode when modal opens
       loadFiles(task.id)
       loadDropdownData(task.space_id)
