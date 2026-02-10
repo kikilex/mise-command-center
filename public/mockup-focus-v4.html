@@ -1,0 +1,387 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard - Focus Queue V4</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @keyframes confetti-fall { 0% { transform: translateY(-100%) rotate(0deg); opacity: 1; } 100% { transform: translateY(100vh) rotate(720deg); opacity: 0; } }
+    .confetti { position: fixed; width: 10px; height: 10px; top: -10px; animation: confetti-fall 3s ease-out forwards; z-index: 9999; }
+    @keyframes money-fall { 0% { transform: translateY(-50px) rotate(0deg); opacity: 1; } 100% { transform: translateY(100vh) rotate(360deg); opacity: 0; } }
+    .money { position: fixed; font-size: 30px; top: -50px; animation: money-fall 2.5s ease-out forwards; z-index: 9999; }
+    @keyframes firework { 0% { transform: scale(0); opacity: 1; } 50% { transform: scale(1); opacity: 1; } 100% { transform: scale(1.5); opacity: 0; } }
+    .firework { position: fixed; font-size: 60px; animation: firework 1s ease-out forwards; z-index: 9999; }
+    @keyframes shake { 0%, 100% { transform: translateX(0); } 25% { transform: translateX(-5px); } 75% { transform: translateX(5px); } }
+    .shake { animation: shake 0.3s ease-in-out; }
+    @keyframes trophy-popup { 0% { transform: scale(0) rotate(-10deg); opacity: 0; } 50% { transform: scale(1.2) rotate(5deg); opacity: 1; } 100% { transform: scale(1) rotate(0deg); opacity: 1; } }
+    .trophy-popup { animation: trophy-popup 0.5s ease-out forwards; }
+    @keyframes fire-float { 0%, 100% { transform: translateY(0) scale(1); } 50% { transform: translateY(-4px) scale(1.05); } }
+    .fire-float { animation: fire-float 0.8s ease-in-out infinite; }
+    @keyframes flame-flicker { 0%, 100% { opacity: 0.8; transform: scaleY(1); } 50% { opacity: 1; transform: scaleY(1.1); } }
+    .flame-flicker { animation: flame-flicker 0.3s ease-in-out infinite; }
+    @keyframes legendary-flash { 0%, 100% { opacity: 0; } 50% { opacity: 1; } }
+    .legendary-flash { animation: legendary-flash 0.1s ease-in-out 5; }
+    @keyframes pulse-border { 0%, 100% { box-shadow: 0 0 0 0 rgba(245, 158, 11, 0.7); } 50% { box-shadow: 0 0 0 10px rgba(245, 158, 11, 0); } }
+    .pulse-border { animation: pulse-border 1.5s ease-in-out infinite; }
+    @keyframes hype-pop { 0% { transform: scale(0); opacity: 0; } 50% { transform: scale(1.1); } 100% { transform: scale(1); opacity: 1; } }
+    .hype-pop { animation: hype-pop 0.4s ease-out forwards; }
+    @keyframes hype-float { 0% { transform: translateY(0); opacity: 1; } 100% { transform: translateY(-50px); opacity: 0; } }
+    .hype-float { animation: hype-float 2s ease-out forwards; }
+    .fire-off { filter: grayscale(1) opacity(0.3); }
+    .fire-low { filter: grayscale(0.3) opacity(0.7); }
+    .fire-high { filter: brightness(1.1) saturate(1.2); }
+    .fire-legendary { filter: brightness(1.3) saturate(1.5) drop-shadow(0 0 8px rgba(245, 158, 11, 0.8)); animation: flame-flicker 0.2s ease-in-out infinite; }
+  </style>
+</head>
+<body class="bg-slate-50 min-h-screen font-sans">
+  <nav class="bg-white border-b border-slate-200 px-6 py-3 sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto flex items-center justify-between">
+      <div class="flex items-center gap-3"><div class="w-8 h-8 bg-violet-600 rounded-lg flex items-center justify-center"><span class="text-white font-bold text-sm">M</span></div><span class="font-bold text-slate-800">Mise Command Center</span></div>
+      <div class="flex items-center gap-4"><button class="text-slate-500 hover:text-slate-700">Tasks</button><button class="text-slate-500 hover:text-slate-700">Projects</button><button class="text-slate-500 hover:text-slate-700">AI</button><div class="w-8 h-8 bg-gradient-to-br from-violet-500 to-purple-600 rounded-full"></div></div>
+    </div>
+  </nav>
+  <main class="max-w-7xl mx-auto px-6 py-8">
+    <div class="flex flex-col lg:flex-row gap-8">
+      <div class="flex-1 space-y-6">
+        <!-- Fire Bar -->
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden transition-all duration-500" id="fireCard">
+          <div class="bg-slate-50 px-6 py-4 border-b border-slate-200 flex items-center justify-between">
+            <div class="flex items-center gap-3"><div class="w-10 h-10 rounded-xl flex items-center justify-center transition-all duration-500" id="fireIcon" style="background: linear-gradient(135deg, #94a3b8, #64748b);"><span class="text-xl">🔥</span></div><div><h2 class="font-bold text-slate-800">Today's Progress</h2><p class="text-xs text-slate-500" id="fireSubtitle">Light your first fire!</p></div></div>
+            <div class="text-right"><div class="text-2xl font-bold" id="fireCount"><span class="text-slate-300">0</span> <span class="text-slate-400">/ 8</span></div></div>
+          </div>
+          <div class="px-6 py-5">
+            <div class="relative"><div class="h-14 bg-slate-200 rounded-xl overflow-hidden relative"><div class="h-full transition-all duration-700 ease-out rounded-xl" id="fireProgress" style="width: 0%; background: #cbd5e1;"></div></div><div class="absolute inset-0 flex items-center justify-between px-3" id="fireEmojis"></div><div class="absolute -right-2 -top-2 bg-gradient-to-r from-yellow-400 to-amber-500 text-white text-sm font-bold px-3 py-1 rounded-full shadow-lg hidden" id="exceededBadge"><span id="exceededCount">+0</span> 💎</div></div>
+            <div class="mt-4 flex gap-2 justify-center"><button onclick="setFireLevel(0)" class="px-3 py-1 bg-slate-200 rounded-lg text-xs">0</button><button onclick="setFireLevel(2)" class="px-3 py-1 bg-slate-200 rounded-lg text-xs">2</button><button onclick="setFireLevel(5)" class="px-3 py-1 bg-orange-200 rounded-lg text-xs">5</button><button onclick="setFireLevel(8)" class="px-3 py-1 bg-red-200 rounded-lg text-xs">8 ✅</button><button onclick="setFireLevel(12)" class="px-3 py-1 bg-yellow-300 rounded-lg text-xs font-bold">12 👑</button></div>
+          </div>
+        </div>
+        <!-- Focus Queue -->
+        <div class="bg-white rounded-2xl border-2 border-violet-500 shadow-lg overflow-hidden">
+          <div class="bg-gradient-to-r from-violet-600 to-purple-600 px-6 py-4 flex items-center justify-between"><div class="flex items-center gap-3"><div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center"><span class="text-xl">⚡</span></div><div><h2 class="font-bold text-white">Focus Queue</h2><p class="text-xs text-violet-200">2 of 5 • Stay locked in</p></div></div><div class="flex gap-1.5"><div class="w-3 h-3 bg-green-400 rounded-full"></div><div class="w-3 h-3 bg-yellow-400 rounded-full animate-pulse"></div><div class="w-3 h-3 bg-white/30 rounded-full"></div><div class="w-3 h-3 bg-white/30 rounded-full"></div><div class="w-3 h-3 bg-white/30 rounded-full"></div></div></div>
+          <div class="p-6"><div class="flex items-start justify-between mb-4"><div><div class="flex items-center gap-2 mb-2"><span class="px-2 py-0.5 bg-red-100 text-red-600 text-xs rounded-full font-medium">HIGH</span><span class="px-2 py-0.5 bg-violet-100 text-violet-600 text-xs rounded-full font-medium">Faithstone</span></div><h3 class="text-lg font-bold text-slate-800">Review TikTok content batch for Mom's approval</h3><p class="text-slate-500 text-sm mt-1">Check the 5 prayer videos before posting.</p></div></div><div class="flex items-center justify-center my-6"><div class="bg-slate-100 rounded-2xl px-8 py-4"><div class="text-4xl font-mono font-bold text-slate-800">23<span class="text-slate-400">:</span>47</div><div class="text-center text-xs text-slate-500 mt-1">Time on task</div></div></div><div class="flex items-center justify-center gap-3"><button class="px-5 py-2.5 bg-slate-200 hover:bg-slate-300 rounded-xl font-medium text-slate-700">⏸ Pause</button><button id="doneBtn" class="px-8 py-2.5 bg-green-500 hover:bg-green-600 rounded-xl font-bold text-white text-lg shadow-lg shadow-green-500/30">✓ Done</button></div><div class="mt-6 pt-4 border-t border-slate-200"><div class="text-xs text-slate-400 uppercase font-medium mb-2">Up Next</div><div class="flex items-center gap-3 text-slate-600"><div class="w-7 h-7 bg-slate-200 rounded-lg flex items-center justify-center text-sm font-medium">3</div><span>Create Spanish translation brief</span><span class="ml-auto text-xs bg-yellow-100 text-yellow-700 px-2 py-0.5 rounded-full">MEDIUM</span></div></div></div>
+        </div>
+        <!-- What's Next -->
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div class="bg-slate-50 px-6 py-4 border-b border-slate-200 flex items-center justify-between"><div class="flex items-center gap-3"><div class="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center"><span class="text-xl">🎯</span></div><div><h2 class="font-bold text-slate-800">What's Next</h2><p class="text-xs text-slate-500">4 projects with tasks</p></div></div><button class="text-violet-600 text-sm font-medium hover:underline">All Tasks →</button></div>
+          <div class="p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
+            <div class="relative p-4 rounded-xl border-2 bg-slate-50 border-slate-200 hover:border-emerald-300 cursor-pointer hover:shadow-md"><button class="absolute top-2 right-2 w-7 h-7 rounded-full bg-amber-100 text-amber-500 flex items-center justify-center">★</button><div class="flex items-start gap-2 mb-3 pr-8"><span class="text-xl">📘</span><div><h3 class="font-bold text-slate-800">SWP Extended Edition</h3><p class="text-xs text-slate-500">12/45 tasks</p></div></div><div class="mb-3"><div class="flex items-center justify-between text-xs mb-1"><span class="text-slate-500">Progress</span><span class="font-bold text-slate-700">27%</span></div><div class="h-2 bg-slate-200 rounded-full overflow-hidden"><div class="h-full bg-violet-500 rounded-full" style="width: 27%"></div></div></div><div class="bg-white rounded-lg p-3 border border-slate-100"><p class="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Next Up</p><p class="text-sm text-slate-700">Write 5 prayers for Marriage</p><button class="mt-2 w-full px-3 py-1.5 bg-violet-100 text-violet-700 rounded-lg text-sm font-medium hover:bg-violet-200">Jump In →</button></div></div>
+            <div class="relative p-4 rounded-xl border-2 bg-slate-50 border-slate-200 hover:border-emerald-300 cursor-pointer hover:shadow-md"><button class="absolute top-2 right-2 w-7 h-7 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center">☆</button><div class="flex items-start gap-2 mb-3 pr-8"><span class="text-xl">🇪🇸</span><div><h3 class="font-bold text-slate-800">Spanish Translation</h3><p class="text-xs text-slate-500">2/8 tasks</p></div></div><div class="mb-3"><div class="flex items-center justify-between text-xs mb-1"><span class="text-slate-500">Progress</span><span class="font-bold text-slate-700">25%</span></div><div class="h-2 bg-slate-200 rounded-full overflow-hidden"><div class="h-full bg-violet-500 rounded-full" style="width: 25%"></div></div></div><div class="bg-white rounded-lg p-3 border border-slate-100"><p class="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Next Up</p><p class="text-sm text-slate-700">Finalize translator</p><button class="mt-2 w-full px-3 py-1.5 bg-violet-100 text-violet-700 rounded-lg text-sm font-medium hover:bg-violet-200">Jump In →</button></div></div>
+            <div class="relative p-4 rounded-xl border-2 bg-slate-50 border-slate-200 hover:border-emerald-300 cursor-pointer hover:shadow-md"><button class="absolute top-2 right-2 w-7 h-7 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center">☆</button><div class="flex items-start gap-2 mb-3 pr-8"><span class="text-xl">📱</span><div><h3 class="font-bold text-slate-800">TikTok Shop Videos</h3><p class="text-xs text-slate-500">8/15 tasks</p></div></div><div class="mb-3"><div class="flex items-center justify-between text-xs mb-1"><span class="text-slate-500">Progress</span><span class="font-bold text-slate-700">53%</span></div><div class="h-2 bg-slate-200 rounded-full overflow-hidden"><div class="h-full bg-violet-500 rounded-full" style="width: 53%"></div></div></div><div class="bg-white rounded-lg p-3 border border-slate-100"><p class="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Next Up</p><p class="text-sm text-slate-700">Record prayer voiceovers</p><button class="mt-2 w-full px-3 py-1.5 bg-violet-100 text-violet-700 rounded-lg text-sm font-medium hover:bg-violet-200">Jump In →</button></div></div>
+            <div class="relative p-4 rounded-xl border-2 bg-emerald-50 border-emerald-200 cursor-pointer hover:shadow-md"><button class="absolute top-2 right-2 w-7 h-7 rounded-full bg-slate-100 text-slate-400 flex items-center justify-center">☆</button><div class="flex items-start gap-2 mb-3 pr-8"><span class="text-xl">⚖️</span><div><h3 class="font-bold text-slate-800">A&P Takedown</h3><p class="text-xs text-slate-500">20/20 tasks</p></div></div><div class="mb-3"><div class="flex items-center justify-between text-xs mb-1"><span class="text-slate-500">Progress</span><span class="font-bold text-emerald-600">100%</span></div><div class="h-2 bg-emerald-200 rounded-full overflow-hidden"><div class="h-full bg-emerald-500 rounded-full" style="width: 100%"></div></div></div><div class="bg-emerald-100 rounded-lg p-3 text-center"><p class="text-sm text-emerald-700 font-medium">🎉 All done!</p></div></div>
+          </div>
+        </div>
+        <!-- Brain Dump -->
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div class="bg-slate-50 px-6 py-4 border-b border-slate-200 flex items-center gap-3"><div class="w-10 h-10 rounded-xl bg-pink-500 flex items-center justify-center"><span class="text-xl">🧠</span></div><div><h2 class="font-bold text-slate-800">Brain Dump</h2><p class="text-xs text-slate-500">Get it out of your head</p></div></div>
+          <div class="p-4"><textarea placeholder="Dump your thoughts here... Ax will organize them." class="w-full h-24 bg-slate-50 rounded-xl p-4 text-sm border border-slate-200 focus:border-violet-500 outline-none resize-none"></textarea><div class="flex justify-end mt-3"><button class="px-4 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-xl font-medium">Dump It 🧠</button></div></div>
+        </div>
+      </div>
+      <!-- Sidebar -->
+      <div class="w-full lg:w-80 space-y-6">
+        <!-- Me vs Last Week -->
+        <div class="bg-gradient-to-br from-violet-600 via-purple-600 to-indigo-700 rounded-2xl p-5 text-white shadow-lg">
+          <div class="flex items-center justify-between mb-4"><span class="text-sm font-medium text-violet-200">This Week</span><span class="text-xs bg-white/20 px-2 py-0.5 rounded-full">vs Last Week</span></div>
+          <div class="flex items-end justify-between"><div><div class="text-5xl font-black">47</div><div class="text-violet-200 text-sm mt-1">💰 Money Bags</div></div><div class="text-right"><div class="text-2xl font-bold text-violet-200 line-through opacity-60">39</div><div class="flex items-center gap-1 mt-2"><span class="bg-green-400 text-green-900 text-sm font-bold px-2 py-0.5 rounded-full">↑ 21%</span></div></div></div>
+          <div class="mt-4 pt-4 border-t border-white/20"><div class="flex items-center justify-between text-sm"><span class="text-violet-200">Best day:</span><span class="font-bold">Tuesday (12 💰)</span></div></div>
+        </div>
+        <!-- Queue -->
+        <div class="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
+          <div class="px-5 py-4 border-b border-slate-200 flex items-center justify-between"><span class="font-bold text-slate-800">Today's Queue</span><button class="text-xs text-violet-600 hover:underline">Edit</button></div>
+          <div class="p-3 space-y-2">
+            <div class="flex items-center gap-3 p-2.5 bg-green-50 border border-green-200 rounded-xl"><div class="w-6 h-6 bg-green-500 rounded-full flex items-center justify-center text-white text-xs">✓</div><span class="text-slate-500 line-through text-sm">Write 3 prayer hooks</span><span class="ml-auto text-xs text-slate-400">18m</span></div>
+            <div class="flex items-center gap-3 p-2.5 bg-violet-50 border border-violet-300 rounded-xl"><div class="w-6 h-6 bg-violet-500 rounded-full flex items-center justify-center text-white text-xs font-bold">2</div><span class="text-slate-800 font-medium text-sm">Review TikTok content...</span><span class="ml-auto text-xs text-violet-600 font-medium">NOW</span></div>
+            <div class="flex items-center gap-3 p-2.5 rounded-xl hover:bg-slate-50"><div class="w-6 h-6 bg-slate-200 rounded-full flex items-center justify-center text-slate-600 text-xs">3</div><span class="text-slate-600 text-sm">Spanish translation brief</span></div>
+            <div class="flex items-center gap-3 p-2.5 rounded-xl hover:bg-slate-50"><div class="w-6 h-6 bg-slate-200 rounded-full flex items-center justify-center text-slate-600 text-xs">4</div><span class="text-slate-600 text-sm">Review Mom's DMCA</span></div>
+            <div class="flex items-center gap-3 p-2.5 rounded-xl hover:bg-slate-50"><div class="w-6 h-6 bg-slate-200 rounded-full flex items-center justify-center text-slate-600 text-xs">5</div><span class="text-slate-600 text-sm">Check Neo's store</span></div>
+          </div>
+        </div>
+        <!-- Break -->
+        <div class="bg-blue-50 border border-blue-200 rounded-2xl p-4"><div class="flex items-center gap-3"><span class="text-2xl">🧘</span><div><div class="font-medium text-blue-800">Break in 1 task</div><div class="text-xs text-blue-600">Stretch those legs</div></div></div></div>
+        <!-- Sound Toggle -->
+        <div class="bg-slate-100 rounded-2xl p-4">
+          <div class="flex items-center justify-between mb-3">
+            <span class="text-xs text-slate-500 uppercase font-medium">Sound Effects</span>
+            <button id="soundToggle" onclick="toggleSound()" class="px-3 py-1 bg-green-500 text-white rounded-lg text-xs font-medium">🔊 ON</button>
+          </div>
+          <div class="grid grid-cols-2 gap-2">
+            <button onclick="showConfetti()" class="px-3 py-2 bg-white rounded-xl text-sm font-medium hover:bg-slate-50 border border-slate-200">🎊 Confetti</button>
+            <button onclick="showMoney()" class="px-3 py-2 bg-white rounded-xl text-sm font-medium hover:bg-slate-50 border border-slate-200">💰 Money</button>
+            <button onclick="showFireworks()" class="px-3 py-2 bg-white rounded-xl text-sm font-medium hover:bg-slate-50 border border-slate-200">🎆 Fireworks</button>
+            <button onclick="showTrophy()" class="px-3 py-2 bg-white rounded-xl text-sm font-medium hover:bg-slate-50 border border-slate-200">🏆 Trophy</button>
+            <button onclick="showLegendary()" class="px-3 py-2 bg-gradient-to-r from-yellow-400 to-amber-500 rounded-xl text-sm font-bold text-white col-span-2 shadow-lg">💎 LEGENDARY</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+  <div id="confetti-container"></div>
+  <div id="hype-container" class="fixed inset-0 flex items-center justify-center pointer-events-none z-50" style="display:none;"><div class="text-center hype-pop" id="hypeText"><div class="text-5xl font-black text-white drop-shadow-[0_4px_20px_rgba(0,0,0,0.5)]" style="text-shadow: 0 0 30px rgba(34, 197, 94, 0.8), 0 0 60px rgba(34, 197, 94, 0.5);"></div></div></div>
+  <div id="legendary-container" class="fixed inset-0 flex items-center justify-center pointer-events-none z-50" style="display:none;"><div class="fixed inset-0 bg-yellow-400/30 legendary-flash"></div><div class="text-center z-10 hype-pop"><div class="bg-gradient-to-r from-yellow-400 via-amber-500 to-yellow-400 text-black font-black text-4xl px-12 py-4 rounded-xl shadow-2xl">⚡ LEGENDARY ⚡</div><div class="text-7xl mt-4">💎👑💎</div><div class="text-3xl font-black text-white mt-4 drop-shadow-lg" id="legendaryText"></div></div></div>
+  
+  <script>
+    // Audio context for sounds
+    let audioCtx = null;
+    let soundEnabled = true;
+    
+    function initAudio() {
+      if (!audioCtx) audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    }
+    
+    function toggleSound() {
+      soundEnabled = !soundEnabled;
+      const btn = document.getElementById('soundToggle');
+      btn.textContent = soundEnabled ? '🔊 ON' : '🔇 OFF';
+      btn.className = soundEnabled ? 'px-3 py-1 bg-green-500 text-white rounded-lg text-xs font-medium' : 'px-3 py-1 bg-slate-400 text-white rounded-lg text-xs font-medium';
+    }
+    
+    function playSound(type) {
+      if (!soundEnabled) return;
+      initAudio();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      
+      if (type === 'pop') {
+        osc.frequency.setValueAtTime(600, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(200, audioCtx.currentTime + 0.1);
+        gain.gain.setValueAtTime(0.3, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.1);
+        osc.start(); osc.stop(audioCtx.currentTime + 0.1);
+      } else if (type === 'cha-ching') {
+        osc.frequency.setValueAtTime(1200, audioCtx.currentTime);
+        osc.frequency.setValueAtTime(1600, audioCtx.currentTime + 0.1);
+        osc.frequency.setValueAtTime(2000, audioCtx.currentTime + 0.2);
+        gain.gain.setValueAtTime(0.2, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+        osc.start(); osc.stop(audioCtx.currentTime + 0.3);
+      } else if (type === 'boom') {
+        osc.type = 'sawtooth';
+        osc.frequency.setValueAtTime(150, audioCtx.currentTime);
+        osc.frequency.exponentialRampToValueAtTime(50, audioCtx.currentTime + 0.3);
+        gain.gain.setValueAtTime(0.4, audioCtx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + 0.3);
+        osc.start(); osc.stop(audioCtx.currentTime + 0.3);
+      } else if (type === 'victory') {
+        const notes = [523, 659, 784, 1047];
+        notes.forEach((freq, i) => {
+          const o = audioCtx.createOscillator();
+          const g = audioCtx.createGain();
+          o.connect(g); g.connect(audioCtx.destination);
+          o.frequency.value = freq;
+          g.gain.setValueAtTime(0.2, audioCtx.currentTime + i * 0.1);
+          g.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + i * 0.1 + 0.2);
+          o.start(audioCtx.currentTime + i * 0.1);
+          o.stop(audioCtx.currentTime + i * 0.1 + 0.2);
+        });
+      } else if (type === 'legendary') {
+        const notes = [523, 659, 784, 880, 1047, 1319, 1568];
+        notes.forEach((freq, i) => {
+          const o = audioCtx.createOscillator();
+          const g = audioCtx.createGain();
+          o.type = 'square';
+          o.connect(g); g.connect(audioCtx.destination);
+          o.frequency.value = freq;
+          g.gain.setValueAtTime(0.15, audioCtx.currentTime + i * 0.08);
+          g.gain.exponentialRampToValueAtTime(0.01, audioCtx.currentTime + i * 0.08 + 0.3);
+          o.start(audioCtx.currentTime + i * 0.08);
+          o.stop(audioCtx.currentTime + i * 0.08 + 0.3);
+        });
+      }
+    }
+    
+    // Hype messages
+    const hypeMessages = [
+      "FUCK YEAH 🔥",
+      "HELL YEAH BROTHER 💪",
+      "LET'S FUCKING GO 🚀",
+      "MONEY IN THE BANK 💰",
+      "KEEP GOING KING 👑",
+      "UNSTOPPABLE 💥",
+      "THAT'S HOW WE DO IT 🙌",
+      "GET THAT BAG 💵",
+      "CRUSHING IT 🔨",
+      "NO STOPPING NOW ⚡"
+    ];
+    
+    const legendaryMessages = [
+      "YOU'RE A FUCKING BEAST 🦁",
+      "ABSOLUTE LEGEND 👑",
+      "BUILT DIFFERENT 💎",
+      "KING SHIT ONLY 🔥",
+      "UNSTOPPABLE FORCE 💪"
+    ];
+    
+    function showHype(isLegendary = false) {
+      const container = document.getElementById(isLegendary ? 'legendary-container' : 'hype-container');
+      const textEl = document.getElementById(isLegendary ? 'legendaryText' : 'hypeText').querySelector('div') || document.getElementById(isLegendary ? 'legendaryText' : 'hypeText');
+      const messages = isLegendary ? legendaryMessages : hypeMessages;
+      const msg = messages[Math.floor(Math.random() * messages.length)];
+      
+      if (isLegendary) {
+        document.getElementById('legendaryText').textContent = msg;
+      } else {
+        textEl.textContent = msg;
+      }
+      
+      container.style.display = 'flex';
+      setTimeout(() => container.style.display = 'none', isLegendary ? 3500 : 2000);
+    }
+    
+    // Fire bar with color evolution
+    function setFireLevel(count) {
+      const progress = document.getElementById('fireProgress');
+      const emojis = document.getElementById('fireEmojis');
+      const countEl = document.getElementById('fireCount');
+      const subtitle = document.getElementById('fireSubtitle');
+      const badge = document.getElementById('exceededBadge');
+      const exceededCount = document.getElementById('exceededCount');
+      const card = document.getElementById('fireCard');
+      const icon = document.getElementById('fireIcon');
+      
+      emojis.innerHTML = '';
+      const goal = 8;
+      const percent = Math.min((count / goal) * 100, 100);
+      progress.style.width = percent + '%';
+      
+      // Color evolution
+      let barColor, iconBg, cardShadow = '';
+      if (count === 0) {
+        barColor = '#cbd5e1'; // gray
+        iconBg = 'linear-gradient(135deg, #94a3b8, #64748b)';
+      } else if (count <= 2) {
+        barColor = 'linear-gradient(90deg, #fdba74, #fb923c)'; // light orange
+        iconBg = 'linear-gradient(135deg, #fb923c, #f97316)';
+      } else if (count <= 4) {
+        barColor = 'linear-gradient(90deg, #fb923c, #f97316, #ea580c)'; // orange
+        iconBg = 'linear-gradient(135deg, #f97316, #ea580c)';
+      } else if (count <= 6) {
+        barColor = 'linear-gradient(90deg, #f97316, #ea580c, #dc2626)'; // orange-red
+        iconBg = 'linear-gradient(135deg, #ea580c, #dc2626)';
+      } else if (count <= 8) {
+        barColor = 'linear-gradient(90deg, #ea580c, #dc2626, #b91c1c)'; // red
+        iconBg = 'linear-gradient(135deg, #dc2626, #b91c1c)';
+        cardShadow = '0 0 20px rgba(220, 38, 38, 0.3)';
+      } else {
+        barColor = 'linear-gradient(90deg, #fbbf24, #f59e0b, #d97706, #f59e0b, #fbbf24)'; // gold
+        iconBg = 'linear-gradient(135deg, #fbbf24, #f59e0b)';
+        cardShadow = '0 0 40px rgba(245, 158, 11, 0.5)';
+        card.classList.add('pulse-border');
+      }
+      
+      if (count <= 8) card.classList.remove('pulse-border');
+      
+      progress.style.background = barColor;
+      icon.style.background = iconBg;
+      card.style.boxShadow = cardShadow;
+      
+      const countColor = count === 0 ? 'text-slate-300' : count >= goal ? 'text-orange-500' : 'text-orange-400';
+      countEl.innerHTML = '<span class="' + countColor + '">' + count + '</span> <span class="text-slate-400">/ ' + goal + '</span>';
+      
+      if (count === 0) subtitle.textContent = 'Light your first fire!';
+      else if (count < 3) subtitle.textContent = 'Getting warmed up...';
+      else if (count < 6) subtitle.textContent = 'Good momentum! 🔥';
+      else if (count < goal) subtitle.textContent = 'ON FIRE! Keep pushing!';
+      else if (count === goal) subtitle.textContent = 'Goal reached! 🎯';
+      else subtitle.textContent = 'LEGENDARY STATUS! 👑';
+      
+      if (count > goal) { badge.classList.remove('hidden'); exceededCount.textContent = '+' + (count - goal); } 
+      else { badge.classList.add('hidden'); }
+      
+      const displayCount = Math.min(count, 10);
+      for (let i = 0; i < 10; i++) {
+        const div = document.createElement('div');
+        div.className = 'flex-1 flex items-center justify-center';
+        if (i < displayCount) {
+          let cls = '';
+          if (count > goal) cls = 'fire-legendary';
+          else if (count >= 6) cls = 'fire-high fire-float';
+          else if (count >= 3) cls = 'fire-float';
+          else cls = 'fire-low';
+          div.innerHTML = '<span class="text-2xl ' + cls + '" style="animation-delay: ' + (i * 0.1) + 's">🔥</span>';
+        } else { 
+          div.innerHTML = '<div class="w-2.5 h-2.5 rounded-full ' + (count === 0 ? 'bg-slate-300' : 'bg-orange-200') + '"></div>'; 
+        }
+        emojis.appendChild(div);
+      }
+    }
+    
+    setFireLevel(0);
+    
+    function showConfetti() { 
+      playSound('pop');
+      const c = document.getElementById('confetti-container'); 
+      const cols = ['#f59e0b', '#22c55e', '#3b82f6', '#ec4899', '#8b5cf6']; 
+      for (let i = 0; i < 80; i++) { 
+        const d = document.createElement('div'); 
+        d.className = 'confetti'; 
+        d.style.left = Math.random() * 100 + 'vw'; 
+        d.style.backgroundColor = cols[Math.floor(Math.random() * cols.length)]; 
+        d.style.animationDelay = Math.random() * 0.5 + 's'; 
+        d.style.borderRadius = Math.random() > 0.5 ? '50%' : '0'; 
+        c.appendChild(d); 
+        setTimeout(() => d.remove(), 3500); 
+      }
+      showHype();
+    }
+    
+    function showMoney() { 
+      playSound('cha-ching');
+      const c = document.getElementById('confetti-container'); 
+      for (let i = 0; i < 25; i++) { 
+        const m = document.createElement('div'); 
+        m.className = 'money'; 
+        m.textContent = Math.random() > 0.5 ? '💰' : '💵'; 
+        m.style.left = Math.random() * 100 + 'vw'; 
+        m.style.animationDelay = Math.random() * 0.8 + 's'; 
+        c.appendChild(m); 
+        setTimeout(() => m.remove(), 3500); 
+      }
+      showHype();
+    }
+    
+    function showFireworks() { 
+      playSound('boom');
+      const c = document.getElementById('confetti-container'); 
+      const e = ['🎆', '✨', '💥', '🌟']; 
+      for (let i = 0; i < 10; i++) { 
+        setTimeout(() => { 
+          const f = document.createElement('div'); 
+          f.className = 'firework'; 
+          f.textContent = e[Math.floor(Math.random() * e.length)]; 
+          f.style.left = (15 + Math.random() * 70) + 'vw'; 
+          f.style.top = (15 + Math.random() * 50) + 'vh'; 
+          c.appendChild(f); 
+          setTimeout(() => f.remove(), 1500); 
+        }, i * 120); 
+      } 
+      document.body.classList.add('shake'); 
+      setTimeout(() => document.body.classList.remove('shake'), 300);
+      showHype();
+    }
+    
+    function showTrophy() { 
+      playSound('victory');
+      showConfetti(); 
+      showHype();
+    }
+    
+    function showLegendary() { 
+      playSound('legendary');
+      showHype(true);
+      showConfetti(); 
+      setTimeout(() => showMoney(), 300); 
+      setTimeout(() => showFireworks(), 600);
+    }
+    
+    document.getElementById('doneBtn').addEventListener('click', () => { 
+      const r = Math.random(); 
+      if (r < 0.05) showLegendary(); 
+      else if (r < 0.25) showFireworks(); 
+      else if (r < 0.45) showMoney(); 
+      else if (r < 0.70) showTrophy(); 
+      else showConfetti(); 
+    });
+  </script>
+</body>
+</html>
