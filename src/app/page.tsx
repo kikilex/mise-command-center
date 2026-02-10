@@ -23,6 +23,9 @@ import {
   Tabs,
   Tab,
   Progress,
+  Popover,
+  PopoverTrigger,
+  PopoverContent,
 } from "@heroui/react";
 import { useState, useEffect, useMemo } from "react";
 import { createClient } from '@/lib/supabase/client'
@@ -84,6 +87,7 @@ interface Task {
   created_by?: string | null
   updated_at?: string
   created_at?: string
+  focus_queue_order?: number | null
 }
 
 interface InboxItem {
@@ -154,6 +158,7 @@ const priorityOptions = [
 export default function Home() {
   const [user, setUser] = useState<UserData | null>(null);
   const [todaysTasks, setTodaysTasks] = useState<Task[]>([]);
+  const [focusQueue, setFocusQueue] = useState<Task[]>([]);
   const [spaces, setSpaces] = useState<Space[]>([]);
   const [inboxItems, setInboxItems] = useState<InboxItem[]>([]);
   const [messages, setMessages] = useState<InboxItem[]>([]);
@@ -248,7 +253,7 @@ export default function Home() {
         is_admin: profile?.is_admin || false
       });
 
-      const [spacesRes, tasksRes, completedRes, inboxRes, messagesRes, agentsRes, workLogRes, projectsRes, allTasksRes, userCompletedRes] = await Promise.all([
+      const [spacesRes, tasksRes, completedRes, inboxRes, messagesRes, agentsRes, workLogRes, projectsRes, allTasksRes, userCompletedRes, focusQueueRes] = await Promise.all([
         supabase.from('spaces').select('id, name, color, space_members!inner(user_id)').eq('space_members.user_id', authUser.id),
         supabase.from('tasks')
           .select('*')
@@ -280,7 +285,14 @@ export default function Home() {
         // Only tasks where user is assignee, OR unassigned tasks they created
         supabase.from('tasks')
           .select('*')
-          .eq('status', 'done')
+          .eq('status', 'done'),
+        // Focus Queue - tasks user has queued for today
+        supabase.from('tasks')
+          .select('*, project:projects(name, icon)')
+          .neq('status', 'done')
+          .not('focus_queue_order', 'is', null)
+          .or(`created_by.eq.${authUser.id},assignee_id.eq.${authUser.id}`)
+          .order('focus_queue_order', { ascending: true })
       ]);
 
       // Merge latest work log action into agents
@@ -296,6 +308,7 @@ export default function Home() {
 
       setSpaces(spacesRes.data || []);
       setTodaysTasks(tasksRes.data || []);
+      setFocusQueue(focusQueueRes.data || []);
       setCompletedTasks(completedRes.data || []);
       setInboxItems(inboxRes.data || []);
       setMessages(messagesRes.data || []);
@@ -784,9 +797,14 @@ export default function Home() {
 
             {/* ⚡ Focus Queue */}
             <FocusQueue 
-              tasks={todaysTasks.filter(t => t.status !== 'done').slice(0, 5)} 
+              tasks={focusQueue} 
+              todayCompletedCount={todayCompletedCount}
               onTaskComplete={() => loadData()}
               onRefresh={() => loadData()}
+              onRemoveFromQueue={async (taskId) => {
+                await supabase.from('tasks').update({ focus_queue_order: null }).eq('id', taskId)
+                setFocusQueue(prev => prev.filter(t => t.id !== taskId))
+              }}
             />
 
             {/* 🧠 Brain Dump System */}
@@ -986,53 +1004,85 @@ export default function Home() {
               <CardHeader className="bg-slate-50 dark:bg-slate-800/50 px-5 py-4 border-b border-slate-200 dark:border-slate-700">
                 <div className="flex items-center justify-between w-full">
                   <span className="font-bold text-slate-800 dark:text-slate-100">Today's Queue</span>
-                  <Button size="sm" variant="light" radius="full" onPress={() => router.push('/tasks')}>
-                    Edit
-                  </Button>
+                  <div className="flex gap-1">
+                    <Popover placement="bottom-end">
+                      <PopoverTrigger>
+                        <Button size="sm" variant="flat" color="primary" radius="full">
+                          + Add
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-72 p-2">
+                        <div className="text-xs font-medium text-slate-500 mb-2 px-2">Add to queue:</div>
+                        <ScrollShadow className="max-h-64">
+                          {todaysTasks.filter(t => t.status !== 'done' && !focusQueue.some(q => q.id === t.id)).slice(0, 10).map(task => (
+                            <button
+                              key={task.id}
+                              className="w-full text-left px-3 py-2 rounded-lg hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+                              onClick={async () => {
+                                const maxOrder = Math.max(...focusQueue.map(t => t.focus_queue_order || 0), 0)
+                                await supabase.from('tasks').update({ focus_queue_order: maxOrder + 1 }).eq('id', task.id)
+                                loadData()
+                              }}
+                            >
+                              <div className="text-sm text-slate-700 dark:text-slate-300 truncate">{task.title}</div>
+                              <div className="text-xs text-slate-400">{task.priority} priority</div>
+                            </button>
+                          ))}
+                          {todaysTasks.filter(t => t.status !== 'done' && !focusQueue.some(q => q.id === t.id)).length === 0 && (
+                            <div className="text-center py-4 text-slate-400 text-sm">All tasks queued!</div>
+                          )}
+                        </ScrollShadow>
+                      </PopoverContent>
+                    </Popover>
+                  </div>
                 </div>
               </CardHeader>
               <CardBody className="p-3 space-y-2">
-                {todaysTasks.slice(0, 5).map((task, idx) => {
-                  const isCompleted = task.status === 'done'
-                  const isCurrent = idx === 0 && !isCompleted
+                {focusQueue.map((task, idx) => {
+                  const isCurrent = idx === 0
                   return (
                     <div 
                       key={task.id}
-                      className={`flex items-center gap-3 p-2.5 rounded-xl transition-colors ${
-                        isCompleted 
-                          ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800' 
-                          : isCurrent 
-                            ? 'bg-violet-50 dark:bg-violet-900/20 border border-violet-300 dark:border-violet-700' 
-                            : ''
+                      className={`flex items-center gap-3 p-2.5 rounded-xl transition-colors group ${
+                        isCurrent 
+                          ? 'bg-violet-50 dark:bg-violet-900/20 border border-violet-300 dark:border-violet-700' 
+                          : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'
                       }`}
                     >
                       <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                        isCompleted 
-                          ? 'bg-green-500 text-white' 
-                          : isCurrent 
-                            ? 'bg-violet-500 text-white' 
-                            : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400'
+                        isCurrent 
+                          ? 'bg-violet-500 text-white' 
+                          : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400'
                       }`}>
-                        {isCompleted ? '✓' : idx + 1}
+                        {idx + 1}
                       </div>
                       <span className={`flex-1 text-sm truncate ${
-                        isCompleted 
-                          ? 'text-slate-500 line-through' 
-                          : isCurrent 
-                            ? 'text-slate-800 dark:text-slate-100 font-medium' 
-                            : 'text-slate-600 dark:text-slate-400'
+                        isCurrent 
+                          ? 'text-slate-800 dark:text-slate-100 font-medium' 
+                          : 'text-slate-600 dark:text-slate-400'
                       }`}>
                         {task.title}
                       </span>
                       {isCurrent && (
                         <span className="text-xs text-violet-600 dark:text-violet-400 font-medium">NOW</span>
                       )}
+                      <button 
+                        className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-red-500 transition-all"
+                        onClick={async () => {
+                          await supabase.from('tasks').update({ focus_queue_order: null }).eq('id', task.id)
+                          setFocusQueue(prev => prev.filter(t => t.id !== task.id))
+                        }}
+                        title="Remove from queue"
+                      >
+                        ×
+                      </button>
                     </div>
                   )
                 })}
-                {todaysTasks.length === 0 && (
-                  <div className="text-center py-8">
-                    <p className="text-slate-400 text-sm">No tasks for today</p>
+                {focusQueue.length === 0 && (
+                  <div className="text-center py-6">
+                    <p className="text-slate-400 text-sm mb-2">Queue is empty</p>
+                    <p className="text-slate-500 text-xs">Add tasks from your task list</p>
                   </div>
                 )}
               </CardBody>

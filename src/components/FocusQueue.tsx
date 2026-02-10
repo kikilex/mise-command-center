@@ -36,6 +36,7 @@ interface FocusQueueProps {
   todayCompletedCount?: number
   onTaskComplete?: (taskId: string) => void
   onRefresh?: () => void
+  onRemoveFromQueue?: (taskId: string) => Promise<void>
 }
 
 const SESSION_EMOJIS = ['🎯', '⚡', '🔥', '💪', '🚀', '💎', '👑', '🦁', '⭐', '🏆']
@@ -51,7 +52,7 @@ const BREAK_MESSAGES = [
   { text: "Walk it off", emoji: "🚶" },
 ]
 
-export default function FocusQueue({ tasks, todayCompletedCount = 0, onTaskComplete, onRefresh }: FocusQueueProps) {
+export default function FocusQueue({ tasks, todayCompletedCount = 0, onTaskComplete, onRefresh, onRemoveFromQueue }: FocusQueueProps) {
   const [currentTaskIndex, setCurrentTaskIndex] = useState(0)
   const [timerState, setTimerState] = useState<'stopped' | 'running' | 'paused'>('stopped')
   const [sessionCount, setSessionCount] = useState(1)
