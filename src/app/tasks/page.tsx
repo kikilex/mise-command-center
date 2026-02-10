@@ -71,6 +71,7 @@ interface Task {
   feedback: string | null
   created_at: string
   updated_at?: string
+  focus_queue_order?: number | null
 }
 
 interface AIAgent {
@@ -558,8 +559,39 @@ function TasksPageContent() {
         </div>
       </div>
 
-      {/* Delete button with inline confirmation */}
-      <div className="flex-shrink-0" onClick={(e) => e.stopPropagation()}>
+      {/* Action buttons */}
+      <div className="flex-shrink-0 flex items-center gap-1" onClick={(e) => e.stopPropagation()}>
+        {/* Add to Today button */}
+        {task.status !== 'done' && !task.focus_queue_order && (
+          <button
+            onClick={async () => {
+              const { data: maxTask } = await supabase
+                .from('tasks')
+                .select('focus_queue_order')
+                .not('focus_queue_order', 'is', null)
+                .order('focus_queue_order', { ascending: false })
+                .limit(1)
+                .single()
+              const nextOrder = (maxTask?.focus_queue_order || 0) + 1
+              await supabase.from('tasks').update({ focus_queue_order: nextOrder }).eq('id', task.id)
+              showSuccessToast('Added to Today\'s Queue!')
+              loadTasks()
+            }}
+            className="p-1.5 text-slate-400 hover:text-violet-500 dark:text-slate-500 dark:hover:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-900/20 rounded-lg transition-colors opacity-0 group-hover:opacity-100"
+            title="Add to Today's Queue"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z" />
+            </svg>
+          </button>
+        )}
+        {/* Already in queue indicator */}
+        {task.focus_queue_order && (
+          <span className="text-xs text-violet-500 dark:text-violet-400 font-medium px-2 opacity-0 group-hover:opacity-100">
+            In Queue
+          </span>
+        )}
+        {/* Delete button */}
         {deletingTaskId === task.id ? (
           <div className="flex items-center gap-2 bg-red-50 dark:bg-red-900/20 px-3 py-1.5 rounded-lg border border-red-200 dark:border-red-800">
             <span className="text-xs text-red-600 dark:text-red-400">Delete?</span>
