@@ -166,7 +166,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   const [posting, setPosting] = useState(false)
 
   // Task detail modal
-  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
+  const [selectedTask, setSelectedTask] = useState<any | null>(null)
 
   // Phase modal
   const { isOpen: isPhaseOpen, onOpen: onPhaseOpen, onClose: onPhaseClose } = useDisclosure()
@@ -1701,7 +1701,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                         <div 
                           key={task.id} 
                           className="group flex items-center gap-3 p-2 rounded-lg bg-default-50 hover:bg-default-100 transition-colors cursor-pointer"
-                          onClick={() => setSelectedTaskId(task.id)}
+                          onClick={() => setSelectedTask(task)}
                         >
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium truncate">{task.title}</p>
@@ -2446,13 +2446,14 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
 
       {/* Task Detail Modal */}
       <TaskDetailModal
-        taskId={selectedTaskId}
-        isOpen={!!selectedTaskId}
-        onClose={() => setSelectedTaskId(null)}
-        onUpdate={() => {
-          setSelectedTaskId(null)
+        task={selectedTask}
+        isOpen={!!selectedTask}
+        onClose={() => setSelectedTask(null)}
+        onTaskUpdated={() => {
+          setSelectedTask(null)
           loadProject()
         }}
+        userId={user?.id}
       />
     </div>
   )
