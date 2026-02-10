@@ -503,6 +503,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
           phase_id: phaseId,
           title: title.trim(),
           position,
+          assigned_to: user?.id || null, // Auto-assign to current user
         })
         .select('*, assignee:assigned_to (id, name, display_name, avatar_url)')
         .single()

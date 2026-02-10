@@ -24,6 +24,7 @@ import { showErrorToast, showSuccessToast } from '@/lib/errors'
 import FileViewerModal, { isViewableFile } from './FileViewerModal'
 import TaskDocuments from './TaskDocuments'
 import TaskThread from './TaskThread'
+import RichTextEditor from './RichTextEditor'
 
 interface Task {
   id: string
@@ -902,25 +903,30 @@ export default function TaskDetailModal({
 
             {/* Quick Notes */}
             <div className="space-y-2">
-              <label className="text-sm font-medium text-slate-600 dark:text-slate-400">Notes</label>
-              <Textarea
-                placeholder="Add notes... (auto-saves)"
-                value={formData.description}
-                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                onBlur={async () => {
-                  if (task && formData.description !== task.description) {
-                    await supabase
-                      .from('tasks')
-                      .update({ description: formData.description || null })
-                      .eq('id', task.id)
-                    showSuccessToast('Notes saved')
-                  }
-                }}
-                minRows={2}
-                maxRows={6}
-                classNames={{
-                  inputWrapper: "bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700"
-                }}
+              <div className="flex items-center justify-between">
+                <label className="text-sm font-medium text-slate-600 dark:text-slate-400">Notes</label>
+                <Button
+                  size="sm"
+                  variant="flat"
+                  color="primary"
+                  onPress={async () => {
+                    if (task) {
+                      await supabase
+                        .from('tasks')
+                        .update({ description: formData.description || null })
+                        .eq('id', task.id)
+                      showSuccessToast('Notes saved')
+                    }
+                  }}
+                >
+                  Save
+                </Button>
+              </div>
+              <RichTextEditor
+                content={formData.description}
+                onChange={(val) => setFormData({ ...formData, description: val })}
+                placeholder="Add notes..."
+                minHeight="80px"
               />
             </div>
 
