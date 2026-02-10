@@ -889,6 +889,30 @@ export default function TaskDetailModal({
               </div>
             )}
 
+            {/* Quick Notes */}
+            <div className="space-y-2">
+              <label className="text-sm font-medium text-slate-600 dark:text-slate-400">Notes</label>
+              <Textarea
+                placeholder="Add notes... (auto-saves)"
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                onBlur={async () => {
+                  if (task && formData.description !== task.description) {
+                    await supabase
+                      .from('tasks')
+                      .update({ description: formData.description || null })
+                      .eq('id', task.id)
+                    showSuccessToast('Notes saved')
+                  }
+                }}
+                minRows={2}
+                maxRows={6}
+                classNames={{
+                  inputWrapper: "bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700"
+                }}
+              />
+            </div>
+
             <Divider />
 
             {/* Documents Section */}
