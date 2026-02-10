@@ -2862,7 +2862,7 @@ function ItemRowContent({
         )}
         
         {item.due_date && (
-          <span className="text-xs text-default-400">{format(new Date(item.due_date), 'MMM d')}</span>
+          <span className="text-xs text-default-400">{format(new Date(item.due_date + 'T00:00:00'), 'MMM d')}</span>
         )}
         
         {/* Delete button - shows on hover */}

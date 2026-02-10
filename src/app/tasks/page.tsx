@@ -543,7 +543,7 @@ function TasksPageContent() {
           {task.due_date && (
             <span className="flex items-center gap-1">
               <Calendar className="w-3 h-3" />
-              {new Date(task.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+              {new Date(task.due_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
             </span>
           )}
           {task.project_id && (

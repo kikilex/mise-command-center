@@ -328,7 +328,7 @@ export default function Home() {
           .sort((a, b) => {
             const pDiff = (priorityOrder[b.priority] || 0) - (priorityOrder[a.priority] || 0);
             if (pDiff !== 0) return pDiff;
-            if (a.due_date && b.due_date) return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
+            if (a.due_date && b.due_date) return new Date(a.due_date + 'T00:00:00').getTime() - new Date(b.due_date + 'T00:00:00').getTime();
             if (a.due_date) return -1;
             if (b.due_date) return 1;
             return 0;
@@ -748,7 +748,7 @@ export default function Home() {
         
         // If same priority, sort by due date (earlier first)
         if (a.due_date && b.due_date) {
-          return new Date(a.due_date).getTime() - new Date(b.due_date).getTime();
+          return new Date(a.due_date + 'T00:00:00').getTime() - new Date(b.due_date + 'T00:00:00').getTime();
         }
         if (a.due_date) return -1;
         if (b.due_date) return 1;
@@ -766,7 +766,7 @@ export default function Home() {
     
     return todaysTasks.filter(task => {
       if (!task.due_date) return false;
-      const dueDate = new Date(task.due_date);
+      const dueDate = new Date(task.due_date + 'T00:00:00');
       dueDate.setHours(0, 0, 0, 0);
       return dueDate.getTime() === today.getTime();
     }).slice(0, 3);
@@ -1339,7 +1339,7 @@ export default function Home() {
                     />
                   ) : (
                     <p className="text-slate-600 dark:text-slate-400">
-                      {selectedTask.due_date ? new Date(selectedTask.due_date).toLocaleDateString() : 'No due date'}
+                      {selectedTask.due_date ? new Date(selectedTask.due_date + 'T00:00:00').toLocaleDateString() : 'No due date'}
                     </p>
                   )}
                 </div>
@@ -1462,7 +1462,7 @@ export default function Home() {
                           </div>
                           {task.due_date && (
                             <span className="text-xs text-slate-400 flex-shrink-0">
-                              {new Date(task.due_date).toLocaleDateString()}
+                              {new Date(task.due_date + 'T00:00:00').toLocaleDateString()}
                             </span>
                           )}
                         </div>
