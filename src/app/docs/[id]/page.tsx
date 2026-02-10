@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useMemo, use, useCallback } from 'react'
+import { useState, useEffect, useMemo, use, useCallback, useRef } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import ReactMarkdown from 'react-markdown'
@@ -118,6 +118,11 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
   const [loadingComments, setLoadingComments] = useState(false)
   const [newComment, setNewComment] = useState('')
   const [sendingComment, setSendingComment] = useState(false)
+  
+  // @mention autocomplete state
+  const [showMentions, setShowMentions] = useState(false)
+  const [mentionFilter, setMentionFilter] = useState('')
+  const commentInputRef = useRef<HTMLInputElement>(null)
   
   // Recipients for revision requests
   const RECIPIENTS = [
@@ -412,11 +417,13 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
     
     setSendingComment(true)
     try {
+      const commentContent = newComment.trim()
+      
       const { data, error } = await supabase
         .from('document_comments')
         .insert({
           document_id: id,
-          content: newComment.trim(),
+          content: commentContent,
           author_id: user.id,
           author_name: user.name || user.email,
           comment_type: 'comment',
@@ -428,6 +435,15 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
       
       setComments(prev => [...prev, data])
       setNewComment('')
+      setShowMentions(false)
+      
+      // Note: Tasks are created automatically by DB trigger (parse_comment_mentions)
+      // Check if comment contains @mentions for user feedback
+      const mentionRegex = /@(\w+)/g
+      const mentions = commentContent.match(mentionRegex)
+      if (mentions && mentions.length > 0) {
+        showSuccessToast(`Comment added — task${mentions.length > 1 ? 's' : ''} created for ${mentions.join(', ')}`)
+      }
     } catch (error) {
       console.error('Add comment error:', error)
       showErrorToast(error, 'Failed to add comment')
@@ -715,6 +731,63 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
     if (diffHours < 24) return `${diffHours}h ago`
     if (diffDays < 7) return `${diffDays}d ago`
     return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+  }
+
+  // Filter mention candidates based on current filter
+  const mentionCandidates = useMemo(() => {
+    const f = mentionFilter.toLowerCase()
+    return RECIPIENTS.filter(r => r.name.toLowerCase().includes(f))
+  }, [mentionFilter])
+
+  // Handle comment input change for @mention detection
+  function handleCommentInputChange(e: React.ChangeEvent<HTMLInputElement>) {
+    const val = e.target.value
+    setNewComment(val)
+
+    // Check for @ trigger
+    const cursor = e.target.selectionStart || 0
+    const textBefore = val.slice(0, cursor)
+    const atMatch = textBefore.match(/@(\w*)$/)
+    if (atMatch) {
+      setMentionFilter(atMatch[1])
+      setShowMentions(true)
+    } else {
+      setShowMentions(false)
+    }
+  }
+
+  // Insert selected mention into the comment input
+  function insertMention(name: string) {
+    const input = commentInputRef.current
+    if (!input) return
+    const cursor = input.selectionStart || 0
+    const textBefore = newComment.slice(0, cursor)
+    const textAfter = newComment.slice(cursor)
+    const atIdx = textBefore.lastIndexOf('@')
+    const before = textBefore.slice(0, atIdx)
+    const inserted = `@${name} `
+    setNewComment(before + inserted + textAfter)
+    setShowMentions(false)
+
+    // Refocus and set cursor position
+    setTimeout(() => {
+      if (commentInputRef.current) {
+        const pos = before.length + inserted.length
+        commentInputRef.current.focus()
+        commentInputRef.current.setSelectionRange(pos, pos)
+      }
+    }, 0)
+  }
+
+  // Render @mentions with blue highlight
+  function renderMentions(text: string) {
+    const parts = text.split(/(@\w+)/g)
+    return parts.map((part, i) => {
+      if (part.match(/^@\w+$/)) {
+        return <span key={i} className="text-blue-500 dark:text-blue-400 font-semibold">{part}</span>
+      }
+      return <span key={i}>{part}</span>
+    })
   }
 
   if (loading) {
@@ -1337,7 +1410,13 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
                         </span>
                       </div>
                       <div className="text-slate-700 dark:text-slate-300 prose prose-sm dark:prose-invert max-w-none">
-                        <ReactMarkdown remarkPlugins={[remarkGfm]}>
+                        <ReactMarkdown 
+                          remarkPlugins={[remarkGfm]}
+                          components={{
+                            p: ({ children }) => <p>{typeof children === 'string' ? renderMentions(children) : children}</p>,
+                            text: ({ children }) => <>{typeof children === 'string' ? renderMentions(children) : children}</>,
+                          }}
+                        >
                           {comment.content}
                         </ReactMarkdown>
                       </div>
@@ -1350,29 +1429,61 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
 
           {/* Add Comment Input */}
           {user && (
-            <div className="flex gap-3">
-              <Input
-                placeholder="Add a comment..."
-                value={newComment}
-                onChange={(e) => setNewComment(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault()
-                    handleAddComment()
-                  }
-                }}
-                isDisabled={sendingComment}
-                className="flex-1"
-              />
-              <Button
-                color="primary"
-                isIconOnly
-                onPress={handleAddComment}
-                isDisabled={!newComment.trim() || sendingComment}
-                isLoading={sendingComment}
-              >
+            <div className="relative">
+              {/* @mention dropdown */}
+              {showMentions && mentionCandidates.length > 0 && (
+                <div className="absolute bottom-full left-0 mb-2 w-64 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700 py-1 z-50 animate-in fade-in zoom-in-95 duration-100">
+                  <div className="px-3 py-1.5 text-xs font-semibold text-slate-400 uppercase tracking-wider">
+                    Mention someone
+                  </div>
+                  {mentionCandidates.map(r => (
+                    <button
+                      key={r.id}
+                      onClick={() => insertMention(r.name)}
+                      className="w-full flex items-center gap-2.5 px-3 py-2 text-sm hover:bg-slate-50 dark:hover:bg-slate-700 transition-colors text-slate-700 dark:text-slate-200"
+                    >
+                      <div className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-bold ${
+                        r.type === 'ai' ? 'bg-gradient-to-br from-violet-500 to-purple-600' : 'bg-gradient-to-br from-blue-500 to-blue-600'
+                      }`}>
+                        {r.name.charAt(0).toUpperCase()}
+                      </div>
+                      <span className="font-medium">{r.name}</span>
+                      <Chip size="sm" variant="flat" color={r.type === 'ai' ? 'secondary' : 'primary'} className="ml-auto">
+                        {r.type === 'ai' ? 'AI' : 'Human'}
+                      </Chip>
+                    </button>
+                  ))}
+                </div>
+              )}
+              
+              <div className="flex gap-3">
+                <Input
+                  ref={commentInputRef}
+                  placeholder="Add a comment... (use @ to mention)"
+                  value={newComment}
+                  onChange={handleCommentInputChange}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && !e.shiftKey && !showMentions) {
+                      e.preventDefault()
+                      handleAddComment()
+                    }
+                    if (e.key === 'Escape' && showMentions) {
+                      setShowMentions(false)
+                    }
+                  }}
+                  isDisabled={sendingComment}
+                  className="flex-1"
+                />
+                <Button
+                  color="primary"
+                  isIconOnly
+                  onPress={handleAddComment}
+                  isDisabled={!newComment.trim() || sendingComment}
+                  isLoading={sendingComment}
+                >
                 {!sendingComment && <Send className="w-4 h-4" />}
               </Button>
+              </div>
             </div>
           )}
         </section>
