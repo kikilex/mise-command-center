@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { MessageCircle, Eye, Download, Trash2, FileText, ClipboardList, Bot, RotateCcw, Paperclip, User, File, Pencil } from 'lucide-react'
+import { MessageCircle, Eye, Download, Trash2, FileText, ClipboardList, Bot, RotateCcw, Paperclip, User, File, Pencil, ChevronDown } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import {
@@ -847,61 +847,47 @@ export default function TaskDetailModal({
               )}
             </div>
 
-            <Divider />
-
-            {/* Task Thread Section */}
-            <div className="space-y-3 h-[450px]">
-              <h3 className="text-md font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-2">
-                <MessageCircle className="w-4 h-4" /> Conversation
-              </h3>
-              
-              {task && (
-                <TaskThread taskId={task.id} className="h-full" />
-              )}
-              
-              {/* Assign to... dropdown (only in read-only mode) */}
-              {!isEditing && (
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-500 dark:text-slate-400">Assign to...</label>
-                  <div className="flex gap-2">
-                    <Select
-                      placeholder="Select user or agent"
-                      selectedKeys={assignToUserId ? [assignToUserId] : []}
-                      onChange={(e) => setAssignToUserId(e.target.value)}
-                      className="flex-grow"
+            {/* Quick Assign (only in read-only mode) */}
+            {!isEditing && (
+              <div className="flex items-center gap-2 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+                <span className="text-sm text-slate-500 whitespace-nowrap">Assign to:</span>
+                <Select
+                  placeholder="Select user or agent"
+                  size="sm"
+                  selectedKeys={assignToUserId ? [assignToUserId] : []}
+                  onChange={(e) => setAssignToUserId(e.target.value)}
+                  className="flex-1"
+                >
+                  {users.map(u => (
+                    <SelectItem 
+                      key={u.id} 
+                      textValue={getUserDisplayName(u)}
+                      startContent={
+                        u.is_agent || u.user_type === 'ai_agent' ? (
+                          <Bot className="w-4 h-4 text-purple-500" />
+                        ) : (
+                          <User className="w-4 h-4 text-blue-500" />
+                        )
+                      }
                     >
-                      {users.map(u => (
-                        <SelectItem 
-                          key={u.id} 
-                          textValue={getUserDisplayName(u)}
-                          startContent={
-                            u.is_agent || u.user_type === 'ai_agent' ? (
-                              <Bot className="w-4 h-4 text-purple-500" />
-                            ) : (
-                              <User className="w-4 h-4 text-blue-500" />
-                            )
-                          }
-                        >
-                          <div className="flex flex-col">
-                            <span className="font-medium">{getUserDisplayName(u)}</span>
-                            <span className="text-xs text-slate-400">{getUserTypeLabel(u)}</span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </Select>
-                    <Button
-                      color="primary"
-                      variant="flat"
-                      onPress={handleAssignTo}
-                      isDisabled={!assignToUserId || saving}
-                      isLoading={saving}
-                    >
-                      Assign
-                    </Button>
-                  </div>
-                </div>
-              )}
-            </div>
+                      <div className="flex flex-col">
+                        <span className="font-medium">{getUserDisplayName(u)}</span>
+                        <span className="text-xs text-slate-400">{getUserTypeLabel(u)}</span>
+                      </div>
+                    </SelectItem>
+                  ))}
+                </Select>
+                <Button
+                  color="primary"
+                  size="sm"
+                  onPress={handleAssignTo}
+                  isDisabled={!assignToUserId || saving}
+                  isLoading={saving}
+                >
+                  Assign
+                </Button>
+              </div>
+            )}
 
             <Divider />
 
@@ -914,6 +900,22 @@ export default function TaskDetailModal({
                 userId={userId || null}
               />
             )}
+
+            <Divider />
+
+            {/* Task Thread Section - Collapsible */}
+            <details className="group">
+              <summary className="flex items-center gap-2 cursor-pointer text-md font-semibold text-slate-700 dark:text-slate-200 hover:text-violet-600 transition-colors">
+                <MessageCircle className="w-4 h-4" /> 
+                <span>Conversation</span>
+                <ChevronDown className="w-4 h-4 ml-auto transition-transform group-open:rotate-180" />
+              </summary>
+              <div className="mt-3 h-[200px]">
+                {task && (
+                  <TaskThread taskId={task.id} className="h-full" />
+                )}
+              </div>
+            </details>
 
             <Divider />
 
