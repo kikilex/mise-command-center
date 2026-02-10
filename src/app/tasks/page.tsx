@@ -249,7 +249,7 @@ function TasksPageContent() {
       
       let query = supabase
         .from('tasks')
-        .select('*')
+        .select('*, creator:created_by(name, display_name), requester:requested_by(name, display_name)')
       
       // Only filter by assignee if viewing "My Tasks"
       if (viewMode === 'mine') {

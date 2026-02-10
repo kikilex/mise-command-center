@@ -41,6 +41,10 @@ interface Task {
   feedback: string | null
   created_at: string
   updated_at?: string
+  created_by?: string | null
+  requested_by?: string | null
+  creator?: { name: string; display_name?: string } | null
+  requester?: { name: string; display_name?: string } | null
 }
 
 interface AIAgent {
@@ -1076,6 +1080,12 @@ export default function TaskDetailModal({
             {/* Metadata */}
             <div className="text-xs text-slate-400 space-y-1">
               <p>Created: {new Date(task.created_at).toLocaleString()}</p>
+              {task.creator && (
+                <p>Created by: {task.creator.display_name || task.creator.name}</p>
+              )}
+              {task.requester && (
+                <p>Requested by: {task.requester.display_name || task.requester.name}</p>
+              )}
               {task.updated_at && (
                 <p>Last updated: {new Date(task.updated_at).toLocaleString()}</p>
               )}
