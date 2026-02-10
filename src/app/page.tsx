@@ -1066,10 +1066,10 @@ export default function Home() {
                   </Button>
                 </div>
               </CardHeader>
-              <CardBody className="p-3 space-y-2 max-h-80 overflow-y-auto">
+              <CardBody className="p-3 space-y-3">
                 {loading ? (
-                  <div className="space-y-2">
-                    {[1, 2, 3].map(i => <Skeleton key={i} className="h-20 rounded-xl w-full" />)}
+                  <div className="space-y-3">
+                    {[1, 2].map(i => <Skeleton key={i} className="h-32 rounded-xl w-full" />)}
                   </div>
                 ) : sortedProjectStats.length === 0 ? (
                   <div className="text-center py-8">
@@ -1078,13 +1078,13 @@ export default function Home() {
                   </div>
                 ) : (
                   <>
-                    {(showAllProjects ? sortedProjectStats : sortedProjectStats.slice(0, 3)).map((stat) => {
+                    {(showAllProjects ? sortedProjectStats : sortedProjectStats.slice(0, 2)).map((stat) => {
                       const isComplete = stat.percentComplete === 100;
                       const isPinned = pinnedProjects.includes(stat.project.id);
                       return (
                         <div 
                           key={stat.project.id}
-                          className={`relative p-3 rounded-xl border transition-all cursor-pointer hover:shadow-sm ${
+                          className={`relative p-4 rounded-xl border-2 transition-all cursor-pointer hover:shadow-md ${
                             isComplete 
                               ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800' 
                               : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 hover:border-emerald-300 dark:hover:border-emerald-700'
@@ -1097,56 +1097,75 @@ export default function Home() {
                               e.stopPropagation();
                               togglePinProject(stat.project.id);
                             }}
-                            className={`absolute top-2 right-2 w-6 h-6 rounded-full flex items-center justify-center transition-all ${
+                            className={`absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center transition-all ${
                               isPinned 
                                 ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-500' 
                                 : 'bg-slate-100 dark:bg-slate-700 text-slate-400 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20'
                             }`}
                           >
-                            <Star className={`w-3 h-3 ${isPinned ? 'fill-amber-500' : ''}`} />
+                            <Star className={`w-4 h-4 ${isPinned ? 'fill-amber-500' : ''}`} />
                           </button>
 
                           {/* Header */}
-                          <div className="flex items-start gap-2 mb-2 pr-6">
-                            <span className="text-lg">{stat.project.icon || '📁'}</span>
-                            <div className="min-w-0 flex-1">
-                              <h3 className="font-semibold text-sm text-slate-800 dark:text-slate-200 line-clamp-1">{stat.project.name}</h3>
-                              <p className="text-[10px] text-slate-500">{stat.completedTasks}/{stat.totalTasks} tasks</p>
+                          <div className="flex items-start gap-2 mb-3 pr-8">
+                            <span className="text-xl">{stat.project.icon || '📁'}</span>
+                            <div className="min-w-0">
+                              <h3 className="font-bold text-slate-800 dark:text-slate-200 line-clamp-1">{stat.project.name}</h3>
+                              <p className="text-xs text-slate-500">{stat.completedTasks}/{stat.totalTasks} tasks</p>
                             </div>
                           </div>
 
                           {/* Progress Bar */}
-                          <div className="mb-2">
+                          <div className="mb-3">
+                            <div className="flex items-center justify-between text-xs mb-1">
+                              <span className="text-slate-500">Progress</span>
+                              <span className={`font-bold ${isComplete ? 'text-emerald-600' : 'text-slate-700 dark:text-slate-300'}`}>{stat.percentComplete}%</span>
+                            </div>
                             <Progress 
                               value={stat.percentComplete} 
                               color={isComplete ? 'success' : 'primary'}
                               size="sm"
-                              className="h-1.5"
+                              className="h-2"
                             />
                           </div>
 
-                          {/* Next Action or Complete */}
+                          {/* Next Action */}
                           {stat.nextAction ? (
-                            <p className="text-xs text-slate-600 dark:text-slate-400 line-clamp-1">
-                              → {stat.nextAction.title}
-                            </p>
+                            <div className="bg-white dark:bg-slate-900 rounded-lg p-3 border border-slate-100 dark:border-slate-700">
+                              <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Next Up</p>
+                              <p className="text-sm text-slate-700 dark:text-slate-300 line-clamp-2">{stat.nextAction.title}</p>
+                              <Button 
+                                size="sm" 
+                                color="primary" 
+                                variant="flat" 
+                                className="mt-2 w-full"
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  router.push(`/projects/${stat.project.id}`);
+                                }}
+                              >
+                                Jump In <ArrowRight className="w-3 h-3 ml-1" />
+                              </Button>
+                            </div>
                           ) : (
-                            <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">✓ Complete!</p>
+                            <div className="bg-emerald-100 dark:bg-emerald-900/30 rounded-lg p-3 text-center">
+                              <p className="text-sm text-emerald-700 dark:text-emerald-400 font-medium">🎉 All tasks complete!</p>
+                            </div>
                           )}
                         </div>
                       );
                     })}
 
                     {/* Show More/Less */}
-                    {sortedProjectStats.length > 3 && (
+                    {sortedProjectStats.length > 2 && (
                       <Button 
-                        variant="light" 
+                        variant="flat" 
                         size="sm"
                         className="w-full"
                         onPress={() => setShowAllProjects(!showAllProjects)}
                         endContent={showAllProjects ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
                       >
-                        {showAllProjects ? 'Show Less' : `Show All ${sortedProjectStats.length}`}
+                        {showAllProjects ? 'Show Less' : `+${sortedProjectStats.length - 2} More Projects`}
                       </Button>
                     )}
                   </>
