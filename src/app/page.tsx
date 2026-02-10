@@ -58,6 +58,9 @@ import {
   ChevronUp,
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
+import { DndContext, closestCenter, PointerSensor, useSensor, useSensors, DragEndEvent } from '@dnd-kit/core'
+import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable'
+import { CSS } from '@dnd-kit/utilities'
 
 interface UserData {
   id: string
@@ -155,6 +158,76 @@ const priorityOptions = [
   { key: 'low', label: 'Low' },
 ]
 
+// Sortable Queue Item component for drag & drop
+function SortableQueueItem({ task, idx, isCurrent, onSelect, onRemove }: { 
+  task: Task, 
+  idx: number, 
+  isCurrent: boolean, 
+  onSelect: () => void, 
+  onRemove: () => void 
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id: task.id })
+  
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 1000 : 'auto',
+  }
+  
+  return (
+    <div 
+      ref={setNodeRef}
+      style={style}
+      className={`flex items-center gap-3 p-2.5 rounded-xl transition-colors group cursor-pointer ${
+        isCurrent 
+          ? 'bg-violet-50 dark:bg-violet-900/20 border border-violet-300 dark:border-violet-700' 
+          : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'
+      } ${isDragging ? 'shadow-lg' : ''}`}
+      onClick={onSelect}
+    >
+      {/* Drag handle */}
+      <div 
+        {...attributes} 
+        {...listeners}
+        className="cursor-grab active:cursor-grabbing text-slate-400 hover:text-slate-600 dark:hover:text-slate-300"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8h16M4 16h16" />
+        </svg>
+      </div>
+      <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+        isCurrent 
+          ? 'bg-violet-500 text-white' 
+          : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400'
+      }`}>
+        {idx + 1}
+      </div>
+      <span className={`flex-1 text-sm truncate ${
+        isCurrent 
+          ? 'text-slate-800 dark:text-slate-100 font-medium' 
+          : 'text-slate-600 dark:text-slate-400'
+      }`}>
+        {task.title}
+      </span>
+      {isCurrent && (
+        <span className="text-xs text-violet-600 dark:text-violet-400 font-medium">NOW</span>
+      )}
+      <button 
+        className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-red-500 transition-all"
+        onClick={(e) => {
+          e.stopPropagation()
+          onRemove()
+        }}
+        title="Remove from queue"
+      >
+        ×
+      </button>
+    </div>
+  )
+}
+
 export default function Home() {
   const [user, setUser] = useState<UserData | null>(null);
   const [todaysTasks, setTodaysTasks] = useState<Task[]>([]);
@@ -212,6 +285,31 @@ export default function Home() {
   
   const supabase = createClient();
   const router = useRouter();
+  
+  // Drag sensors for queue reordering
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 8 }
+    })
+  );
+  
+  // Handle queue drag end
+  const handleQueueDragEnd = async (event: DragEndEvent) => {
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    
+    const oldIndex = focusQueue.findIndex(t => t.id === active.id);
+    const newIndex = focusQueue.findIndex(t => t.id === over.id);
+    
+    const newQueue = arrayMove(focusQueue, oldIndex, newIndex);
+    setFocusQueue(newQueue);
+    
+    // Update all positions in DB
+    const updates = newQueue.map((task, idx) => 
+      supabase.from('tasks').update({ focus_queue_order: idx + 1 }).eq('id', task.id)
+    );
+    await Promise.all(updates);
+  };
 
   useEffect(() => {
     loadData();
@@ -1041,52 +1139,29 @@ export default function Home() {
                 </div>
               </CardHeader>
               <CardBody className="p-3 space-y-2">
-                {focusQueue.slice(0, isQueueExpanded ? 10 : 5).map((task, idx) => {
-                  const isCurrent = idx === 0
-                  return (
-                    <div 
-                      key={task.id}
-                      className={`flex items-center gap-3 p-2.5 rounded-xl transition-colors group cursor-pointer ${
-                        isCurrent 
-                          ? 'bg-violet-50 dark:bg-violet-900/20 border border-violet-300 dark:border-violet-700' 
-                          : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'
-                      }`}
-                      onClick={() => {
-                        setSelectedTask(task)
-                        onTaskModalOpen()
-                      }}
-                    >
-                      <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
-                        isCurrent 
-                          ? 'bg-violet-500 text-white' 
-                          : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400'
-                      }`}>
-                        {idx + 1}
-                      </div>
-                      <span className={`flex-1 text-sm truncate ${
-                        isCurrent 
-                          ? 'text-slate-800 dark:text-slate-100 font-medium' 
-                          : 'text-slate-600 dark:text-slate-400'
-                      }`}>
-                        {task.title}
-                      </span>
-                      {isCurrent && (
-                        <span className="text-xs text-violet-600 dark:text-violet-400 font-medium">NOW</span>
-                      )}
-                      <button 
-                        className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-red-500 transition-all"
-                        onClick={async (e) => {
-                          e.stopPropagation()
-                          await supabase.from('tasks').update({ focus_queue_order: null }).eq('id', task.id)
-                          setFocusQueue(prev => prev.filter(t => t.id !== task.id))
-                        }}
-                        title="Remove from queue"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  )
-                })}
+                <DndContext sensors={sensors} collisionDetection={closestCenter} onDragEnd={handleQueueDragEnd}>
+                  <SortableContext items={focusQueue.slice(0, isQueueExpanded ? 10 : 5).map(t => t.id)} strategy={verticalListSortingStrategy}>
+                    {focusQueue.slice(0, isQueueExpanded ? 10 : 5).map((task, idx) => {
+                      const isCurrent = idx === 0
+                      return (
+                        <SortableQueueItem 
+                          key={task.id} 
+                          task={task} 
+                          idx={idx} 
+                          isCurrent={isCurrent}
+                          onSelect={() => {
+                            setSelectedTask(task)
+                            onTaskModalOpen()
+                          }}
+                          onRemove={async () => {
+                            await supabase.from('tasks').update({ focus_queue_order: null }).eq('id', task.id)
+                            setFocusQueue(prev => prev.filter(t => t.id !== task.id))
+                          }}
+                        />
+                      )
+                    })}
+                  </SortableContext>
+                </DndContext>
                 {focusQueue.length > 5 && (
                   <button
                     className="w-full text-center py-2 text-sm text-violet-600 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-900/20 rounded-lg transition-colors"
