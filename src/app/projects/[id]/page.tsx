@@ -208,6 +208,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   // Project Tasks
   const [projectTasks, setProjectTasks] = useState<any[]>([])
   const [showAllTasks, setShowAllTasks] = useState(true) // Default to ALL for project visibility
+  const [showCompletedTasks, setShowCompletedTasks] = useState(false) // Hide done tasks by default
   
   // Note modal (for quick notes as resources)
   const { isOpen: isNoteOpen, onOpen: onNoteOpen, onClose: onNoteClose } = useDisclosure()
@@ -1725,7 +1726,17 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                   {renderTaskGroup(inProgressTasks, 'In Progress', 'primary')}
                   {renderTaskGroup(todoTasks, 'Todo', 'default')}
                   {renderTaskGroup(reviewTasks, 'Review', 'warning')}
-                  {renderTaskGroup(doneTasks, 'Done', 'success')}
+                  {showCompletedTasks && renderTaskGroup(doneTasks, 'Done', 'success')}
+                  {doneTasks.length > 0 && (
+                    <Button
+                      size="sm"
+                      variant="light"
+                      className="mt-2"
+                      onPress={() => setShowCompletedTasks(!showCompletedTasks)}
+                    >
+                      {showCompletedTasks ? 'Hide' : 'Show'} {doneTasks.length} completed
+                    </Button>
+                  )}
                 </div>
               )
             })()}
