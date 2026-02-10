@@ -1,7 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { MessageCircle, Eye, Download, Trash2, FileText, ClipboardList, Bot, RotateCcw, Paperclip, User, File, Pencil, ChevronDown } from 'lucide-react'
+import { MessageCircle, Eye, Download, Trash2, FileText, ClipboardList, Bot, RotateCcw, Paperclip, User, File, Pencil, ChevronDown, Check } from 'lucide-react'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import {
@@ -186,6 +186,9 @@ export default function TaskDetailModal({
   
   const supabase = createClient()
 
+  // Sub-items state (from phase_items)
+  const [subItems, setSubItems] = useState<{text: string, completed: boolean}[]>([])
+
   // Load task data and dropdown options when modal opens
   useEffect(() => {
     if (task && isOpen) {
@@ -193,14 +196,21 @@ export default function TaskDetailModal({
       const loadFreshTask = async () => {
         const { data: freshTask } = await supabase
           .from('tasks')
-          .select('*')
+          .select('*, phase_item:phase_item_id(notes, sub_items)')
           .eq('id', task.id)
           .single()
         
         const taskData = freshTask || task
+        
+        // Use phase_item notes if task description is empty
+        let description = taskData.description || ''
+        if (!description && taskData.phase_item?.notes) {
+          description = taskData.phase_item.notes
+        }
+        
         setFormData({
           title: taskData.title || '',
-          description: taskData.description || '',
+          description: description,
           status: taskData.status || 'todo',
           priority: taskData.priority || 'medium',
           due_date: taskData.due_date ? taskData.due_date.split('T')[0] : '',
@@ -209,6 +219,20 @@ export default function TaskDetailModal({
           project_id: taskData.project_id || '',
           space_id: taskData.space_id || '',
         })
+        
+        // Load sub_items from phase_item if available
+        if (taskData.phase_item?.sub_items) {
+          const parsedSubItems = taskData.phase_item.sub_items.map((item: string) => {
+            try {
+              return JSON.parse(item)
+            } catch {
+              return { text: item, completed: false }
+            }
+          })
+          setSubItems(parsedSubItems)
+        } else {
+          setSubItems([])
+        }
       }
       loadFreshTask()
       setIsEditing(false) // Reset to read-only mode when modal opens
@@ -930,7 +954,31 @@ export default function TaskDetailModal({
               />
             </div>
 
-            <Divider />
+            {/* Sub-items (from phase items) */}
+            {subItems.length > 0 && (
+              <>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-slate-600 dark:text-slate-400">Sub-items</label>
+                  <div className="space-y-1">
+                    {subItems.map((item, idx) => (
+                      <div key={idx} className="flex items-center gap-2 p-2 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+                        <div className={`w-4 h-4 rounded border-2 flex items-center justify-center ${
+                          item.completed 
+                            ? 'bg-green-500 border-green-500 text-white' 
+                            : 'border-slate-300 dark:border-slate-600'
+                        }`}>
+                          {item.completed && <Check className="w-3 h-3" />}
+                        </div>
+                        <span className={`text-sm ${item.completed ? 'line-through text-slate-400' : 'text-slate-700 dark:text-slate-300'}`}>
+                          {item.text}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <Divider />
+              </>
+            )}
 
             {/* Documents Section */}
             {task && (
