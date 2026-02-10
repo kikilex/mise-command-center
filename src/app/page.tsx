@@ -520,6 +520,19 @@ export default function Home() {
       });
       if (msgError) throw msgError;
 
+      // Create task for Ax so Chi-Chi alerts him
+      const axUserId = 'd6c2fbde-5639-4944-b0ed-e13cbbd64c03';
+      const { error: taskError } = await supabase.from('tasks').insert({
+        title: `Organize brain dump - ${dateStr} ${timeStr}`,
+        description: content,
+        status: 'todo',
+        priority: 'medium',
+        created_by: user.id,
+        assignee_id: axUserId,
+        ai_agent: 'ax',
+      });
+      if (taskError) console.error('Failed to create task:', taskError);
+
       const ids = inboxItems.map(i => i.id);
       await supabase.from('inbox').update({ status: 'processing' }).in('id', ids);
 
