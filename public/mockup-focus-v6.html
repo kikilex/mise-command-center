@@ -1,0 +1,356 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Dashboard - Focus Queue V6 (Session Tracking)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    @keyframes confetti-fall { 0% { transform: translateY(-100%) rotate(0deg); opacity: 1; } 100% { transform: translateY(100vh) rotate(720deg); opacity: 0; } }
+    .confetti { position: fixed; width: 10px; height: 10px; top: -10px; animation: confetti-fall 3s ease-out forwards; z-index: 9999; }
+    @keyframes shake { 0%, 100% { transform: translateX(0); } 10% { transform: translateX(-8px) rotate(-1deg); } 30% { transform: translateX(8px) rotate(1deg); } 50% { transform: translateX(-6px); } 70% { transform: translateX(6px); } 90% { transform: translateX(-3px); } }
+    .shake { animation: shake 0.5s ease-in-out; }
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.5; } }
+    .pulse { animation: pulse 1s ease-in-out infinite; }
+    @keyframes session-pop { 0% { transform: scale(0.8); opacity: 0; } 100% { transform: scale(1); opacity: 1; } }
+    .session-pop { animation: session-pop 0.3s ease-out; }
+  </style>
+</head>
+<body class="bg-slate-50 min-h-screen font-sans">
+  <nav class="bg-white border-b border-slate-200 px-6 py-3">
+    <div class="max-w-4xl mx-auto flex items-center justify-between">
+      <div class="flex items-center gap-3"><div class="w-8 h-8 bg-violet-600 rounded-lg"></div><span class="font-bold text-slate-800">Mise Command Center</span></div>
+      <div class="w-8 h-8 bg-gradient-to-br from-violet-500 to-purple-600 rounded-full"></div>
+    </div>
+  </nav>
+  
+  <main class="max-w-4xl mx-auto px-6 py-8">
+    <h1 class="text-2xl font-bold text-slate-800 mb-6">⚡ Focus Queue - Session Tracking Demo</h1>
+    
+    <!-- Focus Queue Card -->
+    <div class="bg-white rounded-2xl border-2 border-violet-500 shadow-lg overflow-hidden mb-8">
+      <div class="bg-gradient-to-r from-violet-600 to-purple-600 px-6 py-4 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <div class="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center"><span class="text-xl">⚡</span></div>
+          <div>
+            <h2 class="font-bold text-white">Focus Queue</h2>
+            <p class="text-xs text-violet-200">2 of 5 • Stay locked in</p>
+          </div>
+        </div>
+        <!-- Session Counter Badge -->
+        <div id="sessionBadge" class="flex items-center gap-2 bg-white/20 rounded-full px-3 py-1.5">
+          <span class="text-white text-sm font-medium">Session</span>
+          <span id="sessionNum" class="bg-white text-violet-600 text-sm font-bold w-6 h-6 rounded-full flex items-center justify-center">1</span>
+        </div>
+      </div>
+      
+      <div class="p-6">
+        <!-- Task Info -->
+        <div class="mb-4">
+          <div class="flex items-center gap-2 mb-2">
+            <span class="px-2 py-0.5 bg-red-100 text-red-600 text-xs rounded-full font-medium">HIGH</span>
+            <span class="px-2 py-0.5 bg-violet-100 text-violet-600 text-xs rounded-full font-medium">Faithstone</span>
+          </div>
+          <h3 class="text-lg font-bold text-slate-800">Review TikTok content batch for Mom's approval</h3>
+        </div>
+        
+        <!-- Timer Display -->
+        <div class="flex items-center justify-center my-6">
+          <div class="bg-slate-100 rounded-2xl px-8 py-6 text-center">
+            <div class="text-5xl font-mono font-bold text-slate-800" id="timerDisplay">00:00</div>
+            <div class="text-sm text-slate-500 mt-2" id="timerLabel">Ready to start</div>
+            
+            <!-- Session indicator (shows after session 1) -->
+            <div id="sessionIndicator" class="mt-3 hidden">
+              <div class="flex items-center justify-center gap-1">
+                <span class="text-xs text-slate-400">Sessions:</span>
+                <div class="flex gap-1" id="sessionDots"></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <!-- Timer Controls -->
+        <div class="flex items-center justify-center gap-3" id="timerControls">
+          <button id="startBtn" onclick="startTimer()" class="px-8 py-3 bg-green-500 hover:bg-green-600 rounded-xl font-bold text-white text-lg shadow-lg shadow-green-500/30 flex items-center gap-2">
+            ▶ Start
+          </button>
+        </div>
+        
+        <!-- Session History (shows after completion) -->
+        <div id="sessionHistory" class="mt-6 pt-4 border-t border-slate-200 hidden">
+          <div class="text-xs text-slate-400 uppercase font-medium mb-2">Session History</div>
+          <div id="sessionList" class="space-y-2"></div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Session Warning Levels -->
+    <div class="bg-white rounded-2xl border border-slate-200 p-6 mb-8">
+      <h3 class="font-bold text-slate-800 mb-4">📊 Session Warning Levels</h3>
+      <div class="grid grid-cols-3 gap-4">
+        <div class="text-center p-4 bg-green-50 rounded-xl border border-green-200">
+          <div class="text-2xl mb-1">✅</div>
+          <div class="font-bold text-green-700">1-2 Sessions</div>
+          <div class="text-xs text-green-600">Good focus!</div>
+        </div>
+        <div class="text-center p-4 bg-yellow-50 rounded-xl border border-yellow-200">
+          <div class="text-2xl mb-1">⚠️</div>
+          <div class="font-bold text-yellow-700">3-4 Sessions</div>
+          <div class="text-xs text-yellow-600">Heads up - check focus</div>
+        </div>
+        <div class="text-center p-4 bg-red-50 rounded-xl border border-red-200">
+          <div class="text-2xl mb-1">🚨</div>
+          <div class="font-bold text-red-700">5+ Sessions</div>
+          <div class="text-xs text-red-600">Consider a break or split task</div>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Data Structure Preview -->
+    <div class="bg-slate-800 rounded-2xl p-6 text-white">
+      <h3 class="font-bold mb-4">💾 Data Saved Per Task</h3>
+      <pre id="dataPreview" class="text-sm text-green-400 overflow-x-auto">{
+  "task_id": "abc123",
+  "sessions": [],
+  "total_sessions": 0,
+  "total_time_ms": 0
+}</pre>
+    </div>
+  </main>
+
+  <script>
+    let timerState = 'stopped'; // stopped, running, paused
+    let sessionCount = 0;
+    let currentSessionStart = null;
+    let elapsedMs = 0;
+    let timerInterval = null;
+    let sessions = [];
+    
+    function formatTime(ms) {
+      const totalSeconds = Math.floor(ms / 1000);
+      const mins = Math.floor(totalSeconds / 60);
+      const secs = totalSeconds % 60;
+      return String(mins).padStart(2, '0') + ':' + String(secs).padStart(2, '0');
+    }
+    
+    function updateDisplay() {
+      document.getElementById('timerDisplay').textContent = formatTime(elapsedMs);
+    }
+    
+    function updateSessionBadge() {
+      const badge = document.getElementById('sessionBadge');
+      const numEl = document.getElementById('sessionNum');
+      numEl.textContent = sessionCount;
+      
+      // Color based on session count
+      if (sessionCount >= 5) {
+        badge.className = 'flex items-center gap-2 bg-red-500/80 rounded-full px-3 py-1.5 session-pop';
+        numEl.className = 'bg-white text-red-600 text-sm font-bold w-6 h-6 rounded-full flex items-center justify-center';
+      } else if (sessionCount >= 3) {
+        badge.className = 'flex items-center gap-2 bg-yellow-500/80 rounded-full px-3 py-1.5 session-pop';
+        numEl.className = 'bg-white text-yellow-600 text-sm font-bold w-6 h-6 rounded-full flex items-center justify-center';
+      } else {
+        badge.className = 'flex items-center gap-2 bg-white/20 rounded-full px-3 py-1.5 session-pop';
+        numEl.className = 'bg-white text-violet-600 text-sm font-bold w-6 h-6 rounded-full flex items-center justify-center';
+      }
+    }
+    
+    function updateSessionDots() {
+      const container = document.getElementById('sessionDots');
+      const indicator = document.getElementById('sessionIndicator');
+      
+      if (sessionCount > 1) {
+        indicator.classList.remove('hidden');
+        container.innerHTML = '';
+        for (let i = 0; i < sessionCount; i++) {
+          const dot = document.createElement('div');
+          const isComplete = i < sessionCount - 1 || timerState === 'stopped';
+          dot.className = 'w-2 h-2 rounded-full ' + (isComplete ? 'bg-green-500' : 'bg-violet-500 pulse');
+          container.appendChild(dot);
+        }
+      }
+    }
+    
+    function updateDataPreview() {
+      const data = {
+        task_id: "abc123",
+        sessions: sessions.map(s => ({
+          session_num: s.num,
+          start: s.start,
+          end: s.end || "running...",
+          duration_ms: s.duration || "..."
+        })),
+        total_sessions: sessionCount,
+        total_time_ms: sessions.reduce((sum, s) => sum + (s.duration || 0), 0) + (timerState === 'running' ? (Date.now() - currentSessionStart) : 0)
+      };
+      document.getElementById('dataPreview').textContent = JSON.stringify(data, null, 2);
+    }
+    
+    function startTimer() {
+      if (timerState === 'stopped' || timerState === 'paused') {
+        sessionCount++;
+        currentSessionStart = Date.now();
+        sessions.push({
+          num: sessionCount,
+          start: new Date().toLocaleTimeString(),
+          end: null,
+          duration: null
+        });
+        
+        timerState = 'running';
+        document.getElementById('timerLabel').textContent = 'Session ' + sessionCount + ' in progress...';
+        
+        timerInterval = setInterval(() => {
+          const sessionElapsed = Date.now() - currentSessionStart;
+          const totalElapsed = sessions.slice(0, -1).reduce((sum, s) => sum + (s.duration || 0), 0) + sessionElapsed;
+          elapsedMs = totalElapsed;
+          updateDisplay();
+          updateDataPreview();
+        }, 100);
+        
+        updateSessionBadge();
+        updateSessionDots();
+        updateControls();
+      }
+    }
+    
+    function pauseTimer() {
+      if (timerState === 'running') {
+        clearInterval(timerInterval);
+        timerState = 'paused';
+        
+        // Complete current session
+        const sessionDuration = Date.now() - currentSessionStart;
+        sessions[sessions.length - 1].end = new Date().toLocaleTimeString();
+        sessions[sessions.length - 1].duration = sessionDuration;
+        
+        document.getElementById('timerLabel').textContent = 'Paused — Resume to start Session ' + (sessionCount + 1);
+        
+        updateSessionDots();
+        updateSessionHistory();
+        updateControls();
+        updateDataPreview();
+      }
+    }
+    
+    function finishTask() {
+      if (timerState === 'running') {
+        // Complete current session first
+        clearInterval(timerInterval);
+        const sessionDuration = Date.now() - currentSessionStart;
+        sessions[sessions.length - 1].end = new Date().toLocaleTimeString();
+        sessions[sessions.length - 1].duration = sessionDuration;
+      }
+      
+      timerState = 'stopped';
+      document.getElementById('timerLabel').textContent = 'Completed in ' + sessionCount + ' session' + (sessionCount > 1 ? 's' : '') + '!';
+      
+      updateSessionHistory();
+      updateControls();
+      updateDataPreview();
+      
+      // Celebration!
+      document.body.classList.add('shake');
+      setTimeout(() => document.body.classList.remove('shake'), 500);
+      showConfetti();
+    }
+    
+    function updateSessionHistory() {
+      const container = document.getElementById('sessionList');
+      const historyDiv = document.getElementById('sessionHistory');
+      
+      if (sessions.length > 0) {
+        historyDiv.classList.remove('hidden');
+        container.innerHTML = '';
+        
+        sessions.forEach(s => {
+          const div = document.createElement('div');
+          div.className = 'flex items-center justify-between p-2 bg-slate-50 rounded-lg';
+          div.innerHTML = `
+            <div class="flex items-center gap-2">
+              <span class="w-6 h-6 bg-violet-100 text-violet-600 rounded-full flex items-center justify-center text-xs font-bold">${s.num}</span>
+              <span class="text-sm text-slate-600">${s.start} → ${s.end || '...'}</span>
+            </div>
+            <span class="text-sm font-medium text-slate-800">${s.duration ? formatTime(s.duration) : '...'}</span>
+          `;
+          container.appendChild(div);
+        });
+      }
+    }
+    
+    function updateControls() {
+      const container = document.getElementById('timerControls');
+      
+      if (timerState === 'stopped' && sessionCount === 0) {
+        container.innerHTML = `
+          <button onclick="startTimer()" class="px-8 py-3 bg-green-500 hover:bg-green-600 rounded-xl font-bold text-white text-lg shadow-lg shadow-green-500/30 flex items-center gap-2">
+            ▶ Start
+          </button>
+        `;
+      } else if (timerState === 'running') {
+        container.innerHTML = `
+          <button onclick="pauseTimer()" class="px-6 py-3 bg-slate-200 hover:bg-slate-300 rounded-xl font-medium text-slate-700 flex items-center gap-2">
+            ⏸ Pause
+          </button>
+          <button onclick="finishTask()" class="px-8 py-3 bg-green-500 hover:bg-green-600 rounded-xl font-bold text-white text-lg shadow-lg shadow-green-500/30 flex items-center gap-2">
+            ✓ Done
+          </button>
+        `;
+      } else if (timerState === 'paused') {
+        container.innerHTML = `
+          <button onclick="startTimer()" class="px-6 py-3 bg-blue-500 hover:bg-blue-600 rounded-xl font-bold text-white flex items-center gap-2">
+            ▶ Resume <span class="text-xs opacity-70">(Session ${sessionCount + 1})</span>
+          </button>
+          <button onclick="finishTask()" class="px-8 py-3 bg-green-500 hover:bg-green-600 rounded-xl font-bold text-white text-lg shadow-lg shadow-green-500/30 flex items-center gap-2">
+            ✓ Done
+          </button>
+        `;
+      } else if (timerState === 'stopped' && sessionCount > 0) {
+        container.innerHTML = `
+          <button onclick="resetTask()" class="px-6 py-3 bg-slate-200 hover:bg-slate-300 rounded-xl font-medium text-slate-700 flex items-center gap-2">
+            🔄 New Task
+          </button>
+        `;
+      }
+    }
+    
+    function resetTask() {
+      timerState = 'stopped';
+      sessionCount = 0;
+      currentSessionStart = null;
+      elapsedMs = 0;
+      sessions = [];
+      clearInterval(timerInterval);
+      
+      document.getElementById('timerDisplay').textContent = '00:00';
+      document.getElementById('timerLabel').textContent = 'Ready to start';
+      document.getElementById('sessionHistory').classList.add('hidden');
+      document.getElementById('sessionIndicator').classList.add('hidden');
+      
+      updateSessionBadge();
+      updateControls();
+      updateDataPreview();
+    }
+    
+    function showConfetti() {
+      const c = document.body;
+      const cols = ['#f59e0b', '#22c55e', '#3b82f6', '#ec4899', '#8b5cf6'];
+      for (let i = 0; i < 60; i++) {
+        const d = document.createElement('div');
+        d.className = 'confetti';
+        d.style.left = Math.random() * 100 + 'vw';
+        d.style.backgroundColor = cols[Math.floor(Math.random() * cols.length)];
+        d.style.animationDelay = Math.random() * 0.5 + 's';
+        d.style.borderRadius = Math.random() > 0.5 ? '50%' : '0';
+        document.body.appendChild(d);
+        setTimeout(() => d.remove(), 3500);
+      }
+    }
+    
+    // Init
+    updateControls();
+    updateDataPreview();
+  </script>
+</body>
+</html>
