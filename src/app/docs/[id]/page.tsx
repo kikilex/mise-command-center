@@ -10,7 +10,7 @@ import rehypeSanitize from 'rehype-sanitize'
 import { Prism as SyntaxHighlighter } from 'react-syntax-highlighter'
 import { oneDark, oneLight } from 'react-syntax-highlighter/dist/esm/styles/prism'
 import { useTheme } from 'next-themes'
-import { ArrowLeft, Edit, FileText, List, ExternalLink, Share2, Check, RotateCcw, MessageSquare, Send, AlertCircle, Trash2, CheckCircle2, Clock, ChevronDown, ChevronRight, ArrowUp, ArrowDown, ChevronsDownUp, ChevronsUpDown, Folder, Tag as TagIcon, X, Plus, Settings, History, Pencil } from 'lucide-react'
+import { ArrowLeft, Edit, FileText, List, ExternalLink, Share2, Check, RotateCcw, MessageSquare, Send, AlertCircle, Trash2, CheckCircle2, Clock, ChevronDown, ChevronRight, ArrowUp, ArrowDown, ChevronsDownUp, ChevronsUpDown, Folder, Tag as TagIcon, X, Plus, Settings, History, Pencil, Download } from 'lucide-react'
 import {
   Button,
   Chip,
@@ -707,6 +707,63 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
     }
   }
 
+  const handleDownloadMarkdown = () => {
+    if (!document) return
+    const blob = new Blob([document.content], { type: 'text/markdown' })
+    const url = URL.createObjectURL(blob)
+    const a = window.document.createElement('a')
+    a.href = url
+    a.download = `${document.title.replace(/[^a-z0-9]/gi, '-').toLowerCase()}.md`
+    window.document.body.appendChild(a)
+    a.click()
+    window.document.body.removeChild(a)
+    URL.revokeObjectURL(url)
+    showSuccessToast('Markdown downloaded!')
+  }
+
+  const handleDownloadPDF = () => {
+    if (!document) return
+    // Create a print-friendly version
+    const printWindow = window.open('', '_blank')
+    if (!printWindow) {
+      showErrorToast(null, 'Please allow popups to download PDF')
+      return
+    }
+    
+    // Simple HTML with the rendered content
+    printWindow.document.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <title>${document.title}</title>
+          <style>
+            body { font-family: system-ui, -apple-system, sans-serif; max-width: 800px; margin: 40px auto; padding: 20px; line-height: 1.6; }
+            h1 { font-size: 2em; border-bottom: 1px solid #eee; padding-bottom: 0.5em; }
+            h2, h3, h4 { margin-top: 1.5em; }
+            pre { background: #f5f5f5; padding: 1em; overflow-x: auto; border-radius: 4px; }
+            code { background: #f5f5f5; padding: 0.2em 0.4em; border-radius: 3px; }
+            blockquote { border-left: 4px solid #ddd; margin: 1em 0; padding-left: 1em; color: #666; }
+            table { border-collapse: collapse; width: 100%; margin: 1em 0; }
+            th, td { border: 1px solid #ddd; padding: 8px; text-align: left; }
+            th { background: #f5f5f5; }
+            img { max-width: 100%; }
+            @media print { body { margin: 0; } }
+          </style>
+        </head>
+        <body>
+          <h1>${document.title}</h1>
+          <div id="content"></div>
+          <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"><\/script>
+          <script>
+            document.getElementById('content').innerHTML = marked.parse(${JSON.stringify(document.content)});
+            setTimeout(() => { window.print(); window.close(); }, 500);
+          <\/script>
+        </body>
+      </html>
+    `)
+    printWindow.document.close()
+  }
+
   const formatDate = (dateStr: string) => {
     const date = new Date(dateStr)
     return date.toLocaleDateString('en-US', {
@@ -896,6 +953,41 @@ export default function DocumentReaderPage({ params }: { params: Promise<{ id: s
             >
               {copied ? <Check className="w-4 h-4" /> : <Share2 className="w-4 h-4" />}
             </Button>
+            
+            <Popover placement="bottom-end">
+              <PopoverTrigger>
+                <Button
+                  variant="flat"
+                  isIconOnly
+                  size="sm"
+                  title="Download"
+                >
+                  <Download className="w-4 h-4" />
+                </Button>
+              </PopoverTrigger>
+              <PopoverContent className="p-1">
+                <div className="flex flex-col">
+                  <Button
+                    variant="light"
+                    size="sm"
+                    className="justify-start"
+                    onPress={handleDownloadMarkdown}
+                  >
+                    <FileText className="w-4 h-4 mr-2" />
+                    Markdown (.md)
+                  </Button>
+                  <Button
+                    variant="light"
+                    size="sm"
+                    className="justify-start"
+                    onPress={handleDownloadPDF}
+                  >
+                    <FileText className="w-4 h-4 mr-2" />
+                    PDF (Print)
+                  </Button>
+                </div>
+              </PopoverContent>
+            </Popover>
             
             <Popover isOpen={propertiesOpen} onOpenChange={setPropertiesOpen} placement="bottom-end">
               <PopoverTrigger>
