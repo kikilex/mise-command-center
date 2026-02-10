@@ -252,9 +252,10 @@ function TasksPageContent() {
         .from('tasks')
         .select('*, creator:created_by(name, display_name), requester:requested_by(name, display_name)')
       
-      // "My Tasks" = assigned to me, OR tasks I created (includes tasks I delegated)
+      // "My Tasks" = assigned to me, OR unassigned tasks I created
+      // (excludes tasks I created but delegated to others)
       if (viewMode === 'mine') {
-        query = query.or(`assignee_id.eq.${authUser.id},created_by.eq.${authUser.id}`)
+        query = query.or(`assignee_id.eq.${authUser.id},and(assignee_id.is.null,created_by.eq.${authUser.id})`)
       }
       
       if (localSpaceId && localSpaceId !== 'all') {
