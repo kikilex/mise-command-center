@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { Card, CardBody, CardHeader, Button, Chip, Progress } from '@heroui/react'
-import { Zap, Pause, Play, Check, RotateCcw, ExternalLink } from 'lucide-react'
+import { Card, CardBody, CardHeader, Button, Chip, Progress, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, DropdownSection, Popover, PopoverTrigger, PopoverContent } from '@heroui/react'
+import { Zap, Pause, Play, Check, RotateCcw, ExternalLink, UserPlus, Clock, ChevronDown, User, Bot } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useCelebrations } from '@/hooks/useCelebrations'
 import { showErrorToast, showSuccessToast } from '@/lib/errors'
@@ -39,6 +39,22 @@ interface FocusQueueProps {
   onRemoveFromQueue?: (taskId: string) => Promise<void>
 }
 
+interface TeamMember {
+  id: string
+  name: string
+  email: string
+  is_agent?: boolean
+  user_type?: string
+  display_name?: string
+}
+
+const LATER_OPTIONS = [
+  { key: 'tomorrow', label: 'Tomorrow', days: 1 },
+  { key: '3days', label: 'In 3 days', days: 3 },
+  { key: 'nextweek', label: 'Next week', days: 7 },
+  { key: 'custom', label: 'Pick date...', days: 0 },
+]
+
 const SESSION_EMOJIS = ['🎯', '⚡', '🔥', '💪', '🚀', '💎', '👑', '🦁', '⭐', '🏆']
 
 const BREAK_MESSAGES = [
@@ -72,6 +88,9 @@ export default function FocusQueue({ tasks, todayCompletedCount = 0, onTaskCompl
   const [hypeMessage, setHypeMessage] = useState<string | null>(null)
   const [viewTask, setViewTask] = useState<Task | null>(null)
   const [restored, setRestored] = useState(false)
+  const [teamMembers, setTeamMembers] = useState<TeamMember[]>([])
+  const [showDatePicker, setShowDatePicker] = useState(false)
+  const [customDate, setCustomDate] = useState('')
   
   const timerRef = useRef<NodeJS.Timeout | null>(null)
   const autoSaveRef = useRef<NodeJS.Timeout | null>(null)
@@ -156,6 +175,18 @@ export default function FocusQueue({ tasks, todayCompletedCount = 0, onTaskCompl
   useEffect(() => {
     setRestored(false)
   }, [currentTask?.id])
+
+  // Fetch team members for handoff
+  useEffect(() => {
+    async function loadTeamMembers() {
+      const { data } = await supabase
+        .from('users')
+        .select('id, name, email, is_agent, user_type, display_name')
+        .order('is_agent', { ascending: true })
+      setTeamMembers(data || [])
+    }
+    loadTeamMembers()
+  }, [])
 
   // Save to localStorage on every state change while running
   useEffect(() => {
@@ -346,6 +377,141 @@ export default function FocusQueue({ tasks, todayCompletedCount = 0, onTaskCompl
     }
   }, [currentTask, sessions, timerState, currentTaskIndex, tasks.length, celebrate, onTaskComplete, onRefresh, clearLocalStorage])
 
+  // Hand off task to someone else - counts as completed for today
+  const handOffTask = useCallback(async (assigneeId: string) => {
+    if (!currentTask) return
+    
+    const assignee = teamMembers.find(m => m.id === assigneeId)
+    if (!assignee) return
+    
+    // Complete current session if running
+    let finalSessions = sessions
+    if (timerState === 'running' && sessionStartRef.current) {
+      const duration = Date.now() - sessionStartRef.current
+      finalSessions = sessions.map((s, i) => 
+        i === sessions.length - 1 
+          ? { ...s, end: new Date().toLocaleTimeString(), duration_ms: duration }
+          : s
+      )
+    }
+    
+    const isAgent = assignee.is_agent || assignee.user_type === 'ai_agent'
+    
+    try {
+      await supabase
+        .from('tasks')
+        .update({
+          status: 'todo',
+          assignee_id: isAgent ? null : assigneeId,
+          ai_agent: isAgent ? assignee.name?.toLowerCase() : null,
+          focus_queue_order: null, // Remove from focus queue
+          timer_state: 'stopped',
+          current_session_start: null,
+          focus_sessions: finalSessions,
+          total_session_count: finalSessions.length,
+          total_time_spent_ms: finalSessions.reduce((sum, s) => sum + (s.duration_ms || 0), 0)
+        })
+        .eq('id', currentTask.id)
+
+      // Celebrate - this counts!
+      const result = celebrate()
+      setHypeMessage(result.hypeMessage)
+      setTimeout(() => setHypeMessage(null), 2500)
+      
+      showSuccessToast(`Handed off to ${assignee.display_name || assignee.name || assignee.email}!`)
+      
+      // Reset for next task
+      setTimerState('stopped')
+      setSessions([])
+      setSessionCount(1)
+      setElapsedMs(0)
+      sessionStartRef.current = null
+      clearLocalStorage()
+      
+      // Move to next task
+      if (currentTaskIndex < tasks.length - 1) {
+        setCurrentTaskIndex(prev => prev + 1)
+      }
+      
+      onTaskComplete?.(currentTask.id)
+      onRefresh?.()
+    } catch (error) {
+      console.error('Error handing off task:', error)
+      showErrorToast(error, 'Failed to hand off task')
+    }
+  }, [currentTask, sessions, timerState, teamMembers, currentTaskIndex, tasks.length, celebrate, onTaskComplete, onRefresh, clearLocalStorage])
+
+  // Follow up later - counts as completed for today, stays assigned to me
+  const followUpLater = useCallback(async (days: number, specificDate?: string) => {
+    if (!currentTask) return
+    
+    // Complete current session if running
+    let finalSessions = sessions
+    if (timerState === 'running' && sessionStartRef.current) {
+      const duration = Date.now() - sessionStartRef.current
+      finalSessions = sessions.map((s, i) => 
+        i === sessions.length - 1 
+          ? { ...s, end: new Date().toLocaleTimeString(), duration_ms: duration }
+          : s
+      )
+    }
+    
+    // Calculate follow-up date
+    let followUpDate: string
+    if (specificDate) {
+      followUpDate = specificDate
+    } else {
+      const date = new Date()
+      date.setDate(date.getDate() + days)
+      followUpDate = date.toISOString().split('T')[0]
+    }
+    
+    try {
+      await supabase
+        .from('tasks')
+        .update({
+          status: 'in_progress', // Keep in progress
+          focus_queue_order: null, // Remove from today's queue
+          due_date: followUpDate, // Set as new due date
+          timer_state: 'stopped',
+          current_session_start: null,
+          focus_sessions: finalSessions,
+          total_session_count: finalSessions.length,
+          total_time_spent_ms: finalSessions.reduce((sum, s) => sum + (s.duration_ms || 0), 0)
+        })
+        .eq('id', currentTask.id)
+
+      // Celebrate - this counts!
+      const result = celebrate()
+      setHypeMessage(result.hypeMessage)
+      setTimeout(() => setHypeMessage(null), 2500)
+      
+      const dateLabel = days === 1 ? 'tomorrow' : days === 7 ? 'next week' : `in ${days} days`
+      showSuccessToast(`Following up ${specificDate ? 'on ' + followUpDate : dateLabel}!`)
+      
+      // Reset for next task
+      setTimerState('stopped')
+      setSessions([])
+      setSessionCount(1)
+      setElapsedMs(0)
+      sessionStartRef.current = null
+      clearLocalStorage()
+      setShowDatePicker(false)
+      setCustomDate('')
+      
+      // Move to next task
+      if (currentTaskIndex < tasks.length - 1) {
+        setCurrentTaskIndex(prev => prev + 1)
+      }
+      
+      onTaskComplete?.(currentTask.id)
+      onRefresh?.()
+    } catch (error) {
+      console.error('Error setting follow up:', error)
+      showErrorToast(error, 'Failed to set follow up')
+    }
+  }, [currentTask, sessions, timerState, currentTaskIndex, tasks.length, celebrate, onTaskComplete, onRefresh, clearLocalStorage])
+
   const resetTimer = useCallback(() => {
     setTimerState('stopped')
     setSessions([])
@@ -510,7 +676,7 @@ export default function FocusQueue({ tasks, todayCompletedCount = 0, onTaskCompl
           </div>
 
           {/* Controls */}
-          <div className="flex items-center justify-center gap-3">
+          <div className="flex items-center justify-center gap-2 flex-wrap">
             {timerState === 'stopped' && sessions.length === 0 && (
               <Button 
                 color="success" 
@@ -522,44 +688,135 @@ export default function FocusQueue({ tasks, todayCompletedCount = 0, onTaskCompl
                 Start
               </Button>
             )}
-            {timerState === 'running' && (
+            {(timerState === 'running' || timerState === 'paused') && (
               <>
-                <Button 
-                  variant="flat" 
-                  onPress={pauseTimer}
-                  startContent={<Pause className="w-4 h-4" />}
-                >
-                  Pause
-                </Button>
+                {timerState === 'running' && (
+                  <Button 
+                    variant="flat" 
+                    size="sm"
+                    onPress={pauseTimer}
+                    startContent={<Pause className="w-4 h-4" />}
+                  >
+                    Pause
+                  </Button>
+                )}
+                {timerState === 'paused' && (
+                  <Button 
+                    color="primary" 
+                    size="sm"
+                    onPress={startTimer}
+                    startContent={<Play className="w-4 h-4" />}
+                  >
+                    Resume
+                  </Button>
+                )}
+                
+                {/* Main action buttons */}
                 <Button 
                   color="success" 
-                  size="lg" 
                   onPress={finishTask}
-                  startContent={<Check className="w-5 h-5" />}
-                  className="font-bold shadow-lg"
+                  startContent={<Check className="w-4 h-4" />}
+                  className="font-bold"
                 >
-                  Done
+                  Done ✓
                 </Button>
-              </>
-            )}
-            {timerState === 'paused' && (
-              <>
-                <Button 
-                  color="primary" 
-                  onPress={startTimer}
-                  startContent={<Play className="w-4 h-4" />}
-                >
-                  Resume <span className="text-xs opacity-70 ml-1">(S{sessionCount + 1})</span>
-                </Button>
-                <Button 
-                  color="success" 
-                  size="lg" 
-                  onPress={finishTask}
-                  startContent={<Check className="w-5 h-5" />}
-                  className="font-bold shadow-lg"
-                >
-                  Done
-                </Button>
+                
+                {/* Hand Off dropdown */}
+                <Dropdown>
+                  <DropdownTrigger>
+                    <Button 
+                      color="primary" 
+                      variant="flat"
+                      endContent={<ChevronDown className="w-4 h-4" />}
+                    >
+                      Hand Off →
+                    </Button>
+                  </DropdownTrigger>
+                  <DropdownMenu 
+                    aria-label="Hand off to"
+                    onAction={(key) => handOffTask(key as string)}
+                  >
+                    <DropdownSection title="Hand off to">
+                      {teamMembers.map(member => (
+                        <DropdownItem 
+                          key={member.id}
+                          startContent={
+                            member.is_agent || member.user_type === 'ai_agent' 
+                              ? <Bot className="w-4 h-4 text-purple-500" />
+                              : <User className="w-4 h-4 text-blue-500" />
+                          }
+                        >
+                          {member.display_name || member.name || member.email}
+                        </DropdownItem>
+                      ))}
+                    </DropdownSection>
+                  </DropdownMenu>
+                </Dropdown>
+                
+                {/* Later dropdown */}
+                <Popover isOpen={showDatePicker} onOpenChange={setShowDatePicker}>
+                  <Dropdown>
+                    <DropdownTrigger>
+                      <Button 
+                        color="warning" 
+                        variant="flat"
+                        endContent={<ChevronDown className="w-4 h-4" />}
+                      >
+                        Later ⏰
+                      </Button>
+                    </DropdownTrigger>
+                    <DropdownMenu 
+                      aria-label="Follow up later"
+                      onAction={(key) => {
+                        const option = LATER_OPTIONS.find(o => o.key === key)
+                        if (option) {
+                          if (option.key === 'custom') {
+                            setShowDatePicker(true)
+                          } else {
+                            followUpLater(option.days)
+                          }
+                        }
+                      }}
+                    >
+                      {LATER_OPTIONS.map(option => (
+                        <DropdownItem 
+                          key={option.key}
+                          startContent={<Clock className="w-4 h-4 text-amber-500" />}
+                        >
+                          {option.label}
+                        </DropdownItem>
+                      ))}
+                    </DropdownMenu>
+                  </Dropdown>
+                  <PopoverTrigger>
+                    <span></span>
+                  </PopoverTrigger>
+                  <PopoverContent>
+                    <div className="p-3 space-y-3">
+                      <p className="text-sm font-medium">Pick a date</p>
+                      <input 
+                        type="date" 
+                        value={customDate}
+                        onChange={(e) => setCustomDate(e.target.value)}
+                        min={new Date().toISOString().split('T')[0]}
+                        className="w-full p-2 border rounded-lg text-sm"
+                      />
+                      <div className="flex gap-2">
+                        <Button size="sm" variant="flat" onPress={() => setShowDatePicker(false)}>
+                          Cancel
+                        </Button>
+                        <Button 
+                          size="sm" 
+                          color="warning" 
+                          isDisabled={!customDate}
+                          onPress={() => followUpLater(0, customDate)}
+                        >
+                          Set Follow Up
+                        </Button>
+                      </div>
+                    </div>
+                  </PopoverContent>
+                </Popover>
               </>
             )}
             {timerState === 'stopped' && sessions.length > 0 && (
