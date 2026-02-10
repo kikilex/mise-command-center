@@ -1,9 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef } from 'react'
-import { MessageCircle, Eye, Download, Trash2, FileText, ClipboardList, Bot, RotateCcw, Paperclip, User, File, Pencil, ChevronDown, Check } from 'lucide-react'
-import ReactMarkdown from 'react-markdown'
-import remarkGfm from 'remark-gfm'
+import { MessageCircle, Eye, Download, Trash2, FileText, ClipboardList, Bot, Paperclip, User, File, Check, Calendar, Flag, Folder, Layout } from 'lucide-react'
 import {
   Modal,
   ModalContent,
@@ -18,6 +16,10 @@ import {
   Chip,
   Divider,
   Spinner,
+  Dropdown,
+  DropdownTrigger,
+  DropdownMenu,
+  DropdownItem,
 } from '@heroui/react'
 import { createClient } from '@/lib/supabase/client'
 import { showErrorToast, showSuccessToast } from '@/lib/errors'
@@ -44,9 +46,11 @@ interface Task {
   updated_at?: string
   created_by?: string | null
   requested_by?: string | null
+  notes?: string | null
   creator?: { name: string; display_name?: string } | null
   requester?: { name: string; display_name?: string } | null
   focus_queue_order?: number | null
+  phase_item_id?: string | null
 }
 
 interface AIAgent {
@@ -55,34 +59,17 @@ interface AIAgent {
   slug: string
   role: string
   is_active?: boolean
-  model?: string
-  system_prompt?: string
-  capabilities?: string[]
-  settings?: {
-    personality?: string
-  }
-  avatar_url?: string
-  last_action?: string
-  last_action_at?: string
 }
 
 interface Project {
   id: string
   name: string
-  business_id?: string | null
   space_id?: string | null
-  description?: string | null
-  status?: string
-  created_at?: string
-  updated_at?: string
 }
 
 interface Space {
   id: string
   name: string
-  description?: string | null
-  created_at?: string
-  updated_at?: string
 }
 
 interface UserData {
@@ -106,14 +93,6 @@ interface TaskFile {
   uploaded_by: string | null
 }
 
-interface FeedbackMessage {
-  id: string
-  task_id: string
-  author: string
-  message: string
-  created_at: string
-}
-
 interface TaskDetailModalProps {
   task: Task | null
   isOpen: boolean
@@ -132,10 +111,10 @@ const statusOptions = [
 ]
 
 const priorityOptions = [
-  { key: 'critical', label: 'Critical', color: 'bg-red-500' },
-  { key: 'high', label: 'High', color: 'bg-orange-500' },
-  { key: 'medium', label: 'Medium', color: 'bg-yellow-500' },
-  { key: 'low', label: 'Low', color: 'bg-slate-400' },
+  { key: 'critical', label: 'Critical', color: 'danger' },
+  { key: 'high', label: 'High', color: 'warning' },
+  { key: 'medium', label: 'Medium', color: 'primary' },
+  { key: 'low', label: 'Low', color: 'default' },
 ]
 
 const ALLOWED_FILE_TYPES = [
@@ -148,7 +127,7 @@ const ALLOWED_FILE_TYPES = [
   'image/webp',
 ]
 
-const MAX_FILE_SIZE = 50 * 1024 * 1024 // 50MB
+const MAX_FILE_SIZE = 50 * 1024 * 1024
 
 export default function TaskDetailModal({
   task,
@@ -160,6 +139,7 @@ export default function TaskDetailModal({
   const [formData, setFormData] = useState({
     title: '',
     description: '',
+    notes: '',
     status: 'todo',
     priority: 'medium',
     due_date: '',
@@ -181,18 +161,14 @@ export default function TaskDetailModal({
   const [viewingFile, setViewingFile] = useState<TaskFile | null>(null)
   const [viewFileUrl, setViewFileUrl] = useState<string | null>(null)
   const [isEditing, setIsEditing] = useState(false)
-  const [assignToUserId, setAssignToUserId] = useState<string>('')
   const fileInputRef = useRef<HTMLInputElement>(null)
   
   const supabase = createClient()
 
-  // Sub-items state (from phase_items)
   const [subItems, setSubItems] = useState<{text: string, completed: boolean}[]>([])
 
-  // Load task data and dropdown options when modal opens
   useEffect(() => {
     if (task && isOpen) {
-      // Fetch fresh task data to ensure we have latest notes/description
       const loadFreshTask = async () => {
         const { data: freshTask } = await supabase
           .from('tasks')
@@ -202,15 +178,10 @@ export default function TaskDetailModal({
         
         const taskData = freshTask || task
         
-        // Use phase_item notes if task description is empty
-        let description = taskData.description || ''
-        if (!description && taskData.phase_item?.notes) {
-          description = taskData.phase_item.notes
-        }
-        
         setFormData({
           title: taskData.title || '',
-          description: description,
+          description: taskData.description || '',
+          notes: taskData.notes || '',
           status: taskData.status || 'todo',
           priority: taskData.priority || 'medium',
           due_date: taskData.due_date ? taskData.due_date.split('T')[0] : '',
@@ -220,7 +191,6 @@ export default function TaskDetailModal({
           space_id: taskData.space_id || '',
         })
         
-        // Load sub_items from phase_item if available
         if (taskData.phase_item?.sub_items) {
           const parsedSubItems = taskData.phase_item.sub_items.map((item: string) => {
             try {
@@ -235,7 +205,7 @@ export default function TaskDetailModal({
         }
       }
       loadFreshTask()
-      setIsEditing(false) // Reset to read-only mode when modal opens
+      setIsEditing(false)
       loadFiles(task.id)
       loadDropdownData(task.space_id)
     }
@@ -244,33 +214,21 @@ export default function TaskDetailModal({
   async function loadDropdownData(spaceId: string | null) {
     setLoadingData(true)
     try {
-      // Fetch all users (humans + AI agents) for the "Assign to..." dropdown
       const { data: usersData } = await supabase
         .from('users')
         .select('id, email, name, avatar_url, user_type, is_agent, display_name')
-        .order('is_agent', { ascending: true }) // Humans first, then agents
+        .order('is_agent', { ascending: true })
       
-      // Fetch Active Agents (for the AI Agent dropdown in edit mode)
       const { data: agentsData } = await supabase
         .from('ai_agents')
         .select('id, name, slug, role')
         .eq('is_active', true)
       
-      // Fetch Projects
-      let projectQuery = supabase
-        .from('projects')
-        .select('id, name, space_id')
-      
-      if (spaceId) {
-        projectQuery = projectQuery.eq('space_id', spaceId)
-      }
-      
+      let projectQuery = supabase.from('projects').select('id, name, space_id')
+      if (spaceId) projectQuery = projectQuery.eq('space_id', spaceId)
       const { data: projectsData } = await projectQuery
 
-      // Fetch Spaces
-      const { data: spacesData } = await supabase
-        .from('spaces')
-        .select('id, name')
+      const { data: spacesData } = await supabase.from('spaces').select('id, name')
 
       setUsers(usersData || [])
       setAgents(agentsData || [])
@@ -296,22 +254,55 @@ export default function TaskDetailModal({
       setFiles(data || [])
     } catch (error) {
       console.error('Load files error:', error)
-      showErrorToast(error, 'Failed to load attachments')
     } finally {
       setLoadingFiles(false)
     }
   }
 
-  async function handleSave() {
+  // Quick update helper - updates single field immediately
+  async function quickUpdate(field: string, value: any) {
+    if (!task) return
+    try {
+      const { error } = await supabase
+        .from('tasks')
+        .update({ [field]: value })
+        .eq('id', task.id)
+      if (error) throw error
+      onTaskUpdated()
+    } catch (error) {
+      console.error('Update error:', error)
+      showErrorToast(error, 'Failed to update')
+    }
+  }
+
+  async function handleSaveNotes() {
     if (!task) return
     setSaving(true)
-    
+    try {
+      const { error } = await supabase
+        .from('tasks')
+        .update({ notes: formData.notes || null })
+        .eq('id', task.id)
+      if (error) throw error
+      showSuccessToast('Notes saved')
+      onTaskUpdated()
+    } catch (error) {
+      showErrorToast(error, 'Failed to save notes')
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function handleSaveAll() {
+    if (!task) return
+    setSaving(true)
     try {
       const { error } = await supabase
         .from('tasks')
         .update({
           title: formData.title,
           description: formData.description || null,
+          notes: formData.notes || null,
           status: formData.status,
           priority: formData.priority,
           due_date: formData.due_date || null,
@@ -323,72 +314,48 @@ export default function TaskDetailModal({
         .eq('id', task.id)
 
       if (error) throw error
-      
-      showSuccessToast('Task updated successfully')
-      setIsEditing(false) // Switch back to read-only mode after saving
+      showSuccessToast('Task updated')
+      setIsEditing(false)
       onTaskUpdated()
     } catch (error) {
-      console.error('Save task error:', error)
       showErrorToast(error, 'Failed to update task')
     } finally {
       setSaving(false)
     }
   }
 
-  async function handleAssignTo() {
-    if (!task || !assignToUserId) return
-    
-    setSaving(true)
-    
-    try {
-      // Find the user being assigned to
-      const userToAssign = users.find(u => u.id === assignToUserId)
-      if (!userToAssign) throw new Error('User not found')
-      
-      // Determine if this is an AI agent or human
-      const isAgent = userToAssign.is_agent || userToAssign.user_type === 'ai_agent'
-      
-      const updateData: any = {
-        status: isAgent ? 'in_progress' : 'todo',
-      }
-      
-      if (isAgent) {
-        // For AI agents, we need to find the corresponding ai_agent slug
-        const agent = agents.find(a => a.name.toLowerCase() === userToAssign.name?.toLowerCase() || 
-                                      a.slug === userToAssign.name?.toLowerCase())
-        updateData.ai_agent = agent?.slug || userToAssign.name?.toLowerCase()
-        updateData.assignee_id = null // Clear human assignee
-      } else {
-        // For humans
-        updateData.assignee_id = assignToUserId
-        updateData.ai_agent = null // Clear AI agent
-      }
-      
-      const { error } = await supabase
-        .from('tasks')
-        .update(updateData)
-        .eq('id', task.id)
+  async function handleAssign(userId: string) {
+    if (!task) return
+    const user = users.find(u => u.id === userId)
+    if (!user) return
 
+    const isAgent = user.is_agent || user.user_type === 'ai_agent'
+    const updateData: any = { status: isAgent ? 'in_progress' : 'todo' }
+
+    if (isAgent) {
+      const agent = agents.find(a => a.name.toLowerCase() === user.name?.toLowerCase())
+      updateData.ai_agent = agent?.slug || user.name?.toLowerCase()
+      updateData.assignee_id = null
+    } else {
+      updateData.assignee_id = userId
+      updateData.ai_agent = null
+    }
+
+    try {
+      const { error } = await supabase.from('tasks').update(updateData).eq('id', task.id)
       if (error) throw error
-      
-      showSuccessToast(`Task assigned to ${userToAssign.name || userToAssign.email}`)
-      setAssignToUserId('') // Reset dropdown
+      showSuccessToast(`Assigned to ${user.name || user.email}`)
+      setFormData({ ...formData, assignee_id: updateData.assignee_id || '', ai_agent: updateData.ai_agent || '' })
       onTaskUpdated()
-      onClose() // Close modal after assignment
     } catch (error) {
-      console.error('Assign error:', error)
-      showErrorToast(error, 'Failed to assign task')
-    } finally {
-      setSaving(false)
+      showErrorToast(error, 'Failed to assign')
     }
   }
 
   const handleFileUpload = useCallback(async (fileList: FileList | null) => {
     if (!fileList || !task) return
-    
     const filesToUpload = Array.from(fileList)
     
-    // Validate files
     for (const file of filesToUpload) {
       if (!ALLOWED_FILE_TYPES.includes(file.type)) {
         showErrorToast(null, `File type not supported: ${file.name}`)
@@ -401,86 +368,50 @@ export default function TaskDetailModal({
     }
     
     setUploading(true)
-    
     try {
       for (const file of filesToUpload) {
-        // Upload to storage
         const filePath = `${task.id}/${Date.now()}-${file.name}`
-        const { error: uploadError } = await supabase.storage
-          .from('task-files')
-          .upload(filePath, file)
-
+        const { error: uploadError } = await supabase.storage.from('task-files').upload(filePath, file)
         if (uploadError) throw uploadError
 
-        // Create database record
-        const { error: dbError } = await supabase
-          .from('task_files')
-          .insert({
-            task_id: task.id,
-            file_name: file.name,
-            file_path: filePath,
-            file_type: file.type,
-            file_size: file.size,
-            uploaded_by: userId,
-          })
-
+        const { error: dbError } = await supabase.from('task_files').insert({
+          task_id: task.id,
+          file_name: file.name,
+          file_path: filePath,
+          file_type: file.type,
+          file_size: file.size,
+          uploaded_by: userId,
+        })
         if (dbError) throw dbError
       }
-      
       showSuccessToast(`${filesToUpload.length} file(s) uploaded`)
       loadFiles(task.id)
     } catch (error) {
-      console.error('Upload error:', error)
       showErrorToast(error, 'Failed to upload file')
     } finally {
       setUploading(false)
     }
-  }, [task, userId, supabase])
+  }, [task, userId])
 
   async function handleDeleteFile(file: TaskFile) {
     try {
-      // Delete from storage
-      const { error: storageError } = await supabase.storage
-        .from('task-files')
-        .remove([file.file_path])
-
-      if (storageError) throw storageError
-
-      // Delete database record
-      const { error: dbError } = await supabase
-        .from('task_files')
-        .delete()
-        .eq('id', file.id)
-
-      if (dbError) throw dbError
-
+      await supabase.storage.from('task-files').remove([file.file_path])
+      await supabase.from('task_files').delete().eq('id', file.id)
       showSuccessToast('File deleted')
       setFiles(files.filter(f => f.id !== file.id))
     } catch (error) {
-      console.error('Delete file error:', error)
       showErrorToast(error, 'Failed to delete file')
     }
   }
 
   async function getDownloadUrl(file: TaskFile) {
     try {
-      const { data, error } = await supabase.storage
-        .from('task-files')
-        .createSignedUrl(file.file_path, 3600) // 1 hour expiry
-
+      const { data, error } = await supabase.storage.from('task-files').createSignedUrl(file.file_path, 3600)
       if (error) throw error
       return data.signedUrl
     } catch (error) {
-      console.error('Get download URL error:', error)
       showErrorToast(error, 'Failed to get download link')
       return null
-    }
-  }
-
-  async function handleDownload(file: TaskFile) {
-    const url = await getDownloadUrl(file)
-    if (url) {
-      window.open(url, '_blank')
     }
   }
 
@@ -492,722 +423,332 @@ export default function TaskDetailModal({
     }
   }
 
-  function closeFileViewer() {
-    setViewingFile(null)
-    setViewFileUrl(null)
-  }
-
-  // Drag and drop handlers
-  const handleDragOver = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    setIsDragging(true)
-  }, [])
-
-  const handleDragLeave = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    setIsDragging(false)
-  }, [])
-
-  const handleDrop = useCallback((e: React.DragEvent) => {
-    e.preventDefault()
-    setIsDragging(false)
-    handleFileUpload(e.dataTransfer.files)
-  }, [handleFileUpload])
+  const handleDragOver = useCallback((e: React.DragEvent) => { e.preventDefault(); setIsDragging(true) }, [])
+  const handleDragLeave = useCallback((e: React.DragEvent) => { e.preventDefault(); setIsDragging(false) }, [])
+  const handleDrop = useCallback((e: React.DragEvent) => { e.preventDefault(); setIsDragging(false); handleFileUpload(e.dataTransfer.files) }, [handleFileUpload])
 
   const formatFileSize = (bytes: number | null) => {
-    if (!bytes) return 'Unknown size'
+    if (!bytes) return ''
     if (bytes < 1024) return `${bytes} B`
     if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
     return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
   }
 
-  const getFileIcon = (fileType: string | null) => {
-    return <File className="w-5 h-5 text-slate-500" />
-  }
-
-  const formatTimestamp = (timestamp: string) => {
-    const date = new Date(timestamp)
-    const now = new Date()
-    const diffMs = now.getTime() - date.getTime()
-    const diffMins = Math.floor(diffMs / 60000)
-    const diffHours = Math.floor(diffMs / 3600000)
-    const diffDays = Math.floor(diffMs / 86400000)
-    
-    if (diffMins < 1) return 'just now'
-    if (diffMins < 60) return `${diffMins}m ago`
-    if (diffHours < 24) return `${diffHours}h ago`
-    if (diffDays < 7) return `${diffDays}d ago`
-    return date.toLocaleDateString()
-  }
-
-  const isAxMessage = (author: string) => author === 'ax'
-
-  // Helper function to get user display name
-  const getUserDisplayName = (user: UserData) => {
-    if (user.display_name) return user.display_name
-    if (user.name) return user.name
-    return user.email
-  }
-
-  // Helper function to get user type label
-  const getUserTypeLabel = (user: UserData) => {
-    if (user.is_agent || user.user_type === 'ai_agent') return 'AI Agent'
-    return 'Human'
-  }
-
-  // Helper function to get status chip color
-  const getStatusChipColor = (status: string) => {
-    const statusOption = statusOptions.find(s => s.key === status)
-    return statusOption?.color || 'default'
-  }
-
-  // Helper function to get priority chip color
-  const getPriorityChipColor = (priority: string) => {
-    const priorityOption = priorityOptions.find(p => p.key === priority)
-    return priorityOption?.color || 'bg-slate-400'
-  }
-
-  // Helper function to get status label
-  const getStatusLabel = (status: string) => {
-    const statusOption = statusOptions.find(s => s.key === status)
-    return statusOption?.label || status
-  }
-
-  // Helper function to get priority label
-  const getPriorityLabel = (priority: string) => {
-    const priorityOption = priorityOptions.find(p => p.key === priority)
-    return priorityOption?.label || priority
-  }
-
-  // Helper function to get assigned user name
-  const getAssignedUserName = () => {
+  const getUserDisplayName = (user: UserData) => user.display_name || user.name || user.email
+  const getAssignedName = () => {
     if (formData.assignee_id) {
       const user = users.find(u => u.id === formData.assignee_id)
-      return user ? getUserDisplayName(user) : 'Unknown user'
+      return user ? getUserDisplayName(user) : 'Unknown'
     }
     if (formData.ai_agent) {
       const agent = agents.find(a => a.slug === formData.ai_agent)
       return agent ? agent.name : formData.ai_agent
     }
-    return 'Unassigned'
+    return null
   }
-
-  // Helper function to get project name
-  const getProjectName = () => {
-    if (formData.project_id) {
-      const project = projects.find(p => p.id === formData.project_id)
-      return project ? project.name : 'Unknown project'
-    }
-    return 'No project'
-  }
-
-  // Helper function to get space name
-  const getSpaceName = () => {
-    if (formData.space_id) {
-      const space = spaces.find(s => s.id === formData.space_id)
-      return space ? space.name : 'Unknown space'
-    }
-    return 'No space'
-  }
+  const getProjectName = () => projects.find(p => p.id === formData.project_id)?.name || null
+  const getSpaceName = () => spaces.find(s => s.id === formData.space_id)?.name || null
 
   if (!task) return null
 
   return (
     <>
-    <Modal 
-      isOpen={isOpen} 
-      onClose={onClose} 
-      size="3xl"
-      scrollBehavior="inside"
-    >
+    <Modal isOpen={isOpen} onClose={onClose} size="3xl" scrollBehavior="inside">
       <ModalContent>
-        <ModalHeader className="flex flex-col gap-1">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <ClipboardList className="w-5 h-5 text-slate-600 dark:text-slate-400" />
-              <span>Task Details</span>
-              {task.ai_agent && (
-                <Chip size="sm" variant="flat" className="capitalize">
-                  Agent: {task.ai_agent}
-                </Chip>
-              )}
-            </div>
-            {!isEditing && (
-              <Button
-                size="sm"
-                variant="flat"
-                isIconOnly
-                onPress={() => setIsEditing(true)}
-              >
-                <Pencil className="w-4 h-4" />
-              </Button>
-            )}
+        <ModalHeader className="pb-2">
+          <div className="flex items-center gap-2">
+            <ClipboardList className="w-5 h-5 text-violet-500" />
+            <span className="text-sm text-slate-500">Task</span>
           </div>
         </ModalHeader>
         
-        <ModalBody>
-          <div className="flex flex-col gap-6">
-            {/* Basic Info */}
+        <ModalBody className="pt-0">
+          {isEditing ? (
+            /* ===== EDIT MODE ===== */
             <div className="space-y-4">
-              {isEditing ? (
-                <>
-                  <Input
-                    label="Title"
-                    value={formData.title}
-                    onChange={(e) => setFormData({ ...formData, title: e.target.value })}
-                    isRequired
-                  />
-                  
-                  <Textarea
-                    label="Description"
-                    placeholder="Task description..."
-                    value={formData.description}
-                    onChange={(e) => setFormData({ ...formData, description: e.target.value })}
-                    minRows={3}
-                  />
-                  
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <Select
-                      label="Status"
-                      selectedKeys={[formData.status]}
-                      onChange={(e) => setFormData({ ...formData, status: e.target.value })}
-                    >
-                      {statusOptions.map(s => (
-                        <SelectItem key={s.key}>{s.label}</SelectItem>
-                      ))}
-                    </Select>
-                    
-                    <Select
-                      label="Priority"
-                      selectedKeys={[formData.priority]}
-                      onChange={(e) => setFormData({ ...formData, priority: e.target.value })}
-                    >
-                      {priorityOptions.map(p => (
-                        <SelectItem key={p.key}>{p.label}</SelectItem>
-                      ))}
-                    </Select>
-                    
-                    <Input
-                      label="Due Date"
-                      type="date"
-                      value={formData.due_date}
-                      onChange={(e) => setFormData({ ...formData, due_date: e.target.value })}
-                    />
-                  </div>
-
-                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                    <Select
-                      label="Assignee"
-                      placeholder="Select human"
-                      selectedKeys={formData.assignee_id ? [formData.assignee_id] : []}
-                      onChange={(e) => setFormData({ ...formData, assignee_id: e.target.value })}
-                      startContent={<User className="w-4 h-4 text-slate-400" />}
-                    >
-                      {users.filter(u => !u.is_agent && u.user_type !== 'ai_agent').map(u => (
-                        <SelectItem key={u.id} textValue={u.name || u.email}>
-                          <div className="flex items-center gap-2">
-                            <span>{u.name || u.email}</span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </Select>
-
-                    <Select
-                      label="AI Agent"
-                      placeholder="Select agent"
-                      selectedKeys={formData.ai_agent ? [formData.ai_agent] : []}
-                      onChange={(e) => setFormData({ ...formData, ai_agent: e.target.value })}
-                      startContent={<Bot className="w-4 h-4 text-slate-400" />}
-                    >
-                      {agents.map(a => (
-                        <SelectItem key={a.slug} textValue={a.name}>
-                          <div className="flex flex-col">
-                            <span className="font-medium">{a.name}</span>
-                            <span className="text-xs text-slate-400">{a.role}</span>
-                          </div>
-                        </SelectItem>
-                      ))}
-                    </Select>
-
-                    <Select
-                      label="Project"
-                      placeholder="Select project"
-                      selectedKeys={formData.project_id ? [formData.project_id] : []}
-                      onChange={(e) => setFormData({ ...formData, project_id: e.target.value })}
-                      startContent={<FileText className="w-4 h-4 text-slate-400" />}
-                    >
-                      {projects.map(p => (
-                        <SelectItem key={p.id} textValue={p.name}>
-                          {p.name}
-                        </SelectItem>
-                      ))}
-                    </Select>
-                  </div>
-                </>
-              ) : (
-                <>
-                  {/* Read-only view */}
-                  <div className="space-y-3">
-                    <div>
-                      <label className="text-sm font-medium text-slate-500 dark:text-slate-400">Title</label>
-                      <p className="text-lg font-semibold text-slate-800 dark:text-slate-200 mt-1">{formData.title}</p>
-                    </div>
-                    
-                    {formData.description && (
-                      <div>
-                        <label className="text-sm font-medium text-slate-500 dark:text-slate-400">Description</label>
-                        <div 
-                          className="text-slate-700 dark:text-slate-300 mt-1 prose prose-slate dark:prose-invert max-w-none prose-sm"
-                          dangerouslySetInnerHTML={{ __html: formData.description }}
-                        />
-                      </div>
-                    )}
-                    
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                      <div>
-                        <label className="text-sm font-medium text-slate-500 dark:text-slate-400">Status</label>
-                        <div className="mt-1">
-                          <Select
-                            size="sm"
-                            selectedKeys={[formData.status]}
-                            onChange={(e) => {
-                              setFormData({ ...formData, status: e.target.value })
-                              // Auto-save status change
-                              if (task) {
-                                supabase
-                                  .from('tasks')
-                                  .update({ status: e.target.value })
-                                  .eq('id', task.id)
-                                  .then(() => {
-                                    showSuccessToast('Status updated')
-                                    onTaskUpdated()
-                                  })
-                                  .catch(error => {
-                                    console.error('Update status error:', error)
-                                    showErrorToast(error, 'Failed to update status')
-                                  })
-                              }
-                            }}
-                            className="w-full"
-                          >
-                            {statusOptions.map(s => (
-                              <SelectItem key={s.key}>{s.label}</SelectItem>
-                            ))}
-                          </Select>
-                        </div>
-                      </div>
-                      
-                      <div>
-                        <label className="text-sm font-medium text-slate-500 dark:text-slate-400">Priority</label>
-                        <div className="mt-1">
-                          <Select
-                            size="sm"
-                            selectedKeys={[formData.priority]}
-                            onChange={(e) => {
-                              setFormData({ ...formData, priority: e.target.value })
-                              // Auto-save priority change
-                              if (task) {
-                                supabase
-                                  .from('tasks')
-                                  .update({ priority: e.target.value })
-                                  .eq('id', task.id)
-                                  .then(() => {
-                                    showSuccessToast('Priority updated')
-                                    onTaskUpdated()
-                                  })
-                                  .catch(error => {
-                                    console.error('Update priority error:', error)
-                                    showErrorToast(error, 'Failed to update priority')
-                                  })
-                              }
-                            }}
-                            className="w-full"
-                          >
-                            {priorityOptions.map(p => (
-                              <SelectItem key={p.key}>{p.label}</SelectItem>
-                            ))}
-                          </Select>
-                        </div>
-                      </div>
-                      
-                      <div>
-                        <label className="text-sm font-medium text-slate-500 dark:text-slate-400">Due Date</label>
-                        <div className="mt-1">
-                          <Input
-                            type="date"
-                            size="sm"
-                            value={formData.due_date}
-                            onChange={(e) => {
-                              setFormData({ ...formData, due_date: e.target.value })
-                              // Auto-save due date change
-                              if (task) {
-                                supabase
-                                  .from('tasks')
-                                  .update({ due_date: e.target.value || null })
-                                  .eq('id', task.id)
-                                  .then(() => {
-                                    showSuccessToast('Due date updated')
-                                    onTaskUpdated()
-                                  })
-                                  .catch(error => {
-                                    console.error('Update due date error:', error)
-                                    showErrorToast(error, 'Failed to update due date')
-                                  })
-                              }
-                            }}
-                            className="w-full"
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                      <div>
-                        <label className="text-sm font-medium text-slate-500 dark:text-slate-400">Assigned To</label>
-                        <p className="text-slate-700 dark:text-slate-300 mt-1">{getAssignedUserName()}</p>
-                      </div>
-                      
-                      <div>
-                        <label className="text-sm font-medium text-slate-500 dark:text-slate-400">Project</label>
-                        <p className="text-slate-700 dark:text-slate-300 mt-1">{getProjectName()}</p>
-                      </div>
-                      
-                      <div>
-                        <label className="text-sm font-medium text-slate-500 dark:text-slate-400">Space</label>
-                        <p className="text-slate-700 dark:text-slate-300 mt-1">
-                          {getSpaceName()}
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </>
-              )}
-            </div>
-
-            {/* Quick Assign (only in read-only mode) */}
-            {!isEditing && (
-              <div className="flex items-center gap-2 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
-                <span className="text-sm text-slate-500 whitespace-nowrap">Assign to:</span>
-                <Select
-                  placeholder="Select user or agent"
-                  size="sm"
-                  selectedKeys={assignToUserId ? [assignToUserId] : []}
-                  onChange={(e) => setAssignToUserId(e.target.value)}
-                  className="flex-1"
-                >
-                  {users.map(u => (
-                    <SelectItem 
-                      key={u.id} 
-                      textValue={getUserDisplayName(u)}
-                      startContent={
-                        u.is_agent || u.user_type === 'ai_agent' ? (
-                          <Bot className="w-4 h-4 text-purple-500" />
-                        ) : (
-                          <User className="w-4 h-4 text-blue-500" />
-                        )
-                      }
-                    >
-                      <div className="flex flex-col">
-                        <span className="font-medium">{getUserDisplayName(u)}</span>
-                        <span className="text-xs text-slate-400">{getUserTypeLabel(u)}</span>
-                      </div>
-                    </SelectItem>
-                  ))}
-                </Select>
-                <Button
-                  color="primary"
-                  size="sm"
-                  onPress={handleAssignTo}
-                  isDisabled={!assignToUserId || saving}
-                  isLoading={saving}
-                >
-                  Assign
-                </Button>
-              </div>
-            )}
-
-            {/* Quick Notes */}
-            <div className="space-y-2">
-              <div className="flex items-center justify-between">
-                <label className="text-sm font-medium text-slate-600 dark:text-slate-400">Notes</label>
-                <Button
-                  size="sm"
-                  variant="flat"
-                  color="primary"
-                  onPress={async () => {
-                    if (task) {
-                      await supabase
-                        .from('tasks')
-                        .update({ description: formData.description || null })
-                        .eq('id', task.id)
-                      showSuccessToast('Notes saved')
-                    }
-                  }}
-                >
-                  Save
-                </Button>
-              </div>
-              <RichTextEditor
-                content={formData.description}
-                onChange={(val) => setFormData({ ...formData, description: val })}
-                placeholder="Add notes..."
-                minHeight="80px"
+              <Input
+                label="Title"
+                value={formData.title}
+                onChange={(e) => setFormData({ ...formData, title: e.target.value })}
+                size="lg"
               />
-            </div>
+              
+              <Textarea
+                label="Description"
+                placeholder="What needs to be done?"
+                value={formData.description}
+                onChange={(e) => setFormData({ ...formData, description: e.target.value })}
+                minRows={2}
+              />
 
-            {/* Sub-items (from phase items) */}
-            {subItems.length > 0 && (
-              <>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-slate-600 dark:text-slate-400">Sub-items</label>
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <Select label="Status" size="sm" selectedKeys={[formData.status]} onChange={(e) => setFormData({ ...formData, status: e.target.value })}>
+                  {statusOptions.map(s => <SelectItem key={s.key}>{s.label}</SelectItem>)}
+                </Select>
+                <Select label="Priority" size="sm" selectedKeys={[formData.priority]} onChange={(e) => setFormData({ ...formData, priority: e.target.value })}>
+                  {priorityOptions.map(p => <SelectItem key={p.key}>{p.label}</SelectItem>)}
+                </Select>
+                <Input label="Due" type="date" size="sm" value={formData.due_date} onChange={(e) => setFormData({ ...formData, due_date: e.target.value })} />
+                <Select label="Assignee" size="sm" placeholder="Select" selectedKeys={formData.assignee_id ? [formData.assignee_id] : []} onChange={(e) => setFormData({ ...formData, assignee_id: e.target.value })}>
+                  {users.filter(u => !u.is_agent).map(u => <SelectItem key={u.id}>{u.name || u.email}</SelectItem>)}
+                </Select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <Select label="AI Agent" size="sm" placeholder="None" selectedKeys={formData.ai_agent ? [formData.ai_agent] : []} onChange={(e) => setFormData({ ...formData, ai_agent: e.target.value })}>
+                  {agents.map(a => <SelectItem key={a.slug}>{a.name}</SelectItem>)}
+                </Select>
+                <Select label="Project" size="sm" placeholder="None" selectedKeys={formData.project_id ? [formData.project_id] : []} onChange={(e) => setFormData({ ...formData, project_id: e.target.value })}>
+                  {projects.map(p => <SelectItem key={p.id}>{p.name}</SelectItem>)}
+                </Select>
+              </div>
+            </div>
+          ) : (
+            /* ===== VIEW MODE ===== */
+            <div className="space-y-4">
+              {/* Title */}
+              <h2 className="text-xl font-bold text-slate-800 dark:text-slate-100">{formData.title}</h2>
+              
+              {/* Compact Metadata Row */}
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Status Dropdown */}
+                <Dropdown>
+                  <DropdownTrigger>
+                    <Chip 
+                      size="sm" 
+                      color={statusOptions.find(s => s.key === formData.status)?.color as any || 'default'}
+                      className="cursor-pointer hover:opacity-80"
+                    >
+                      {statusOptions.find(s => s.key === formData.status)?.label}
+                    </Chip>
+                  </DropdownTrigger>
+                  <DropdownMenu onAction={(key) => { setFormData({ ...formData, status: key as string }); quickUpdate('status', key) }}>
+                    {statusOptions.map(s => <DropdownItem key={s.key}>{s.label}</DropdownItem>)}
+                  </DropdownMenu>
+                </Dropdown>
+
+                {/* Priority Dropdown */}
+                <Dropdown>
+                  <DropdownTrigger>
+                    <Chip 
+                      size="sm" 
+                      color={priorityOptions.find(p => p.key === formData.priority)?.color as any || 'default'}
+                      variant="flat"
+                      className="cursor-pointer hover:opacity-80"
+                      startContent={<Flag className="w-3 h-3" />}
+                    >
+                      {priorityOptions.find(p => p.key === formData.priority)?.label}
+                    </Chip>
+                  </DropdownTrigger>
+                  <DropdownMenu onAction={(key) => { setFormData({ ...formData, priority: key as string }); quickUpdate('priority', key) }}>
+                    {priorityOptions.map(p => <DropdownItem key={p.key}>{p.label}</DropdownItem>)}
+                  </DropdownMenu>
+                </Dropdown>
+
+                {/* Due Date */}
+                <div className="flex items-center gap-1 text-sm text-slate-500">
+                  <Calendar className="w-3.5 h-3.5" />
+                  <input 
+                    type="date" 
+                    value={formData.due_date} 
+                    onChange={(e) => { setFormData({ ...formData, due_date: e.target.value }); quickUpdate('due_date', e.target.value || null) }}
+                    className="bg-transparent border-none p-0 text-sm text-slate-600 dark:text-slate-400 cursor-pointer hover:text-violet-600"
+                  />
+                </div>
+
+                {/* Assignee Dropdown */}
+                <Dropdown>
+                  <DropdownTrigger>
+                    <Chip 
+                      size="sm" 
+                      variant="flat"
+                      className="cursor-pointer hover:opacity-80"
+                      startContent={getAssignedName() && (formData.ai_agent ? <Bot className="w-3 h-3" /> : <User className="w-3 h-3" />)}
+                    >
+                      {getAssignedName() || 'Unassigned'}
+                    </Chip>
+                  </DropdownTrigger>
+                  <DropdownMenu onAction={(key) => handleAssign(key as string)}>
+                    {users.map(u => (
+                      <DropdownItem 
+                        key={u.id}
+                        startContent={u.is_agent || u.user_type === 'ai_agent' ? <Bot className="w-4 h-4 text-purple-500" /> : <User className="w-4 h-4 text-blue-500" />}
+                      >
+                        {getUserDisplayName(u)}
+                      </DropdownItem>
+                    ))}
+                  </DropdownMenu>
+                </Dropdown>
+
+                {/* Project */}
+                {getProjectName() && (
+                  <Chip size="sm" variant="flat" startContent={<Folder className="w-3 h-3" />}>
+                    {getProjectName()}
+                  </Chip>
+                )}
+
+                {/* Space */}
+                {getSpaceName() && (
+                  <Chip size="sm" variant="flat" color="secondary" startContent={<Layout className="w-3 h-3" />}>
+                    {getSpaceName()}
+                  </Chip>
+                )}
+              </div>
+
+              {/* Description (if exists) */}
+              {formData.description && (
+                <div className="p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+                  <div 
+                    className="prose prose-sm prose-slate dark:prose-invert max-w-none"
+                    dangerouslySetInnerHTML={{ __html: formData.description }}
+                  />
+                </div>
+              )}
+
+              {/* Sub-items */}
+              {subItems.length > 0 && (
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-slate-500 uppercase">Checklist</label>
                   <div className="space-y-1">
                     {subItems.map((item, idx) => (
-                      <div key={idx} className="flex items-center gap-2 p-2 bg-slate-50 dark:bg-slate-800/50 rounded-lg">
+                      <div key={idx} className="flex items-center gap-2 p-2 bg-slate-50 dark:bg-slate-800/50 rounded">
                         <div className={`w-4 h-4 rounded border-2 flex items-center justify-center ${
-                          item.completed 
-                            ? 'bg-green-500 border-green-500 text-white' 
-                            : 'border-slate-300 dark:border-slate-600'
+                          item.completed ? 'bg-green-500 border-green-500 text-white' : 'border-slate-300'
                         }`}>
                           {item.completed && <Check className="w-3 h-3" />}
                         </div>
-                        <span className={`text-sm ${item.completed ? 'line-through text-slate-400' : 'text-slate-700 dark:text-slate-300'}`}>
-                          {item.text}
-                        </span>
+                        <span className={`text-sm ${item.completed ? 'line-through text-slate-400' : ''}`}>{item.text}</span>
                       </div>
                     ))}
                   </div>
                 </div>
-                <Divider />
-              </>
-            )}
+              )}
 
-            {/* Documents Section */}
-            {task && (
+              <Divider />
+
+              {/* Notes Section - Always visible, easy to edit */}
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-medium text-slate-500 uppercase">Notes</label>
+                  <Button size="sm" variant="flat" color="primary" onPress={handleSaveNotes} isLoading={saving}>
+                    Save Notes
+                  </Button>
+                </div>
+                <RichTextEditor
+                  content={formData.notes}
+                  onChange={(val) => setFormData({ ...formData, notes: val })}
+                  placeholder="Add notes, thoughts, updates..."
+                  minHeight="100px"
+                />
+              </div>
+
+              <Divider />
+
+              {/* Conversation - Always visible */}
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-slate-500 uppercase flex items-center gap-1">
+                  <MessageCircle className="w-3.5 h-3.5" /> Conversation
+                </label>
+                <div className="h-[180px] border border-slate-200 dark:border-slate-700 rounded-lg overflow-hidden">
+                  <TaskThread taskId={task.id} className="h-full" />
+                </div>
+              </div>
+
+              <Divider />
+
+              {/* Documents */}
               <TaskDocuments
                 taskId={task.id}
                 taskTitle={task.title}
                 spaceId={task.space_id}
                 userId={userId || null}
               />
-            )}
 
-            <Divider />
+              <Divider />
 
-            {/* Task Thread Section - Collapsible */}
-            <details className="group">
-              <summary className="flex items-center gap-2 cursor-pointer text-md font-semibold text-slate-700 dark:text-slate-200 hover:text-violet-600 transition-colors">
-                <MessageCircle className="w-4 h-4" /> 
-                <span>Conversation</span>
-                <ChevronDown className="w-4 h-4 ml-auto transition-transform group-open:rotate-180" />
-              </summary>
-              <div className="mt-3 h-[200px]">
-                {task && (
-                  <TaskThread taskId={task.id} className="h-full" />
-                )}
-              </div>
-            </details>
-
-            <Divider />
-
-            {/* File Attachments */}
-            <div className="space-y-3">
-              <h3 className="text-md font-semibold text-slate-700 dark:text-slate-200 flex items-center gap-2">
-                <Paperclip className="w-4 h-4" /> Attachments
-                {files.length > 0 && (
-                  <Chip size="sm" variant="flat">{files.length}</Chip>
-                )}
-              </h3>
-              
-              {/* Upload Area */}
-              <div
-                className={`border-2 border-dashed rounded-lg p-6 text-center transition-colors cursor-pointer ${
-                  isDragging 
-                    ? 'border-primary bg-primary/10' 
-                    : 'border-slate-300 dark:border-slate-600 hover:border-primary/50'
-                }`}
-                onDragOver={handleDragOver}
-                onDragLeave={handleDragLeave}
-                onDrop={handleDrop}
-                onClick={() => fileInputRef.current?.click()}
-              >
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  multiple
-                  accept=".txt,.md,.pdf,.png,.jpg,.jpeg,.gif,.webp"
-                  className="hidden"
-                  onChange={(e) => handleFileUpload(e.target.files)}
-                />
+              {/* Attachments - Bottom */}
+              <div className="space-y-2">
+                <label className="text-xs font-medium text-slate-500 uppercase flex items-center gap-1">
+                  <Paperclip className="w-3.5 h-3.5" /> Attachments {files.length > 0 && `(${files.length})`}
+                </label>
                 
-                {uploading ? (
-                  <div className="flex items-center justify-center gap-2">
+                <div
+                  className={`border-2 border-dashed rounded-lg p-4 text-center transition-colors cursor-pointer ${
+                    isDragging ? 'border-primary bg-primary/10' : 'border-slate-300 dark:border-slate-600 hover:border-primary/50'
+                  }`}
+                  onDragOver={handleDragOver}
+                  onDragLeave={handleDragLeave}
+                  onDrop={handleDrop}
+                  onClick={() => fileInputRef.current?.click()}
+                >
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    multiple
+                    accept=".txt,.md,.pdf,.png,.jpg,.jpeg,.gif,.webp"
+                    className="hidden"
+                    onChange={(e) => handleFileUpload(e.target.files)}
+                  />
+                  {uploading ? (
                     <Spinner size="sm" />
-                    <span className="text-slate-500">Uploading...</span>
-                  </div>
-                ) : (
-                  <>
-                    <div className="mb-2 text-slate-400">
-                      <svg xmlns="http://www.w3.org/2000/svg" className="w-10 h-10 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}>
-                        <path strokeLinecap="round" strokeLinejoin="round" d="M3 16.5v2.25A2.25 2.25 0 005.25 21h13.5A2.25 2.25 0 0021 18.75V16.5m-13.5-9L12 3m0 0l4.5 4.5M12 3v13.5" />
-                      </svg>
-                    </div>
-                    <p className="text-slate-600 dark:text-slate-300">
-                      Drag & drop files here, or click to browse
-                    </p>
-                    <p className="text-sm text-slate-400 mt-1">
-                      Supports: txt, md, pdf, png, jpg, gif, webp (max 50MB)
-                    </p>
-                  </>
-                )}
-              </div>
-
-              {/* File List */}
-              {loadingFiles ? (
-                <div className="flex items-center justify-center py-4">
-                  <Spinner size="sm" />
-                  <span className="ml-2 text-slate-500">Loading attachments...</span>
+                  ) : (
+                    <p className="text-sm text-slate-500">Drop files or click to upload</p>
+                  )}
                 </div>
-              ) : files.length > 0 ? (
-                <div className="space-y-2">
-                  {files.map((file) => {
-                    const canView = isViewableFile(file.file_name, file.file_type)
-                    return (
-                      <div
-                        key={file.id}
-                        className={`flex items-center justify-between p-3 bg-slate-100 dark:bg-slate-800 rounded-lg ${canView ? 'cursor-pointer hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors' : ''}`}
-                        onClick={() => canView && handleViewFile(file)}
-                      >
-                        <div className="flex items-center gap-3 min-w-0">
-                          {getFileIcon(file.file_type)}
-                          <div className="min-w-0">
-                            <div className="flex items-center gap-2">
-                              <p className="font-medium text-slate-700 dark:text-slate-200 truncate">
-                                {file.file_name}
-                              </p>
-                              {canView && (
-                                <Chip size="sm" variant="flat" className="bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 text-xs">
-                                  <Eye className="w-3 h-3 mr-1 inline" />
-                                  Viewable
-                                </Chip>
-                              )}
-                            </div>
-                            <p className="text-xs text-slate-500">
-                              {formatFileSize(file.file_size)} • {new Date(file.uploaded_at).toLocaleDateString()}
-                            </p>
-                          </div>
+
+                {files.length > 0 && (
+                  <div className="space-y-1">
+                    {files.map((file) => (
+                      <div key={file.id} className="flex items-center justify-between p-2 bg-slate-50 dark:bg-slate-800 rounded text-sm">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <File className="w-4 h-4 text-slate-400 flex-shrink-0" />
+                          <span className="truncate">{file.file_name}</span>
+                          <span className="text-xs text-slate-400">{formatFileSize(file.file_size)}</span>
                         </div>
-                        <div className="flex gap-1 sm:gap-2 flex-shrink-0" onClick={(e) => e.stopPropagation()}>
-                          {canView && (
-                            <Button
-                              size="sm"
-                              variant="flat"
-                              color="primary"
-                              onPress={() => handleViewFile(file)}
-                              className="hidden sm:flex"
-                              startContent={<Eye className="w-4 h-4" />}
-                            >
-                              View
-                            </Button>
-                          )}
-                          <Button
-                            size="sm"
-                            variant="flat"
-                            onPress={() => handleDownload(file)}
-                            className="hidden sm:flex"
-                            startContent={<Download className="w-4 h-4" />}
-                          >
-                            Download
-                          </Button>
-                          <Button
-                            size="sm"
-                            variant="flat"
-                            color="danger"
-                            onPress={() => handleDeleteFile(file)}
-                            className="hidden sm:flex"
-                            startContent={<Trash2 className="w-4 h-4" />}
-                          >
-                            Delete
-                          </Button>
-                          {/* Mobile icon-only buttons */}
-                          {canView && (
-                            <Button
-                              size="sm"
-                              variant="flat"
-                              color="primary"
-                              isIconOnly
-                              onPress={() => handleViewFile(file)}
-                              className="sm:hidden min-w-[36px]"
-                            >
+                        <div className="flex gap-1">
+                          {isViewableFile(file.file_name, file.file_type) && (
+                            <Button size="sm" variant="light" isIconOnly onPress={() => handleViewFile(file)}>
                               <Eye className="w-4 h-4" />
                             </Button>
                           )}
-                          <Button
-                            size="sm"
-                            variant="flat"
-                            isIconOnly
-                            onPress={() => handleDownload(file)}
-                            className="sm:hidden min-w-[36px]"
-                          >
+                          <Button size="sm" variant="light" isIconOnly onPress={async () => { const url = await getDownloadUrl(file); if (url) window.open(url, '_blank') }}>
                             <Download className="w-4 h-4" />
                           </Button>
-                          <Button
-                            size="sm"
-                            variant="flat"
-                            color="danger"
-                            isIconOnly
-                            onPress={() => handleDeleteFile(file)}
-                            className="sm:hidden min-w-[36px]"
-                          >
+                          <Button size="sm" variant="light" color="danger" isIconOnly onPress={() => handleDeleteFile(file)}>
                             <Trash2 className="w-4 h-4" />
                           </Button>
                         </div>
                       </div>
-                    )
-                  })}
-                </div>
-              ) : (
-                <p className="text-center text-slate-400 py-4">No attachments yet</p>
-              )}
-            </div>
+                    ))}
+                  </div>
+                )}
+              </div>
 
-            {/* Metadata */}
-            <div className="text-xs text-slate-400 space-y-1">
-              <p>Created: {new Date(task.created_at).toLocaleString()}</p>
-              {task.creator && (
-                <p>Created by: {task.creator.display_name || task.creator.name}</p>
-              )}
-              {task.requester && (
-                <p>Requested by: {task.requester.display_name || task.requester.name}</p>
-              )}
-              {task.updated_at && (
-                <p>Last updated: {new Date(task.updated_at).toLocaleString()}</p>
-              )}
+              {/* Metadata footer */}
+              <div className="text-xs text-slate-400 pt-2">
+                Created {new Date(task.created_at).toLocaleDateString()}
+                {task.creator && ` by ${task.creator.display_name || task.creator.name}`}
+                {task.updated_at && ` • Updated ${new Date(task.updated_at).toLocaleDateString()}`}
+              </div>
             </div>
-          </div>
+          )}
         </ModalBody>
 
-        <ModalFooter>
+        <ModalFooter className="border-t border-slate-200 dark:border-slate-700">
           {isEditing ? (
             <>
-              <Button variant="flat" onPress={() => setIsEditing(false)}>
-                Cancel
-              </Button>
-              <Button
-                color="primary"
-                onPress={handleSave}
-                isLoading={saving}
-                isDisabled={!formData.title.trim()}
-              >
-                Save Changes
-              </Button>
+              <Button variant="flat" onPress={() => setIsEditing(false)}>Cancel</Button>
+              <Button color="primary" onPress={handleSaveAll} isLoading={saving}>Save Changes</Button>
             </>
           ) : (
             <div className="flex gap-2 w-full justify-between">
-              <div>
-                {task && task.status !== 'done' && !task.focus_queue_order && (
+              <div className="flex gap-2">
+                <Button variant="flat" size="sm" onPress={() => setIsEditing(true)}>Edit Task</Button>
+                {task.status !== 'done' && !task.focus_queue_order && (
                   <Button 
                     variant="flat" 
                     color="secondary"
+                    size="sm"
                     onPress={async () => {
                       const { data: maxTask } = await supabase
                         .from('tasks')
@@ -1219,29 +760,26 @@ export default function TaskDetailModal({
                       const nextOrder = (maxTask?.focus_queue_order || 0) + 1
                       await supabase.from('tasks').update({ focus_queue_order: nextOrder }).eq('id', task.id)
                       showSuccessToast("Added to Today's Queue!")
-                      onUpdate?.()
+                      onTaskUpdated()
                     }}
                   >
                     ☀️ Add to Today
                   </Button>
                 )}
-                {task && task.focus_queue_order && (
-                  <Chip color="secondary" variant="flat">In Today's Queue</Chip>
+                {task.focus_queue_order !== null && task.focus_queue_order !== undefined && (
+                  <Chip size="sm" color="secondary" variant="flat">In Queue</Chip>
                 )}
               </div>
-              <Button variant="flat" onPress={onClose}>
-                Close
-              </Button>
+              <Button variant="flat" onPress={onClose}>Close</Button>
             </div>
           )}
         </ModalFooter>
       </ModalContent>
     </Modal>
     
-    {/* File Viewer Modal */}
     <FileViewerModal
       isOpen={!!viewingFile}
-      onClose={closeFileViewer}
+      onClose={() => { setViewingFile(null); setViewFileUrl(null) }}
       fileName={viewingFile?.file_name || ''}
       fileUrl={viewFileUrl}
       fileType={viewingFile?.file_type || null}

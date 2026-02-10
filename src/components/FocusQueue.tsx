@@ -52,6 +52,16 @@ const BREAK_MESSAGES = [
   { text: "Walk it off", emoji: "🚶" },
 ]
 
+const LOCALSTORAGE_KEY = 'focus-queue-timer-state'
+
+interface SavedTimerState {
+  taskId: string
+  timerState: 'stopped' | 'running' | 'paused'
+  sessionStartTimestamp: number | null
+  sessions: Session[]
+  savedAt: number
+}
+
 export default function FocusQueue({ tasks, todayCompletedCount = 0, onTaskComplete, onRefresh, onRemoveFromQueue }: FocusQueueProps) {
   const [currentTaskIndex, setCurrentTaskIndex] = useState(0)
   const [timerState, setTimerState] = useState<'stopped' | 'running' | 'paused'>('stopped')
@@ -61,8 +71,10 @@ export default function FocusQueue({ tasks, todayCompletedCount = 0, onTaskCompl
   const [showHistory, setShowHistory] = useState(false)
   const [hypeMessage, setHypeMessage] = useState<string | null>(null)
   const [viewTask, setViewTask] = useState<Task | null>(null)
+  const [restored, setRestored] = useState(false)
   
   const timerRef = useRef<NodeJS.Timeout | null>(null)
+  const autoSaveRef = useRef<NodeJS.Timeout | null>(null)
   const sessionStartRef = useRef<number | null>(null)
   const supabase = createClient()
   const { celebrate, getRandomHype } = useCelebrations()
@@ -71,22 +83,131 @@ export default function FocusQueue({ tasks, todayCompletedCount = 0, onTaskCompl
   const queuedTasks = tasks.slice(0, 5)
   const completedCount = currentTaskIndex
 
-  // Load saved timer state from current task
+  // Save to localStorage for instant persistence
+  const saveToLocalStorage = useCallback((state: SavedTimerState) => {
+    try {
+      localStorage.setItem(LOCALSTORAGE_KEY, JSON.stringify(state))
+    } catch (e) {
+      console.error('Failed to save timer to localStorage:', e)
+    }
+  }, [])
+
+  // Load from localStorage
+  const loadFromLocalStorage = useCallback((): SavedTimerState | null => {
+    try {
+      const saved = localStorage.getItem(LOCALSTORAGE_KEY)
+      if (saved) return JSON.parse(saved)
+    } catch (e) {
+      console.error('Failed to load timer from localStorage:', e)
+    }
+    return null
+  }, [])
+
+  // Clear localStorage timer state
+  const clearLocalStorage = useCallback(() => {
+    try {
+      localStorage.removeItem(LOCALSTORAGE_KEY)
+    } catch (e) {
+      console.error('Failed to clear localStorage:', e)
+    }
+  }, [])
+
+  // Restore timer state on mount - check localStorage first (survives browser close)
   useEffect(() => {
-    if (currentTask) {
-      if (currentTask.focus_sessions && currentTask.focus_sessions.length > 0) {
-        setSessions(currentTask.focus_sessions)
-        setSessionCount(currentTask.focus_sessions.length)
-        const totalElapsed = currentTask.focus_sessions.reduce((sum, s) => sum + (s.duration_ms || 0), 0)
+    if (!currentTask || restored) return
+    
+    const savedState = loadFromLocalStorage()
+    
+    // Check if we have localStorage state for this task
+    if (savedState && savedState.taskId === currentTask.id) {
+      console.log('Restoring timer from localStorage:', savedState)
+      setSessions(savedState.sessions)
+      setSessionCount(savedState.sessions.length || 1)
+      
+      if (savedState.timerState === 'running' && savedState.sessionStartTimestamp) {
+        // Resume running timer - calculate elapsed since browser closed
+        sessionStartRef.current = savedState.sessionStartTimestamp
+        setTimerState('running')
+        // Elapsed will be calculated in the tick effect
+      } else if (savedState.timerState === 'paused') {
+        setTimerState('paused')
+        const totalElapsed = savedState.sessions.reduce((sum, s) => sum + (s.duration_ms || 0), 0)
         setElapsedMs(totalElapsed)
       }
-      if (currentTask.timer_state === 'running' && currentTask.current_session_start) {
-        // Resume timer from saved state
-        sessionStartRef.current = new Date(currentTask.current_session_start).getTime()
-        setTimerState('running')
+      setRestored(true)
+      return
+    }
+    
+    // Fall back to DB state (from task props)
+    if (currentTask.focus_sessions && currentTask.focus_sessions.length > 0) {
+      setSessions(currentTask.focus_sessions)
+      setSessionCount(currentTask.focus_sessions.length)
+      const totalElapsed = currentTask.focus_sessions.reduce((sum, s) => sum + (s.duration_ms || 0), 0)
+      setElapsedMs(totalElapsed)
+    }
+    if (currentTask.timer_state === 'running' && currentTask.current_session_start) {
+      sessionStartRef.current = new Date(currentTask.current_session_start).getTime()
+      setTimerState('running')
+    }
+    setRestored(true)
+  }, [currentTask?.id, restored, loadFromLocalStorage])
+
+  // Reset restored flag when task changes
+  useEffect(() => {
+    setRestored(false)
+  }, [currentTask?.id])
+
+  // Save to localStorage on every state change while running
+  useEffect(() => {
+    if (!currentTask) return
+    
+    const state: SavedTimerState = {
+      taskId: currentTask.id,
+      timerState,
+      sessionStartTimestamp: sessionStartRef.current,
+      sessions,
+      savedAt: Date.now()
+    }
+    saveToLocalStorage(state)
+  }, [currentTask?.id, timerState, sessions, saveToLocalStorage])
+
+  // Save to DB periodically while running (every 30s as backup)
+  useEffect(() => {
+    if (timerState === 'running' && currentTask) {
+      autoSaveRef.current = setInterval(() => {
+        console.log('Auto-saving timer state to DB...')
+        saveTimerState('running', sessions)
+      }, 30000) // 30 seconds
+    } else {
+      if (autoSaveRef.current) {
+        clearInterval(autoSaveRef.current)
+        autoSaveRef.current = null
       }
     }
-  }, [currentTask?.id])
+    return () => {
+      if (autoSaveRef.current) clearInterval(autoSaveRef.current)
+    }
+  }, [timerState, currentTask?.id, sessions])
+
+  // Save on beforeunload (browser close/refresh)
+  useEffect(() => {
+    const handleBeforeUnload = () => {
+      if (timerState === 'running' && currentTask && sessionStartRef.current) {
+        // Update localStorage one final time with current timestamp
+        const state: SavedTimerState = {
+          taskId: currentTask.id,
+          timerState: 'running',
+          sessionStartTimestamp: sessionStartRef.current,
+          sessions,
+          savedAt: Date.now()
+        }
+        localStorage.setItem(LOCALSTORAGE_KEY, JSON.stringify(state))
+      }
+    }
+    
+    window.addEventListener('beforeunload', handleBeforeUnload)
+    return () => window.removeEventListener('beforeunload', handleBeforeUnload)
+  }, [timerState, currentTask?.id, sessions])
 
   // Timer tick
   useEffect(() => {
@@ -210,6 +331,7 @@ export default function FocusQueue({ tasks, todayCompletedCount = 0, onTaskCompl
       setSessionCount(1)
       setElapsedMs(0)
       sessionStartRef.current = null
+      clearLocalStorage()
       
       // Move to next task
       if (currentTaskIndex < tasks.length - 1) {
@@ -222,7 +344,7 @@ export default function FocusQueue({ tasks, todayCompletedCount = 0, onTaskCompl
       console.error('Error completing task:', error)
       showErrorToast(error, 'Failed to complete task')
     }
-  }, [currentTask, sessions, timerState, currentTaskIndex, tasks.length, celebrate, onTaskComplete, onRefresh])
+  }, [currentTask, sessions, timerState, currentTaskIndex, tasks.length, celebrate, onTaskComplete, onRefresh, clearLocalStorage])
 
   const resetTimer = useCallback(() => {
     setTimerState('stopped')
@@ -231,8 +353,9 @@ export default function FocusQueue({ tasks, todayCompletedCount = 0, onTaskCompl
     setElapsedMs(0)
     sessionStartRef.current = null
     if (timerRef.current) clearInterval(timerRef.current)
+    clearLocalStorage()
     saveTimerState('stopped', [])
-  }, [])
+  }, [clearLocalStorage])
 
   const getSessionBadgeStyle = () => {
     if (sessionCount >= 5) return 'bg-red-500 text-white'
