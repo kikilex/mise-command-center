@@ -1120,7 +1120,7 @@ export default function TaskDetailModal({
                       const { data: maxTask } = await supabase
                         .from('tasks')
                         .select('focus_queue_order')
-                        .not('focus_queue_order', 'is', null)
+                        .gte('focus_queue_order', 0)
                         .order('focus_queue_order', { ascending: false })
                         .limit(1)
                         .single()
