@@ -81,6 +81,7 @@ interface Task {
   project_id?: string | null
   due_date: string | null
   assignee_id?: string | null
+  created_by?: string | null
   updated_at?: string
   created_at?: string
 }
@@ -276,10 +277,10 @@ export default function Home() {
         supabase.from('projects').select('*').order('created_at', { ascending: false }),
         supabase.from('tasks').select('*').not('project_id', 'is', null),
         // User's completed tasks today for progress tracking
+        // Only tasks where user is assignee, OR unassigned tasks they created
         supabase.from('tasks')
           .select('*')
           .eq('status', 'done')
-          .or(`created_by.eq.${authUser.id},assignee_id.eq.${authUser.id}`)
       ]);
 
       // Merge latest work log action into agents
@@ -337,11 +338,20 @@ export default function Home() {
       
       setProjectStats(stats);
 
-      // Count tasks completed today (only current user's tasks)
+      // Count tasks completed today (only tasks user actually completed)
+      // Rule: assigned to me, OR unassigned tasks I created (not tasks I created for others)
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      const userTasks: Task[] = userCompletedRes.data || [];
-      const todayDone = userTasks.filter(t => {
+      const allCompletedTasks: Task[] = userCompletedRes.data || [];
+      const myCompletedTasks = allCompletedTasks.filter(t => {
+        // Task is assigned to me
+        if (t.assignee_id === authUser.id) return true;
+        // OR task is unassigned AND I created it
+        if (!t.assignee_id && t.created_by === authUser.id) return true;
+        // Tasks I created but assigned to someone else don't count
+        return false;
+      });
+      const todayDone = myCompletedTasks.filter(t => {
         if (!t.updated_at) return false;
         const updated = new Date(t.updated_at);
         updated.setHours(0, 0, 0, 0);
@@ -779,134 +789,7 @@ export default function Home() {
               onRefresh={() => loadData()}
             />
 
-            {/* 📊 Project Progress Cards */}
-            <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-              <CardHeader className="bg-slate-50 dark:bg-slate-800/50 px-6 py-4 border-b border-slate-200 dark:border-slate-800">
-                <div className="flex items-center justify-between w-full">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-emerald-600 flex items-center justify-center">
-                      <Target className="w-6 h-6 text-white" />
-                    </div>
-                    <div>
-                      <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100">What's Next</h2>
-                      <p className="text-xs text-slate-500">{sortedProjectStats.length} project{sortedProjectStats.length !== 1 ? 's' : ''} with tasks</p>
-                    </div>
-                  </div>
-                  <Button variant="light" color="primary" onPress={() => router.push('/tasks')}>All Tasks</Button>
-                </div>
-              </CardHeader>
-              <CardBody className="p-4">
-                {loading ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    {[1, 2, 3, 4].map(i => <Skeleton key={i} className="h-40 rounded-xl w-full" />)}
-                  </div>
-                ) : sortedProjectStats.length === 0 ? (
-                  <div className="text-center py-12">
-                    <FolderKanban className="w-12 h-12 text-slate-300 dark:text-slate-600 mx-auto mb-3" />
-                    <p className="text-slate-500">No active projects with tasks.</p>
-                    <p className="text-xs text-slate-400 mt-1">Create a project and add tasks to get started.</p>
-                  </div>
-                ) : (
-                  <>
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                      {(showAllProjects ? sortedProjectStats : sortedProjectStats.slice(0, 4)).map((stat) => {
-                        const isComplete = stat.percentComplete === 100;
-                        const isPinned = pinnedProjects.includes(stat.project.id);
-                        return (
-                          <div 
-                            key={stat.project.id}
-                            className={`relative p-4 rounded-xl border-2 transition-all cursor-pointer hover:shadow-md ${
-                              isComplete 
-                                ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800' 
-                                : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 hover:border-emerald-300 dark:hover:border-emerald-700'
-                            }`}
-                            onClick={() => router.push(`/projects/${stat.project.id}`)}
-                          >
-                            {/* Pin Button */}
-                            <button
-                              onClick={(e) => {
-                                e.stopPropagation();
-                                togglePinProject(stat.project.id);
-                              }}
-                              className={`absolute top-2 right-2 w-7 h-7 rounded-full flex items-center justify-center transition-all ${
-                                isPinned 
-                                  ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-500' 
-                                  : 'bg-slate-100 dark:bg-slate-700 text-slate-400 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20'
-                              }`}
-                            >
-                              <Star className={`w-4 h-4 ${isPinned ? 'fill-amber-500' : ''}`} />
-                            </button>
-
-                            {/* Header */}
-                            <div className="flex items-start gap-2 mb-3 pr-8">
-                              <span className="text-xl">{stat.project.icon || '📁'}</span>
-                              <div className="min-w-0">
-                                <h3 className="font-bold text-slate-800 dark:text-slate-200 line-clamp-1">{stat.project.name}</h3>
-                                <p className="text-xs text-slate-500">{stat.completedTasks}/{stat.totalTasks} tasks</p>
-                              </div>
-                            </div>
-
-                            {/* Progress Bar */}
-                            <div className="mb-3">
-                              <div className="flex items-center justify-between text-xs mb-1">
-                                <span className="text-slate-500">Progress</span>
-                                <span className={`font-bold ${isComplete ? 'text-emerald-600' : 'text-slate-700 dark:text-slate-300'}`}>{stat.percentComplete}%</span>
-                              </div>
-                              <Progress 
-                                value={stat.percentComplete} 
-                                color={isComplete ? 'success' : 'primary'}
-                                size="sm"
-                                className="h-2"
-                              />
-                            </div>
-
-                            {/* Next Action */}
-                            {stat.nextAction ? (
-                              <div className="bg-white dark:bg-slate-900 rounded-lg p-3 border border-slate-100 dark:border-slate-700">
-                                <p className="text-[10px] font-bold uppercase tracking-wider text-slate-400 mb-1">Next Up</p>
-                                <p className="text-sm text-slate-700 dark:text-slate-300 line-clamp-2">{stat.nextAction.title}</p>
-                                <Button 
-                                  size="sm" 
-                                  color="primary" 
-                                  variant="flat" 
-                                  className="mt-2 w-full"
-                                  onClick={(e) => {
-                                    e.stopPropagation();
-                                    router.push(`/projects/${stat.project.id}`);
-                                  }}
-                                >
-                                  Jump In <ArrowRight className="w-3 h-3 ml-1" />
-                                </Button>
-                              </div>
-                            ) : (
-                              <div className="bg-emerald-100 dark:bg-emerald-900/30 rounded-lg p-3 text-center">
-                                <p className="text-sm text-emerald-700 dark:text-emerald-400 font-medium">🎉 All tasks complete!</p>
-                              </div>
-                            )}
-                          </div>
-                        );
-                      })}
-                    </div>
-
-                    {/* Show More/Less */}
-                    {sortedProjectStats.length > 4 && (
-                      <div className="mt-4 text-center">
-                        <Button 
-                          variant="light" 
-                          size="sm"
-                          onPress={() => setShowAllProjects(!showAllProjects)}
-                          endContent={showAllProjects ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                        >
-                          {showAllProjects ? 'Show Less' : `Show All ${sortedProjectStats.length} Projects`}
-                        </Button>
-                      </div>
-                    )}
-                  </>
-                )}
-              </CardBody>
-            </Card>
-
-            {/* 🧠 Brain Dump System - MOVED TO BOTTOM */}
+            {/* 🧠 Brain Dump System */}
             <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
               <CardHeader className="bg-slate-50 dark:bg-slate-800/50 px-6 py-4 border-b border-slate-200 dark:border-slate-800">
                 <div className="flex items-center justify-between w-full">
@@ -1168,60 +1051,108 @@ export default function Home() {
               </div>
             )}
 
-            {/* Agents Widget - Admin Only */}
-            {user?.is_admin && (
-              <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-                <CardHeader className="bg-slate-50 dark:bg-slate-800/50 px-4 py-3 border-b border-slate-200 dark:border-slate-700">
-                  <div className="flex items-center justify-between w-full">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
-                        <Bot className="w-4 h-4 text-white" />
-                      </div>
-                      <span className="font-semibold text-slate-800 dark:text-slate-100">Agents</span>
+            {/* Project Progress - Sidebar Version */}
+            <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
+              <CardHeader className="bg-slate-50 dark:bg-slate-800/50 px-4 py-3 border-b border-slate-200 dark:border-slate-700">
+                <div className="flex items-center justify-between w-full">
+                  <div className="flex items-center gap-2">
+                    <div className="w-8 h-8 rounded-full bg-emerald-600 flex items-center justify-center">
+                      <Target className="w-4 h-4 text-white" />
                     </div>
-                    <Button size="sm" variant="light" radius="full" onPress={() => router.push('/ai')}>
-                      View All
-                    </Button>
+                    <span className="font-semibold text-slate-800 dark:text-slate-100">What's Next</span>
                   </div>
-                </CardHeader>
-                <CardBody className="p-0 divide-y divide-slate-100 dark:divide-slate-800">
-                  {agents.map((agent) => (
-                    <div 
-                      key={agent.id} 
-                      onClick={() => handleAgentClick(agent)}
-                      className="p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors"
-                    >
-                      <div className="flex items-center justify-between mb-2">
-                        <div className="flex items-center gap-3">
-                          <div className="relative">
-                            <Avatar src={agent.avatar_url} name={agent.name} size="sm" className="bg-gradient-to-br from-violet-500 to-purple-600 text-white font-black" />
-                            <div className={`absolute -bottom-0.5 -right-0.5 w-3 h-3 rounded-full border-2 border-white dark:border-slate-900 ${agent.is_active ? 'bg-emerald-500' : 'bg-slate-400'}`} />
+                  <Button size="sm" variant="light" radius="full" onPress={() => router.push('/tasks')}>
+                    All Tasks
+                  </Button>
+                </div>
+              </CardHeader>
+              <CardBody className="p-3 space-y-2 max-h-80 overflow-y-auto">
+                {loading ? (
+                  <div className="space-y-2">
+                    {[1, 2, 3].map(i => <Skeleton key={i} className="h-20 rounded-xl w-full" />)}
+                  </div>
+                ) : sortedProjectStats.length === 0 ? (
+                  <div className="text-center py-8">
+                    <FolderKanban className="w-10 h-10 text-slate-300 dark:text-slate-600 mx-auto mb-2" />
+                    <p className="text-slate-500 text-sm">No active projects</p>
+                  </div>
+                ) : (
+                  <>
+                    {(showAllProjects ? sortedProjectStats : sortedProjectStats.slice(0, 3)).map((stat) => {
+                      const isComplete = stat.percentComplete === 100;
+                      const isPinned = pinnedProjects.includes(stat.project.id);
+                      return (
+                        <div 
+                          key={stat.project.id}
+                          className={`relative p-3 rounded-xl border transition-all cursor-pointer hover:shadow-sm ${
+                            isComplete 
+                              ? 'bg-emerald-50 dark:bg-emerald-900/20 border-emerald-200 dark:border-emerald-800' 
+                              : 'bg-slate-50 dark:bg-slate-800/50 border-slate-200 dark:border-slate-700 hover:border-emerald-300 dark:hover:border-emerald-700'
+                          }`}
+                          onClick={() => router.push(`/projects/${stat.project.id}`)}
+                        >
+                          {/* Pin Button */}
+                          <button
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              togglePinProject(stat.project.id);
+                            }}
+                            className={`absolute top-2 right-2 w-6 h-6 rounded-full flex items-center justify-center transition-all ${
+                              isPinned 
+                                ? 'bg-amber-100 dark:bg-amber-900/30 text-amber-500' 
+                                : 'bg-slate-100 dark:bg-slate-700 text-slate-400 hover:text-amber-500 hover:bg-amber-50 dark:hover:bg-amber-900/20'
+                            }`}
+                          >
+                            <Star className={`w-3 h-3 ${isPinned ? 'fill-amber-500' : ''}`} />
+                          </button>
+
+                          {/* Header */}
+                          <div className="flex items-start gap-2 mb-2 pr-6">
+                            <span className="text-lg">{stat.project.icon || '📁'}</span>
+                            <div className="min-w-0 flex-1">
+                              <h3 className="font-semibold text-sm text-slate-800 dark:text-slate-200 line-clamp-1">{stat.project.name}</h3>
+                              <p className="text-[10px] text-slate-500">{stat.completedTasks}/{stat.totalTasks} tasks</p>
+                            </div>
                           </div>
-                          <div>
-                            <p className="font-semibold text-sm text-slate-800 dark:text-slate-100">{agent.name}</p>
-                            <p className="text-[10px] text-slate-400 capitalize">{agent.role.replace(/_/g, ' ')}</p>
+
+                          {/* Progress Bar */}
+                          <div className="mb-2">
+                            <Progress 
+                              value={stat.percentComplete} 
+                              color={isComplete ? 'success' : 'primary'}
+                              size="sm"
+                              className="h-1.5"
+                            />
                           </div>
-                        </div>
-                        <Chip size="sm" variant="flat" color={agent.is_active ? 'success' : 'default'} className="h-5 text-[10px]">
-                          {agent.is_active ? 'Online' : 'Offline'}
-                        </Chip>
-                      </div>
-                      {agent.last_action && (
-                        <div className="ml-11 mt-1">
-                          <div className="flex items-center gap-1.5 text-[11px] text-slate-500 dark:text-slate-400">
-                            <Activity className="w-3 h-3 text-slate-400 flex-shrink-0" />
-                            <span className="line-clamp-1">{agent.last_action}</span>
-                          </div>
-                          {agent.last_action_at && (
-                            <p className="text-[10px] text-slate-400 ml-4.5 mt-0.5">{timeAgo(agent.last_action_at)}</p>
+
+                          {/* Next Action or Complete */}
+                          {stat.nextAction ? (
+                            <p className="text-xs text-slate-600 dark:text-slate-400 line-clamp-1">
+                              → {stat.nextAction.title}
+                            </p>
+                          ) : (
+                            <p className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">✓ Complete!</p>
                           )}
                         </div>
-                      )}
-                    </div>
-                  ))}
-                </CardBody>
-              </Card>
-            )}
+                      );
+                    })}
+
+                    {/* Show More/Less */}
+                    {sortedProjectStats.length > 3 && (
+                      <Button 
+                        variant="light" 
+                        size="sm"
+                        className="w-full"
+                        onPress={() => setShowAllProjects(!showAllProjects)}
+                        endContent={showAllProjects ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                      >
+                        {showAllProjects ? 'Show Less' : `Show All ${sortedProjectStats.length}`}
+                      </Button>
+                    )}
+                  </>
+                )}
+              </CardBody>
+            </Card>
           </div>
         </div>
       </main>
