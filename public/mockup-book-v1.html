@@ -1,0 +1,560 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Book Builder Mockup - Command Center</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { font-family: 'Inter', system-ui, sans-serif; }
+    .drag-handle { cursor: grab; }
+    .drag-handle:active { cursor: grabbing; }
+    .chapter-card:hover { background: rgba(139, 92, 246, 0.05); }
+    .chapter-card { transition: all 0.15s ease; }
+    .progress-bar { transition: width 0.5s ease; }
+    
+    /* Glow effect for final chapters */
+    .status-final { 
+      box-shadow: 0 0 0 1px rgba(34, 197, 94, 0.3);
+    }
+    
+    /* Subtle animations */
+    @keyframes fadeIn {
+      from { opacity: 0; transform: translateY(-10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-in { animation: fadeIn 0.2s ease; }
+  </style>
+</head>
+<body class="bg-slate-950 text-white min-h-screen">
+  
+  <!-- Navbar Mock -->
+  <nav class="bg-slate-900 border-b border-slate-800 px-6 py-3 flex items-center justify-between">
+    <div class="flex items-center gap-4">
+      <div class="text-xl font-bold text-violet-400">⚡ Command Center</div>
+      <span class="text-slate-500">/</span>
+      <span class="text-slate-400">Faithstone Books</span>
+      <span class="text-slate-500">/</span>
+      <span class="text-white font-medium">SWP Extended Edition</span>
+    </div>
+    <div class="flex items-center gap-3">
+      <div class="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-sm font-bold">A</div>
+    </div>
+  </nav>
+
+  <!-- Project Header -->
+  <div class="bg-slate-900/50 border-b border-slate-800">
+    <div class="max-w-7xl mx-auto px-6 py-6">
+      <div class="flex items-start justify-between">
+        <div>
+          <div class="flex items-center gap-3 mb-2">
+            <span class="text-3xl">📖</span>
+            <h1 class="text-2xl font-bold">Spiritual Warfare Prayers: Extended Edition</h1>
+            <span class="px-2 py-1 bg-yellow-500/20 text-yellow-400 text-xs font-medium rounded-full">Drafting</span>
+          </div>
+          <p class="text-slate-400 mb-4">110 powerful prayers across 15 sections • Target: 45,000 words</p>
+          
+          <!-- Progress Bar -->
+          <div class="flex items-center gap-4">
+            <div class="flex-1 max-w-md">
+              <div class="flex justify-between text-sm mb-1">
+                <span class="text-slate-400">Progress</span>
+                <span class="text-violet-400 font-medium">28,450 / 45,000 words (63%)</span>
+              </div>
+              <div class="h-3 bg-slate-800 rounded-full overflow-hidden">
+                <div class="progress-bar h-full bg-gradient-to-r from-violet-500 to-purple-500 rounded-full" style="width: 63%"></div>
+              </div>
+            </div>
+            <div class="flex items-center gap-2 text-sm">
+              <span class="text-green-400">●</span>
+              <span class="text-slate-400">8 Final</span>
+              <span class="text-yellow-400 ml-2">●</span>
+              <span class="text-slate-400">4 Draft</span>
+              <span class="text-blue-400 ml-2">●</span>
+              <span class="text-slate-400">3 Outline</span>
+            </div>
+          </div>
+        </div>
+        
+        <div class="flex items-center gap-2">
+          <button class="px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm font-medium flex items-center gap-2 transition">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
+            Settings
+          </button>
+          <button class="px-4 py-2 bg-violet-600 hover:bg-violet-500 rounded-lg text-sm font-medium flex items-center gap-2 transition">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+            Export Book
+          </button>
+        </div>
+      </div>
+    </div>
+    
+    <!-- Tabs -->
+    <div class="max-w-7xl mx-auto px-6">
+      <div class="flex gap-1">
+        <button class="px-4 py-2 text-slate-400 hover:text-white text-sm font-medium transition">Overview</button>
+        <button class="px-4 py-2 text-slate-400 hover:text-white text-sm font-medium transition">Tasks</button>
+        <button class="px-4 py-2 text-slate-400 hover:text-white text-sm font-medium transition">Docs</button>
+        <button class="px-4 py-2 text-white text-sm font-medium border-b-2 border-violet-500">📖 Book</button>
+        <button class="px-4 py-2 text-slate-400 hover:text-white text-sm font-medium transition">Activity</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Main Content -->
+  <div class="max-w-7xl mx-auto px-6 py-6">
+    
+    <!-- Book Sub-tabs -->
+    <div class="flex items-center justify-between mb-6">
+      <div class="flex gap-2">
+        <button class="px-3 py-1.5 bg-violet-600 text-white text-sm font-medium rounded-lg">Outline</button>
+        <button class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium rounded-lg transition">Manuscript</button>
+        <button class="px-3 py-1.5 bg-slate-800 hover:bg-slate-700 text-slate-300 text-sm font-medium rounded-lg transition">Progress</button>
+      </div>
+      <button onclick="showAddModal()" class="px-4 py-2 bg-green-600 hover:bg-green-500 rounded-lg text-sm font-medium flex items-center gap-2 transition">
+        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
+        Add Chapter
+      </button>
+    </div>
+
+    <!-- Chapters List -->
+    <div class="space-y-3">
+      
+      <!-- Part Header (Optional Grouping) -->
+      <div class="flex items-center gap-3 pt-4 pb-2">
+        <button class="text-slate-400 hover:text-white">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+        </button>
+        <h3 class="text-lg font-semibold text-slate-300">Part I: Foundations of Spiritual Warfare</h3>
+        <span class="text-sm text-slate-500">4 chapters • 12,340 words</span>
+      </div>
+      
+      <!-- Chapter 1 - Final -->
+      <div class="chapter-card status-final bg-slate-900 border border-slate-800 rounded-xl p-4 flex items-start gap-4">
+        <div class="drag-handle text-slate-600 hover:text-slate-400 pt-1">
+          <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>
+        </div>
+        <div class="flex-1">
+          <div class="flex items-center gap-3 mb-2">
+            <span class="text-slate-500 font-mono text-sm">Ch. 1</span>
+            <h4 class="font-semibold text-white">Understanding Spiritual Warfare</h4>
+            <span class="px-2 py-0.5 bg-green-500/20 text-green-400 text-xs font-medium rounded-full">Final ✓</span>
+            <span class="text-slate-500 text-sm ml-auto">Assigned: Matthew</span>
+          </div>
+          <p class="text-slate-400 text-sm mb-3">An introduction to the reality of spiritual warfare and why prayer is our most powerful weapon.</p>
+          <div class="flex items-center gap-6 text-sm">
+            <span class="text-slate-500 flex items-center gap-1.5">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+              3,245 words
+            </span>
+            <span class="text-slate-500 flex items-center gap-1.5">
+              🙏 8 prayers
+            </span>
+            <div class="flex-1 max-w-32">
+              <div class="h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                <div class="h-full bg-green-500 rounded-full" style="width: 100%"></div>
+              </div>
+            </div>
+            <span class="text-green-400">100%</span>
+          </div>
+        </div>
+        <div class="flex items-center gap-1">
+          <button class="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition" title="Edit chapter">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+          </button>
+          <button class="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition" title="More options">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path></svg>
+          </button>
+        </div>
+      </div>
+      
+      <!-- Chapter 2 - Final -->
+      <div class="chapter-card status-final bg-slate-900 border border-slate-800 rounded-xl p-4 flex items-start gap-4">
+        <div class="drag-handle text-slate-600 hover:text-slate-400 pt-1">
+          <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>
+        </div>
+        <div class="flex-1">
+          <div class="flex items-center gap-3 mb-2">
+            <span class="text-slate-500 font-mono text-sm">Ch. 2</span>
+            <h4 class="font-semibold text-white">The Armor of God</h4>
+            <span class="px-2 py-0.5 bg-green-500/20 text-green-400 text-xs font-medium rounded-full">Final ✓</span>
+            <span class="text-slate-500 text-sm ml-auto">Assigned: Matthew</span>
+          </div>
+          <p class="text-slate-400 text-sm mb-3">Detailed prayers for putting on each piece of spiritual armor from Ephesians 6.</p>
+          <div class="flex items-center gap-6 text-sm">
+            <span class="text-slate-500 flex items-center gap-1.5">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+              4,120 words
+            </span>
+            <span class="text-slate-500 flex items-center gap-1.5">
+              🙏 7 prayers
+            </span>
+            <div class="flex-1 max-w-32">
+              <div class="h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                <div class="h-full bg-green-500 rounded-full" style="width: 100%"></div>
+              </div>
+            </div>
+            <span class="text-green-400">100%</span>
+          </div>
+        </div>
+        <div class="flex items-center gap-1">
+          <button class="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+          </button>
+          <button class="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path></svg>
+          </button>
+        </div>
+      </div>
+      
+      <!-- Chapter 3 - Draft (in progress) -->
+      <div class="chapter-card bg-slate-900 border border-slate-800 rounded-xl p-4 flex items-start gap-4">
+        <div class="drag-handle text-slate-600 hover:text-slate-400 pt-1">
+          <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>
+        </div>
+        <div class="flex-1">
+          <div class="flex items-center gap-3 mb-2">
+            <span class="text-slate-500 font-mono text-sm">Ch. 3</span>
+            <h4 class="font-semibold text-white">Breaking Generational Curses</h4>
+            <span class="px-2 py-0.5 bg-yellow-500/20 text-yellow-400 text-xs font-medium rounded-full">Draft</span>
+            <span class="text-slate-500 text-sm ml-auto">Assigned: Matthew</span>
+          </div>
+          <p class="text-slate-400 text-sm mb-3">Prayers for breaking free from patterns and curses passed down through family lines.</p>
+          <div class="flex items-center gap-6 text-sm">
+            <span class="text-slate-500 flex items-center gap-1.5">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+              2,890 words
+            </span>
+            <span class="text-slate-500 flex items-center gap-1.5">
+              🙏 5 prayers
+            </span>
+            <div class="flex-1 max-w-32">
+              <div class="h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                <div class="h-full bg-yellow-500 rounded-full" style="width: 72%"></div>
+              </div>
+            </div>
+            <span class="text-yellow-400">72%</span>
+          </div>
+        </div>
+        <div class="flex items-center gap-1">
+          <button class="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+          </button>
+          <button class="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path></svg>
+          </button>
+        </div>
+      </div>
+      
+      <!-- Chapter 4 - Outline -->
+      <div class="chapter-card bg-slate-900 border border-slate-800 rounded-xl p-4 flex items-start gap-4">
+        <div class="drag-handle text-slate-600 hover:text-slate-400 pt-1">
+          <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>
+        </div>
+        <div class="flex-1">
+          <div class="flex items-center gap-3 mb-2">
+            <span class="text-slate-500 font-mono text-sm">Ch. 4</span>
+            <h4 class="font-semibold text-white">Authority in Christ</h4>
+            <span class="px-2 py-0.5 bg-blue-500/20 text-blue-400 text-xs font-medium rounded-full">Outline</span>
+            <span class="text-slate-500 text-sm ml-auto">Assigned: Matthew</span>
+          </div>
+          <p class="text-slate-400 text-sm mb-3">Prayers declaring and exercising the believer's authority in Christ Jesus.</p>
+          <div class="flex items-center gap-6 text-sm">
+            <span class="text-slate-500 flex items-center gap-1.5">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+              850 words
+            </span>
+            <span class="text-slate-500 flex items-center gap-1.5">
+              🙏 0 prayers
+            </span>
+            <div class="flex-1 max-w-32">
+              <div class="h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                <div class="h-full bg-blue-500 rounded-full" style="width: 21%"></div>
+              </div>
+            </div>
+            <span class="text-blue-400">21%</span>
+          </div>
+        </div>
+        <div class="flex items-center gap-1">
+          <button class="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+          </button>
+          <button class="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path></svg>
+          </button>
+        </div>
+      </div>
+      
+      <!-- Part II Header -->
+      <div class="flex items-center gap-3 pt-8 pb-2">
+        <button class="text-slate-400 hover:text-white">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path></svg>
+        </button>
+        <h3 class="text-lg font-semibold text-slate-300">Part II: Prayers for Protection</h3>
+        <span class="text-sm text-slate-500">3 chapters • 8,200 words</span>
+      </div>
+      
+      <!-- Chapter 5 - Final -->
+      <div class="chapter-card status-final bg-slate-900 border border-slate-800 rounded-xl p-4 flex items-start gap-4">
+        <div class="drag-handle text-slate-600 hover:text-slate-400 pt-1">
+          <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>
+        </div>
+        <div class="flex-1">
+          <div class="flex items-center gap-3 mb-2">
+            <span class="text-slate-500 font-mono text-sm">Ch. 5</span>
+            <h4 class="font-semibold text-white">Protection Over Family</h4>
+            <span class="px-2 py-0.5 bg-green-500/20 text-green-400 text-xs font-medium rounded-full">Final ✓</span>
+          </div>
+          <p class="text-slate-400 text-sm mb-3">Powerful prayers covering your spouse, children, and extended family members.</p>
+          <div class="flex items-center gap-6 text-sm">
+            <span class="text-slate-500 flex items-center gap-1.5">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+              3,100 words
+            </span>
+            <span class="text-slate-500 flex items-center gap-1.5">
+              🙏 10 prayers
+            </span>
+            <div class="flex-1 max-w-32">
+              <div class="h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                <div class="h-full bg-green-500 rounded-full" style="width: 100%"></div>
+              </div>
+            </div>
+            <span class="text-green-400">100%</span>
+          </div>
+        </div>
+        <div class="flex items-center gap-1">
+          <button class="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+          </button>
+          <button class="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path></svg>
+          </button>
+        </div>
+      </div>
+      
+      <!-- Chapter 6 - Draft -->
+      <div class="chapter-card bg-slate-900 border border-slate-800 rounded-xl p-4 flex items-start gap-4">
+        <div class="drag-handle text-slate-600 hover:text-slate-400 pt-1">
+          <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>
+        </div>
+        <div class="flex-1">
+          <div class="flex items-center gap-3 mb-2">
+            <span class="text-slate-500 font-mono text-sm">Ch. 6</span>
+            <h4 class="font-semibold text-white">Protection Over Your Mind</h4>
+            <span class="px-2 py-0.5 bg-yellow-500/20 text-yellow-400 text-xs font-medium rounded-full">Draft</span>
+          </div>
+          <p class="text-slate-400 text-sm mb-3">Prayers for guarding your thoughts against anxiety, fear, and the enemy's lies.</p>
+          <div class="flex items-center gap-6 text-sm">
+            <span class="text-slate-500 flex items-center gap-1.5">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+              2,450 words
+            </span>
+            <span class="text-slate-500 flex items-center gap-1.5">
+              🙏 6 prayers
+            </span>
+            <div class="flex-1 max-w-32">
+              <div class="h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                <div class="h-full bg-yellow-500 rounded-full" style="width: 65%"></div>
+              </div>
+            </div>
+            <span class="text-yellow-400">65%</span>
+          </div>
+        </div>
+        <div class="flex items-center gap-1">
+          <button class="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+          </button>
+          <button class="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path></svg>
+          </button>
+        </div>
+      </div>
+      
+      <!-- Chapter 7 - Idea (just created) -->
+      <div class="chapter-card bg-slate-900 border border-slate-800 border-dashed rounded-xl p-4 flex items-start gap-4 opacity-75">
+        <div class="drag-handle text-slate-600 hover:text-slate-400 pt-1">
+          <svg class="w-5 h-5" fill="currentColor" viewBox="0 0 24 24"><circle cx="9" cy="6" r="1.5"/><circle cx="15" cy="6" r="1.5"/><circle cx="9" cy="12" r="1.5"/><circle cx="15" cy="12" r="1.5"/><circle cx="9" cy="18" r="1.5"/><circle cx="15" cy="18" r="1.5"/></svg>
+        </div>
+        <div class="flex-1">
+          <div class="flex items-center gap-3 mb-2">
+            <span class="text-slate-500 font-mono text-sm">Ch. 7</span>
+            <h4 class="font-semibold text-slate-400">Protection Over Finances</h4>
+            <span class="px-2 py-0.5 bg-slate-700 text-slate-400 text-xs font-medium rounded-full">Idea</span>
+          </div>
+          <p class="text-slate-500 text-sm mb-3 italic">No synopsis yet — click to add details</p>
+          <div class="flex items-center gap-6 text-sm">
+            <span class="text-slate-600 flex items-center gap-1.5">
+              <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path></svg>
+              0 words
+            </span>
+            <span class="text-slate-600 flex items-center gap-1.5">
+              🎯 Target: 3,000
+            </span>
+          </div>
+        </div>
+        <div class="flex items-center gap-1">
+          <button class="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+          </button>
+          <button class="p-2 hover:bg-slate-800 rounded-lg text-slate-400 hover:text-white transition">
+            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"></path></svg>
+          </button>
+        </div>
+      </div>
+      
+    </div>
+  </div>
+
+  <!-- Add Chapter Modal -->
+  <div id="addModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden items-center justify-center z-50" onclick="hideAddModal(event)">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg mx-4 animate-in" onclick="event.stopPropagation()">
+      <div class="p-6 border-b border-slate-800">
+        <h2 class="text-xl font-bold">Add Chapter</h2>
+        <p class="text-slate-400 text-sm mt-1">Create a new chapter for your book</p>
+      </div>
+      
+      <div class="p-6 space-y-4">
+        <!-- Chapter Title -->
+        <div>
+          <label class="block text-sm font-medium text-slate-300 mb-2">Chapter Title *</label>
+          <input type="text" placeholder="e.g., Prayers for Healing" class="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-violet-500">
+        </div>
+        
+        <!-- Chapter Type -->
+        <div>
+          <label class="block text-sm font-medium text-slate-300 mb-2">Type</label>
+          <select class="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none focus:border-violet-500">
+            <option>Chapter</option>
+            <option>Prologue</option>
+            <option>Epilogue</option>
+            <option>Introduction</option>
+            <option>Appendix</option>
+          </select>
+        </div>
+        
+        <!-- Part Assignment -->
+        <div>
+          <label class="block text-sm font-medium text-slate-300 mb-2">Part (optional)</label>
+          <select class="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none focus:border-violet-500">
+            <option>No part (standalone)</option>
+            <option>Part I: Foundations of Spiritual Warfare</option>
+            <option>Part II: Prayers for Protection</option>
+            <option>Part III: Prayers for Victory</option>
+            <option>+ Add new part...</option>
+          </select>
+        </div>
+        
+        <!-- Synopsis -->
+        <div>
+          <label class="block text-sm font-medium text-slate-300 mb-2">Synopsis (optional)</label>
+          <textarea rows="2" placeholder="Brief description of this chapter..." class="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-violet-500 resize-none"></textarea>
+        </div>
+        
+        <!-- Target Word Count -->
+        <div>
+          <label class="block text-sm font-medium text-slate-300 mb-2">Target Word Count</label>
+          <input type="number" placeholder="3000" class="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white placeholder-slate-500 focus:outline-none focus:border-violet-500">
+        </div>
+        
+        <!-- Assign To -->
+        <div>
+          <label class="block text-sm font-medium text-slate-300 mb-2">Assign To</label>
+          <select class="w-full px-4 py-3 bg-slate-800 border border-slate-700 rounded-xl text-white focus:outline-none focus:border-violet-500">
+            <option>Unassigned</option>
+            <option selected>Matthew (AI Writer)</option>
+            <option>Alex</option>
+            <option>Mom</option>
+          </select>
+        </div>
+      </div>
+      
+      <div class="p-6 border-t border-slate-800 flex justify-end gap-3">
+        <button onclick="hideAddModal()" class="px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm font-medium transition">Cancel</button>
+        <button class="px-4 py-2 bg-violet-600 hover:bg-violet-500 rounded-lg text-sm font-medium transition">Create Chapter</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Export Modal (hidden by default) -->
+  <div id="exportModal" class="fixed inset-0 bg-black/60 backdrop-blur-sm hidden items-center justify-center z-50">
+    <div class="bg-slate-900 border border-slate-700 rounded-2xl w-full max-w-lg mx-4">
+      <div class="p-6 border-b border-slate-800">
+        <h2 class="text-xl font-bold">Export Book</h2>
+        <p class="text-slate-400 text-sm mt-1">Compile your manuscript for publishing</p>
+      </div>
+      
+      <div class="p-6 space-y-4">
+        <!-- Format -->
+        <div>
+          <label class="block text-sm font-medium text-slate-300 mb-2">Format</label>
+          <div class="grid grid-cols-2 gap-3">
+            <button class="p-4 bg-violet-600/20 border-2 border-violet-500 rounded-xl text-center">
+              <div class="text-2xl mb-1">📄</div>
+              <div class="font-medium">PDF</div>
+              <div class="text-xs text-slate-400">Print-ready</div>
+            </button>
+            <button class="p-4 bg-slate-800 border border-slate-700 rounded-xl text-center hover:border-slate-600">
+              <div class="text-2xl mb-1">📱</div>
+              <div class="font-medium">EPUB</div>
+              <div class="text-xs text-slate-400">E-readers</div>
+            </button>
+            <button class="p-4 bg-slate-800 border border-slate-700 rounded-xl text-center hover:border-slate-600">
+              <div class="text-2xl mb-1">📝</div>
+              <div class="font-medium">DOCX</div>
+              <div class="text-xs text-slate-400">Word</div>
+            </button>
+            <button class="p-4 bg-slate-800 border border-slate-700 rounded-xl text-center hover:border-slate-600">
+              <div class="text-2xl mb-1">📋</div>
+              <div class="font-medium">Markdown</div>
+              <div class="text-xs text-slate-400">Raw text</div>
+            </button>
+          </div>
+        </div>
+        
+        <!-- Include Sections -->
+        <div>
+          <label class="block text-sm font-medium text-slate-300 mb-2">Include</label>
+          <div class="space-y-2">
+            <label class="flex items-center gap-3 p-3 bg-slate-800 rounded-lg cursor-pointer">
+              <input type="checkbox" checked class="w-4 h-4 rounded border-slate-600 bg-slate-700 text-violet-500 focus:ring-violet-500">
+              <span>Title Page</span>
+            </label>
+            <label class="flex items-center gap-3 p-3 bg-slate-800 rounded-lg cursor-pointer">
+              <input type="checkbox" checked class="w-4 h-4 rounded border-slate-600 bg-slate-700 text-violet-500 focus:ring-violet-500">
+              <span>Table of Contents</span>
+            </label>
+            <label class="flex items-center gap-3 p-3 bg-slate-800 rounded-lg cursor-pointer">
+              <input type="checkbox" class="w-4 h-4 rounded border-slate-600 bg-slate-700 text-violet-500 focus:ring-violet-500">
+              <span>Copyright Page</span>
+            </label>
+          </div>
+        </div>
+      </div>
+      
+      <div class="p-6 border-t border-slate-800 flex justify-end gap-3">
+        <button class="px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm font-medium transition">Cancel</button>
+        <button class="px-4 py-2 bg-violet-600 hover:bg-violet-500 rounded-lg text-sm font-medium flex items-center gap-2 transition">
+          <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+          Export
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function showAddModal() {
+      document.getElementById('addModal').classList.remove('hidden');
+      document.getElementById('addModal').classList.add('flex');
+    }
+    
+    function hideAddModal(e) {
+      if (!e || e.target === document.getElementById('addModal')) {
+        document.getElementById('addModal').classList.add('hidden');
+        document.getElementById('addModal').classList.remove('flex');
+      }
+    }
+  </script>
+
+</body>
+</html>
