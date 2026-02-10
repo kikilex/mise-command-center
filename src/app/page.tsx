@@ -1078,80 +1078,95 @@ export default function Home() {
             </Modal>
           </div>
 
-          <div className="w-full lg:w-96 space-y-8">
-            {/* Messages - Thread List (iOS Style) */}
+          <div className="w-full lg:w-80 space-y-6">
+            {/* This Week Stats - Me vs Last Week */}
+            <div className="bg-gradient-to-br from-violet-600 via-purple-600 to-indigo-700 rounded-2xl p-5 text-white shadow-lg">
+              <div className="flex items-center justify-between mb-4">
+                <span className="text-sm text-violet-200">This Week</span>
+                <span className="text-xs bg-white/20 px-2 py-0.5 rounded-full">vs Last</span>
+              </div>
+              <div className="flex items-end justify-between">
+                <div>
+                  <div className="text-5xl font-black">{todayCompletedCount}</div>
+                  <div className="text-violet-200 text-sm">💰 Money Bags</div>
+                </div>
+                <div className="text-right">
+                  <span className="bg-green-400 text-green-900 text-sm font-bold px-2 py-0.5 rounded-full">
+                    {todayCompletedCount > 0 ? '🔥' : '—'}
+                  </span>
+                </div>
+              </div>
+            </div>
+
+            {/* Today's Queue */}
             <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-              <CardHeader className="bg-slate-50 dark:bg-slate-800/50 px-4 py-3 border-b border-slate-200 dark:border-slate-700">
+              <CardHeader className="bg-slate-50 dark:bg-slate-800/50 px-5 py-4 border-b border-slate-200 dark:border-slate-700">
                 <div className="flex items-center justify-between w-full">
-                  <div className="flex items-center gap-2">
-                    <div className="w-8 h-8 rounded-full bg-gradient-to-br from-blue-500 to-blue-600 flex items-center justify-center">
-                      <MessageCircle className="w-4 h-4 text-white" />
-                    </div>
-                    <span className="font-semibold text-slate-800 dark:text-slate-100">Messages</span>
-                  </div>
-                  <Button size="sm" variant="light" radius="full" onPress={() => {
-                    window.dispatchEvent(new CustomEvent('open-chat-thread', { detail: {} }))
-                  }}>
-                    View All
+                  <span className="font-bold text-slate-800 dark:text-slate-100">Today's Queue</span>
+                  <Button size="sm" variant="light" radius="full" onPress={() => router.push('/tasks')}>
+                    Edit
                   </Button>
                 </div>
               </CardHeader>
-              <CardBody className="p-0">
-                {messageThreads.length === 0 ? (
-                  <div className="text-center py-12 px-4">
-                    <div className="w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mx-auto mb-3">
-                      <MessageCircle className="w-8 h-8 text-slate-400" />
+              <CardBody className="p-3 space-y-2">
+                {todaysTasks.slice(0, 5).map((task, idx) => {
+                  const isCompleted = task.status === 'done'
+                  const isCurrent = idx === 0 && !isCompleted
+                  return (
+                    <div 
+                      key={task.id}
+                      className={`flex items-center gap-3 p-2.5 rounded-xl transition-colors ${
+                        isCompleted 
+                          ? 'bg-green-50 dark:bg-green-900/20 border border-green-200 dark:border-green-800' 
+                          : isCurrent 
+                            ? 'bg-violet-50 dark:bg-violet-900/20 border border-violet-300 dark:border-violet-700' 
+                            : ''
+                      }`}
+                    >
+                      <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
+                        isCompleted 
+                          ? 'bg-green-500 text-white' 
+                          : isCurrent 
+                            ? 'bg-violet-500 text-white' 
+                            : 'bg-slate-200 dark:bg-slate-700 text-slate-600 dark:text-slate-400'
+                      }`}>
+                        {isCompleted ? '✓' : idx + 1}
+                      </div>
+                      <span className={`flex-1 text-sm truncate ${
+                        isCompleted 
+                          ? 'text-slate-500 line-through' 
+                          : isCurrent 
+                            ? 'text-slate-800 dark:text-slate-100 font-medium' 
+                            : 'text-slate-600 dark:text-slate-400'
+                      }`}>
+                        {task.title}
+                      </span>
+                      {isCurrent && (
+                        <span className="text-xs text-violet-600 dark:text-violet-400 font-medium">NOW</span>
+                      )}
                     </div>
-                    <p className="text-sm text-slate-500">No conversations yet</p>
-                  </div>
-                ) : (
-                  <div className="divide-y divide-slate-100 dark:divide-slate-800">
-                    {messageThreads.map((thread, idx) => {
-                      const isAI = ['ax', 'tony'].includes(thread.recipient.toLowerCase())
-                      const threadName = thread.subject || `Chat with ${thread.recipient.charAt(0).toUpperCase() + thread.recipient.slice(1)}`
-                      return (
-                        <div 
-                          key={idx} 
-                          onClick={() => {
-                            const threadId = thread.threadId || `dm-${thread.recipient}`
-                            window.dispatchEvent(new CustomEvent('open-chat-thread', { detail: { threadId } }))
-                          }}
-                          className="flex items-center gap-3 p-4 hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer transition-colors"
-                        >
-                          <div className="relative">
-                            <Avatar 
-                              size="sm" 
-                              name={thread.recipient}
-                              className={isAI ? 'bg-gradient-to-br from-violet-500 to-purple-600' : 'bg-gradient-to-br from-blue-500 to-blue-600'}
-                            />
-                            {isAI && (
-                              <div className="absolute -bottom-0.5 -right-0.5 w-4 h-4 rounded-full bg-white dark:bg-slate-900 flex items-center justify-center">
-                                <Bot className="w-3 h-3 text-violet-500" />
-                              </div>
-                            )}
-                          </div>
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between gap-2">
-                              <span className="font-semibold text-sm text-slate-800 dark:text-slate-100">
-                                {threadName}
-                              </span>
-                              <span className="text-xs text-slate-400 flex-shrink-0">
-                                {new Date(thread.lastMessage.created_at).toLocaleTimeString([], { hour: 'numeric', minute: '2-digit' })}
-                              </span>
-                            </div>
-                            <p className="text-xs text-slate-400 capitalize mt-0.5">{thread.recipient}</p>
-                            <p className="text-sm text-slate-500 dark:text-slate-400 line-clamp-1 mt-0.5">{thread.lastMessage.content}</p>
-                          </div>
-                          {thread.messageCount > 1 && (
-                            <Chip size="sm" variant="flat" className="h-5 min-w-5 text-[10px]">{thread.messageCount}</Chip>
-                          )}
-                        </div>
-                      )
-                    })}
+                  )
+                })}
+                {todaysTasks.length === 0 && (
+                  <div className="text-center py-8">
+                    <p className="text-slate-400 text-sm">No tasks for today</p>
                   </div>
                 )}
               </CardBody>
             </Card>
+
+            {/* Break Reminder */}
+            {todayCompletedCount >= 3 && (
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-2xl p-4">
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">🧘</span>
+                  <div>
+                    <div className="font-medium text-blue-800 dark:text-blue-200">Break in {Math.max(1, 5 - (todayCompletedCount % 5))} task{5 - (todayCompletedCount % 5) !== 1 ? 's' : ''}</div>
+                    <div className="text-xs text-blue-600 dark:text-blue-400">Stretch those legs</div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Agents Widget - Admin Only */}
             {user?.is_admin && (
