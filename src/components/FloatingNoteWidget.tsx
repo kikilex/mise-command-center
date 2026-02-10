@@ -1,7 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
-import Draggable from 'react-draggable'
+import { useState, useEffect } from 'react'
 import {
   Button,
   Input,
@@ -15,7 +14,7 @@ import {
 } from '@heroui/react'
 import { 
   StickyNote, X, Search, Pin, PinOff, Minimize2, Maximize2, 
-  Plus, GripHorizontal, ChevronDown, Save
+  Plus, ChevronDown, Save
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { showErrorToast, showSuccessToast } from '@/lib/errors'
@@ -31,7 +30,6 @@ interface Note {
 
 export default function FloatingNoteWidget() {
   const supabase = createClient()
-  const nodeRef = useRef(null)
   
   // Hydration check
   const [mounted, setMounted] = useState(false)
@@ -241,28 +239,16 @@ export default function FloatingNoteWidget() {
   const panelWidth = isExpanded ? 'w-[500px]' : 'w-[360px]'
   const panelHeight = isExpanded ? 'h-[600px]' : 'h-[450px]'
   
-  // Calculate position safely (only on client)
-  const defaultX = typeof window !== 'undefined' ? Math.max(0, window.innerWidth - 400) : 100
-  const defaultY = typeof window !== 'undefined' ? Math.max(0, window.innerHeight - 500) : 100
-  
   return (
-    <Draggable 
-      handle=".drag-handle" 
-      nodeRef={nodeRef}
-      bounds="parent"
-      defaultPosition={{ x: defaultX, y: defaultY }}
+    <div 
+      className={`fixed bottom-6 right-24 z-50 ${panelWidth} ${panelHeight} transition-all duration-200`}
+      style={{ maxHeight: '90vh' }}
     >
-      <div 
-        ref={nodeRef}
-        className={`fixed z-50 ${panelWidth} ${panelHeight} transition-all duration-200`}
-        style={{ maxHeight: '90vh' }}
-      >
-        <Card className="h-full shadow-2xl border border-amber-200 dark:border-amber-800 bg-white dark:bg-slate-900">
-          {/* Header */}
-          <CardHeader className="drag-handle cursor-move px-3 py-2 border-b border-default-200 flex items-center justify-between bg-amber-50 dark:bg-amber-900/20">
-            <div className="flex items-center gap-2">
-              <GripHorizontal className="w-4 h-4 text-default-400" />
-              <StickyNote className="w-4 h-4 text-amber-500" />
+      <Card className="h-full shadow-2xl border border-amber-200 dark:border-amber-800 bg-white dark:bg-slate-900">
+        {/* Header */}
+        <CardHeader className="px-3 py-2 border-b border-default-200 flex items-center justify-between bg-amber-50 dark:bg-amber-900/20">
+          <div className="flex items-center gap-2">
+            <StickyNote className="w-4 h-4 text-amber-500" />
               <span className="font-semibold text-sm">
                 {selectedNote ? selectedNote.title : isCreating ? 'New Note' : 'Quick Notes'}
               </span>
@@ -490,6 +476,5 @@ export default function FloatingNoteWidget() {
           </CardBody>
         </Card>
       </div>
-    </Draggable>
   )
 }
