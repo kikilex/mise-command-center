@@ -239,6 +239,7 @@ export default function Home() {
   const [completedTasks, setCompletedTasks] = useState<Task[]>([]);
   const [projectStats, setProjectStats] = useState<ProjectStats[]>([]);
   const [todayCompletedCount, setTodayCompletedCount] = useState(0);
+  const [todayCompletedList, setTodayCompletedList] = useState<Task[]>([]);
   const [pinnedProjects, setPinnedProjects] = useState<string[]>([]);
   const [showAllProjects, setShowAllProjects] = useState(false);
   const [loading, setLoading] = useState(true);
@@ -465,13 +466,14 @@ export default function Home() {
         // Tasks I created but assigned to someone else don't count
         return false;
       });
-      const todayDone = myCompletedTasks.filter(t => {
+      const todayCompletedTasks = myCompletedTasks.filter(t => {
         if (!t.updated_at) return false;
         const updated = new Date(t.updated_at);
         updated.setHours(0, 0, 0, 0);
         return updated.getTime() === today.getTime();
-      }).length;
-      setTodayCompletedCount(todayDone);
+      });
+      setTodayCompletedCount(todayCompletedTasks.length);
+      setTodayCompletedList(todayCompletedTasks);
 
     } catch (error) {
       console.error('Dashboard load error:', error);
@@ -894,7 +896,7 @@ export default function Home() {
         <div className="flex flex-col lg:flex-row gap-8">
           <div className="flex-1 space-y-8">
             {/* 🔥 Today's Progress - Fire Bar */}
-            <FireProgress completedCount={todayCompletedCount} goal={8} />
+            <FireProgress completedCount={todayCompletedCount} goal={8} todayTasks={todayCompletedList} />
 
             {/* ⚡ Focus Queue */}
             <FocusQueue 

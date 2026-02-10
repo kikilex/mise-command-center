@@ -1,15 +1,24 @@
 'use client'
 
-import { useMemo } from 'react'
-import { Card, CardBody, CardHeader } from '@heroui/react'
-import { Flame } from 'lucide-react'
+import { useMemo, useState } from 'react'
+import { Card, CardBody, CardHeader, Chip } from '@heroui/react'
+import { Flame, ChevronDown, ChevronUp, Check } from 'lucide-react'
+
+interface CompletedTask {
+  id: string
+  title: string
+  updated_at?: string
+  project?: { name: string } | null
+}
 
 interface FireProgressProps {
   completedCount: number
   goal?: number
+  todayTasks?: CompletedTask[]
 }
 
-export default function FireProgress({ completedCount, goal = 8 }: FireProgressProps) {
+export default function FireProgress({ completedCount, goal = 8, todayTasks = [] }: FireProgressProps) {
+  const [expanded, setExpanded] = useState(false)
   const percent = Math.min((completedCount / goal) * 100, 100)
   const exceeded = completedCount > goal
   const exceededBy = completedCount - goal
@@ -182,6 +191,38 @@ export default function FireProgress({ completedCount, goal = 8 }: FireProgressP
               >
                 {exceeded && i % 3 === 0 ? '👑' : '🔥'}
               </span>
+            ))}
+          </div>
+        )}
+        
+        {/* Expand button */}
+        {todayTasks.length > 0 && (
+          <button
+            onClick={() => setExpanded(!expanded)}
+            className="w-full mt-3 flex items-center justify-center gap-2 text-sm py-2 rounded-lg hover:bg-white/50 transition-colors"
+            style={{ color: subColor }}
+          >
+            {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+            {expanded ? 'Hide' : 'Show'} completed tasks
+          </button>
+        )}
+        
+        {/* Expanded task list */}
+        {expanded && todayTasks.length > 0 && (
+          <div className="mt-3 space-y-2 max-h-64 overflow-y-auto">
+            {todayTasks.map(task => (
+              <div 
+                key={task.id} 
+                className="flex items-center gap-2 p-2 bg-white/60 dark:bg-slate-800/60 rounded-lg text-sm"
+              >
+                <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
+                  <Check className="w-3 h-3 text-white" />
+                </div>
+                <span className="flex-1 truncate text-slate-700 dark:text-slate-300">{task.title}</span>
+                {task.project?.name && (
+                  <Chip size="sm" variant="flat" className="text-xs">{task.project.name}</Chip>
+                )}
+              </div>
             ))}
           </div>
         )}
