@@ -95,6 +95,7 @@ export default function FocusQueue({ tasks, todayCompletedCount = 0, onTaskCompl
   const timerRef = useRef<NodeJS.Timeout | null>(null)
   const autoSaveRef = useRef<NodeJS.Timeout | null>(null)
   const sessionStartRef = useRef<number | null>(null)
+  const previousTaskIdRef = useRef<string | null>(null)
   const supabase = createClient()
   const { celebrate, getRandomHype } = useCelebrations()
   
@@ -131,29 +132,74 @@ export default function FocusQueue({ tasks, todayCompletedCount = 0, onTaskCompl
     }
   }, [])
 
-  // Restore timer state on mount - check localStorage first (survives browser close)
+  // Handle task change - save old task state, reset, then load new task state
   useEffect(() => {
-    if (!currentTask || restored) return
+    if (!currentTask) return
     
+    const previousTaskId = previousTaskIdRef.current
+    const currentTaskId = currentTask.id
+    
+    // If task changed (not first load)
+    if (previousTaskId && previousTaskId !== currentTaskId) {
+      console.log('Task changed from', previousTaskId, 'to', currentTaskId)
+      
+      // Save old task's state to DB before switching (if there was activity)
+      if (sessions.length > 0 || timerState !== 'stopped') {
+        // Complete current session if running
+        let finalSessions = sessions
+        if (timerState === 'running' && sessionStartRef.current) {
+          const duration = Date.now() - sessionStartRef.current
+          finalSessions = sessions.map((s, i) => 
+            i === sessions.length - 1 
+              ? { ...s, end: new Date().toLocaleTimeString(), duration_ms: duration }
+              : s
+          )
+        }
+        
+        // Save to DB for the OLD task
+        supabase
+          .from('tasks')
+          .update({
+            timer_state: timerState === 'running' ? 'paused' : timerState,
+            current_session_start: null,
+            focus_sessions: finalSessions,
+            total_session_count: finalSessions.length,
+            total_time_spent_ms: finalSessions.reduce((sum, s) => sum + (s.duration_ms || 0), 0)
+          })
+          .eq('id', previousTaskId)
+          .then(() => console.log('Saved state for previous task', previousTaskId))
+      }
+      
+      // Reset timer state for new task
+      setTimerState('stopped')
+      setSessions([])
+      setSessionCount(1)
+      setElapsedMs(0)
+      sessionStartRef.current = null
+      if (timerRef.current) clearInterval(timerRef.current)
+      clearLocalStorage()
+    }
+    
+    // Update ref to current task
+    previousTaskIdRef.current = currentTaskId
+    
+    // Load new task's state
     const savedState = loadFromLocalStorage()
     
-    // Check if we have localStorage state for this task
-    if (savedState && savedState.taskId === currentTask.id) {
+    // Check if we have localStorage state for THIS task
+    if (savedState && savedState.taskId === currentTaskId) {
       console.log('Restoring timer from localStorage:', savedState)
       setSessions(savedState.sessions)
       setSessionCount(savedState.sessions.length || 1)
       
       if (savedState.timerState === 'running' && savedState.sessionStartTimestamp) {
-        // Resume running timer - calculate elapsed since browser closed
         sessionStartRef.current = savedState.sessionStartTimestamp
         setTimerState('running')
-        // Elapsed will be calculated in the tick effect
       } else if (savedState.timerState === 'paused') {
         setTimerState('paused')
         const totalElapsed = savedState.sessions.reduce((sum, s) => sum + (s.duration_ms || 0), 0)
         setElapsedMs(totalElapsed)
       }
-      setRestored(true)
       return
     }
     
@@ -168,12 +214,6 @@ export default function FocusQueue({ tasks, todayCompletedCount = 0, onTaskCompl
       sessionStartRef.current = new Date(currentTask.current_session_start).getTime()
       setTimerState('running')
     }
-    setRestored(true)
-  }, [currentTask?.id, restored, loadFromLocalStorage])
-
-  // Reset restored flag when task changes
-  useEffect(() => {
-    setRestored(false)
   }, [currentTask?.id])
 
   // Fetch team members for handoff
@@ -188,9 +228,13 @@ export default function FocusQueue({ tasks, todayCompletedCount = 0, onTaskCompl
     loadTeamMembers()
   }, [])
 
-  // Save to localStorage on every state change while running
+  // Save to localStorage on timer/session state changes (NOT on task change)
   useEffect(() => {
     if (!currentTask) return
+    // Only save if there's actual timer activity
+    if (timerState === 'stopped' && sessions.length === 0) return
+    // Don't save if task just changed (previousTaskIdRef not yet updated)
+    if (previousTaskIdRef.current !== currentTask.id) return
     
     const state: SavedTimerState = {
       taskId: currentTask.id,
@@ -200,7 +244,7 @@ export default function FocusQueue({ tasks, todayCompletedCount = 0, onTaskCompl
       savedAt: Date.now()
     }
     saveToLocalStorage(state)
-  }, [currentTask?.id, timerState, sessions, saveToLocalStorage])
+  }, [timerState, sessions, saveToLocalStorage, currentTask])
 
   // Save to DB periodically while running (every 30s as backup)
   useEffect(() => {
