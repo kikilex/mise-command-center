@@ -19,16 +19,16 @@
     .progress-ring circle { transition: stroke-dashoffset 0.5s ease; }
   </style>
 </head>
-<body class="bg-slate-950 text-white min-h-screen">
+<body class="bg-slate-50 text-slate-900 min-h-screen">
   
   <!-- Navbar -->
-  <nav class="bg-slate-900 border-b border-slate-800 px-6 py-3 flex items-center justify-between">
+  <nav class="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between">
     <div class="flex items-center gap-4">
       <div class="text-xl font-bold text-violet-400">⚡ Command Center</div>
       <span class="text-slate-500">/</span>
-      <span class="text-slate-400">Faithstone Books</span>
+      <span class="text-slate-500">Faithstone Books</span>
       <span class="text-slate-500">/</span>
-      <span class="text-white font-medium">SWP Extended Edition</span>
+      <span class="text-slate-900 font-medium">SWP Extended Edition</span>
     </div>
     <div class="flex items-center gap-3">
       <div class="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-sm font-bold">A</div>
@@ -36,7 +36,7 @@
   </nav>
 
   <!-- Project Header -->
-  <div class="bg-slate-900/50 border-b border-slate-800">
+  <div class="bg-white/50 border-b border-slate-200">
     <div class="max-w-7xl mx-auto px-6 py-6">
       <div class="flex items-start justify-between">
         <div>
@@ -45,11 +45,11 @@
             <h1 class="text-2xl font-bold">Spiritual Warfare Prayers: Extended Edition</h1>
             <span class="px-2 py-1 bg-yellow-500/20 text-yellow-400 text-xs font-medium rounded-full">Drafting</span>
           </div>
-          <p class="text-slate-400">110 powerful prayers across 15 sections • Target: 45,000 words</p>
+          <p class="text-slate-500">110 powerful prayers across 15 sections • Target: 45,000 words</p>
         </div>
         
         <div class="flex items-center gap-2">
-          <button class="px-4 py-2 bg-slate-800 hover:bg-slate-700 rounded-lg text-sm font-medium flex items-center gap-2 transition">
+          <button class="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm font-medium flex items-center gap-2 transition">
             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path></svg>
             Settings
           </button>
@@ -64,11 +64,11 @@
     <!-- Project Tabs -->
     <div class="max-w-7xl mx-auto px-6">
       <div class="flex gap-1">
-        <button class="px-4 py-2 text-slate-400 hover:text-white text-sm font-medium transition">Overview</button>
-        <button class="px-4 py-2 text-slate-400 hover:text-white text-sm font-medium transition">Tasks</button>
-        <button class="px-4 py-2 text-slate-400 hover:text-white text-sm font-medium transition">Docs</button>
-        <button class="px-4 py-2 text-white text-sm font-medium border-b-2 border-violet-500">📖 Book</button>
-        <button class="px-4 py-2 text-slate-400 hover:text-white text-sm font-medium transition">Activity</button>
+        <button class="px-4 py-2 text-slate-500 hover:text-slate-900 text-sm font-medium transition">Overview</button>
+        <button class="px-4 py-2 text-slate-500 hover:text-slate-900 text-sm font-medium transition">Tasks</button>
+        <button class="px-4 py-2 text-slate-500 hover:text-slate-900 text-sm font-medium transition">Docs</button>
+        <button class="px-4 py-2 text-slate-900 text-sm font-medium border-b-2 border-violet-500">📖 Book</button>
+        <button class="px-4 py-2 text-slate-500 hover:text-slate-900 text-sm font-medium transition">Activity</button>
       </div>
     </div>
   </div>
@@ -79,9 +79,9 @@
     <!-- Book Sub-tabs -->
     <div class="flex items-center justify-between mb-6">
       <div class="flex gap-2">
-        <button onclick="showView('outline')" id="tab-outline" class="px-3 py-1.5 bg-slate-800 text-slate-300 text-sm font-medium rounded-lg transition">Outline</button>
-        <button onclick="showView('manuscript')" id="tab-manuscript" class="px-3 py-1.5 bg-slate-800 text-slate-300 text-sm font-medium rounded-lg transition">Manuscript</button>
-        <button onclick="showView('progress')" id="tab-progress" class="px-3 py-1.5 bg-violet-600 text-white text-sm font-medium rounded-lg">Progress</button>
+        <button onclick="showView('outline')" id="tab-outline" class="px-3 py-1.5 bg-slate-100 text-slate-700 text-sm font-medium rounded-lg transition">Outline</button>
+        <button onclick="showView('manuscript')" id="tab-manuscript" class="px-3 py-1.5 bg-slate-100 text-slate-700 text-sm font-medium rounded-lg transition">Manuscript</button>
+        <button onclick="showView('progress')" id="tab-progress" class="px-3 py-1.5 bg-violet-600 text-slate-900 text-sm font-medium rounded-lg">Progress</button>
       </div>
       <button class="px-4 py-2 bg-green-600 hover:bg-green-500 rounded-lg text-sm font-medium flex items-center gap-2 transition">
         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path></svg>
@@ -91,18 +91,18 @@
 
     <!-- Outline View -->
     <div id="view-outline" class="hidden">
-      <p class="text-slate-400 text-center py-12">← See v1 mockup for Outline view</p>
+      <p class="text-slate-500 text-center py-12">← See v1 mockup for Outline view</p>
     </div>
 
     <!-- Manuscript View -->
     <div id="view-manuscript" class="hidden">
-      <div class="bg-slate-900 border border-slate-800 rounded-2xl overflow-hidden">
+      <div class="bg-white border border-slate-200 rounded-2xl overflow-hidden">
         <!-- Manuscript Header -->
-        <div class="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-900/50">
+        <div class="p-4 border-b border-slate-200 flex items-center justify-between bg-white/50">
           <div class="flex items-center gap-3">
-            <span class="text-sm text-slate-400">Reading view — click chapter to edit</span>
+            <span class="text-sm text-slate-500">Reading view — click chapter to edit</span>
           </div>
-          <div class="flex items-center gap-4 text-sm text-slate-400">
+          <div class="flex items-center gap-4 text-sm text-slate-500">
             <span>📄 28,450 words</span>
             <span>📖 ~114 pages</span>
             <span>⏱️ ~2.5 hr read</span>
@@ -110,18 +110,18 @@
         </div>
         
         <!-- Manuscript Content -->
-        <div class="p-8 max-h-[600px] overflow-y-auto bg-slate-950">
-          <div class="prose mx-auto text-slate-300">
+        <div class="p-8 max-h-[600px] overflow-y-auto bg-slate-50">
+          <div class="prose mx-auto text-slate-700">
             
             <div class="text-center mb-16">
-              <h1 class="text-4xl font-bold text-white mb-4">Spiritual Warfare Prayers</h1>
+              <h1 class="text-4xl font-bold text-slate-900 mb-4">Spiritual Warfare Prayers</h1>
               <p class="text-xl text-violet-400">Extended Edition</p>
               <p class="text-slate-500 mt-4">By Faithstone Publishing</p>
             </div>
             
-            <div class="border-t border-slate-800 my-12"></div>
+            <div class="border-t border-slate-200 my-12"></div>
             
-            <h2 class="text-2xl font-bold text-slate-200 border-b border-slate-800 pb-2">Part I: Foundations of Spiritual Warfare</h2>
+            <h2 class="text-2xl font-bold text-slate-200 border-b border-slate-200 pb-2">Part I: Foundations of Spiritual Warfare</h2>
             
             <h2 class="cursor-pointer hover:text-violet-400 transition">Chapter 1: Understanding Spiritual Warfare</h2>
             
@@ -135,13 +135,13 @@
             
             <p>This opening chapter will equip you with the foundational understanding you need to pray with authority and power. We'll explore what the Bible teaches about the spiritual realm, the nature of our enemy, and most importantly, the victory that is already ours in Christ Jesus.</p>
             
-            <h3 class="text-lg font-semibold text-slate-300 mt-6">Prayer for Spiritual Awareness</h3>
+            <h3 class="text-lg font-semibold text-slate-700 mt-6">Prayer for Spiritual Awareness</h3>
             
-            <p class="italic bg-slate-900 p-4 rounded-lg border-l-4 border-violet-500">
+            <p class="italic bg-white p-4 rounded-lg border-l-4 border-violet-500">
               Heavenly Father, I come before You today asking that You would open my spiritual eyes. Help me to see beyond the physical realm into the spiritual reality that surrounds me. Give me discernment to recognize the enemy's tactics and wisdom to respond with Your truth. I declare that I am not ignorant of Satan's devices, for Your Word has made me aware. Thank You for the victory that is already mine through Christ Jesus my Lord. In Jesus' name, Amen.
             </p>
             
-            <div class="border-t border-slate-800 my-8"></div>
+            <div class="border-t border-slate-200 my-8"></div>
             
             <h2 class="cursor-pointer hover:text-violet-400 transition">Chapter 2: The Armor of God</h2>
             
@@ -161,24 +161,24 @@
       
       <!-- Stats Cards Row -->
       <div class="grid grid-cols-4 gap-4">
-        <div class="bg-slate-900 border border-slate-800 rounded-xl p-5">
-          <div class="text-slate-400 text-sm mb-1">Total Words</div>
-          <div class="text-3xl font-bold text-white">28,450</div>
+        <div class="bg-white border border-slate-200 rounded-xl p-5">
+          <div class="text-slate-500 text-sm mb-1">Total Words</div>
+          <div class="text-3xl font-bold text-slate-900">28,450</div>
           <div class="text-green-400 text-sm mt-1">+2,340 this week</div>
         </div>
-        <div class="bg-slate-900 border border-slate-800 rounded-xl p-5">
-          <div class="text-slate-400 text-sm mb-1">Target</div>
-          <div class="text-3xl font-bold text-white">45,000</div>
+        <div class="bg-white border border-slate-200 rounded-xl p-5">
+          <div class="text-slate-500 text-sm mb-1">Target</div>
+          <div class="text-3xl font-bold text-slate-900">45,000</div>
           <div class="text-violet-400 text-sm mt-1">63% complete</div>
         </div>
-        <div class="bg-slate-900 border border-slate-800 rounded-xl p-5">
-          <div class="text-slate-400 text-sm mb-1">Chapters</div>
-          <div class="text-3xl font-bold text-white">15</div>
-          <div class="text-slate-400 text-sm mt-1">8 final • 4 draft • 3 outline</div>
+        <div class="bg-white border border-slate-200 rounded-xl p-5">
+          <div class="text-slate-500 text-sm mb-1">Chapters</div>
+          <div class="text-3xl font-bold text-slate-900">15</div>
+          <div class="text-slate-500 text-sm mt-1">8 final • 4 draft • 3 outline</div>
         </div>
-        <div class="bg-slate-900 border border-slate-800 rounded-xl p-5">
-          <div class="text-slate-400 text-sm mb-1">Est. Completion</div>
-          <div class="text-3xl font-bold text-white">Feb 28</div>
+        <div class="bg-white border border-slate-200 rounded-xl p-5">
+          <div class="text-slate-500 text-sm mb-1">Est. Completion</div>
+          <div class="text-3xl font-bold text-slate-900">Feb 28</div>
           <div class="text-yellow-400 text-sm mt-1">18 days remaining</div>
         </div>
       </div>
@@ -187,7 +187,7 @@
       <div class="grid grid-cols-2 gap-6">
         
         <!-- Overall Progress -->
-        <div class="bg-slate-900 border border-slate-800 rounded-xl p-6">
+        <div class="bg-white border border-slate-200 rounded-xl p-6">
           <h3 class="font-semibold text-lg mb-4">Overall Progress</h3>
           
           <div class="flex items-center gap-8">
@@ -213,28 +213,28 @@
               <div class="flex items-center justify-between">
                 <div class="flex items-center gap-2">
                   <div class="w-3 h-3 rounded-full bg-green-500"></div>
-                  <span class="text-slate-300">Final</span>
+                  <span class="text-slate-700">Final</span>
                 </div>
                 <span class="font-medium">8 chapters</span>
               </div>
               <div class="flex items-center justify-between">
                 <div class="flex items-center gap-2">
                   <div class="w-3 h-3 rounded-full bg-yellow-500"></div>
-                  <span class="text-slate-300">Draft</span>
+                  <span class="text-slate-700">Draft</span>
                 </div>
                 <span class="font-medium">4 chapters</span>
               </div>
               <div class="flex items-center justify-between">
                 <div class="flex items-center gap-2">
                   <div class="w-3 h-3 rounded-full bg-blue-500"></div>
-                  <span class="text-slate-300">Outline</span>
+                  <span class="text-slate-700">Outline</span>
                 </div>
                 <span class="font-medium">3 chapters</span>
               </div>
               <div class="flex items-center justify-between">
                 <div class="flex items-center gap-2">
                   <div class="w-3 h-3 rounded-full bg-slate-600"></div>
-                  <span class="text-slate-300">Idea</span>
+                  <span class="text-slate-700">Idea</span>
                 </div>
                 <span class="font-medium">0 chapters</span>
               </div>
@@ -243,43 +243,43 @@
         </div>
         
         <!-- Word Count by Part -->
-        <div class="bg-slate-900 border border-slate-800 rounded-xl p-6">
+        <div class="bg-white border border-slate-200 rounded-xl p-6">
           <h3 class="font-semibold text-lg mb-4">Words by Section</h3>
           
           <div class="space-y-4">
             <div>
               <div class="flex justify-between text-sm mb-1">
-                <span class="text-slate-300">Part I: Foundations</span>
-                <span class="text-slate-400">12,340 / 15,000</span>
+                <span class="text-slate-700">Part I: Foundations</span>
+                <span class="text-slate-500">12,340 / 15,000</span>
               </div>
-              <div class="h-3 bg-slate-800 rounded-full overflow-hidden">
+              <div class="h-3 bg-slate-100 rounded-full overflow-hidden">
                 <div class="h-full bg-gradient-to-r from-violet-500 to-purple-500 rounded-full" style="width: 82%"></div>
               </div>
             </div>
             <div>
               <div class="flex justify-between text-sm mb-1">
-                <span class="text-slate-300">Part II: Protection</span>
-                <span class="text-slate-400">8,200 / 12,000</span>
+                <span class="text-slate-700">Part II: Protection</span>
+                <span class="text-slate-500">8,200 / 12,000</span>
               </div>
-              <div class="h-3 bg-slate-800 rounded-full overflow-hidden">
+              <div class="h-3 bg-slate-100 rounded-full overflow-hidden">
                 <div class="h-full bg-gradient-to-r from-violet-500 to-purple-500 rounded-full" style="width: 68%"></div>
               </div>
             </div>
             <div>
               <div class="flex justify-between text-sm mb-1">
-                <span class="text-slate-300">Part III: Victory</span>
-                <span class="text-slate-400">5,100 / 10,000</span>
+                <span class="text-slate-700">Part III: Victory</span>
+                <span class="text-slate-500">5,100 / 10,000</span>
               </div>
-              <div class="h-3 bg-slate-800 rounded-full overflow-hidden">
+              <div class="h-3 bg-slate-100 rounded-full overflow-hidden">
                 <div class="h-full bg-gradient-to-r from-violet-500 to-purple-500 rounded-full" style="width: 51%"></div>
               </div>
             </div>
             <div>
               <div class="flex justify-between text-sm mb-1">
-                <span class="text-slate-300">Part IV: Daily Warfare</span>
-                <span class="text-slate-400">2,810 / 8,000</span>
+                <span class="text-slate-700">Part IV: Daily Warfare</span>
+                <span class="text-slate-500">2,810 / 8,000</span>
               </div>
-              <div class="h-3 bg-slate-800 rounded-full overflow-hidden">
+              <div class="h-3 bg-slate-100 rounded-full overflow-hidden">
                 <div class="h-full bg-gradient-to-r from-violet-500 to-purple-500 rounded-full" style="width: 35%"></div>
               </div>
             </div>
@@ -288,10 +288,10 @@
       </div>
       
       <!-- Writing Activity -->
-      <div class="bg-slate-900 border border-slate-800 rounded-xl p-6">
+      <div class="bg-white border border-slate-200 rounded-xl p-6">
         <div class="flex items-center justify-between mb-4">
           <h3 class="font-semibold text-lg">Writing Activity</h3>
-          <select class="bg-slate-800 border border-slate-700 rounded-lg px-3 py-1.5 text-sm">
+          <select class="bg-slate-100 border border-slate-300 rounded-lg px-3 py-1.5 text-sm">
             <option>Last 7 days</option>
             <option>Last 30 days</option>
             <option>All time</option>
@@ -340,16 +340,16 @@
             <div class="w-full bg-green-500/20 rounded-t" style="height: 100%">
               <div class="w-full bg-green-500 rounded-t h-full"></div>
             </div>
-            <span class="text-xs text-white font-medium">Today</span>
+            <span class="text-xs text-slate-900 font-medium">Today</span>
           </div>
         </div>
         
-        <div class="flex items-center justify-between mt-4 pt-4 border-t border-slate-800">
-          <div class="text-sm text-slate-400">
-            <span class="text-white font-medium">2,340</span> words this week
+        <div class="flex items-center justify-between mt-4 pt-4 border-t border-slate-200">
+          <div class="text-sm text-slate-500">
+            <span class="text-slate-900 font-medium">2,340</span> words this week
           </div>
-          <div class="text-sm text-slate-400">
-            Daily average: <span class="text-white font-medium">334</span> words
+          <div class="text-sm text-slate-500">
+            Daily average: <span class="text-slate-900 font-medium">334</span> words
           </div>
           <div class="text-sm text-green-400">
             🔥 3 day streak!
@@ -358,7 +358,7 @@
       </div>
       
       <!-- Chapter Status Grid -->
-      <div class="bg-slate-900 border border-slate-800 rounded-xl p-6">
+      <div class="bg-white border border-slate-200 rounded-xl p-6">
         <h3 class="font-semibold text-lg mb-4">Chapter Status</h3>
         
         <div class="grid grid-cols-8 gap-2">
@@ -380,22 +380,22 @@
           <div class="aspect-square rounded-lg bg-blue-500/20 border-2 border-blue-500 flex items-center justify-center text-sm font-medium" title="Ch 15: Outline">15</div>
         </div>
         
-        <div class="flex items-center gap-6 mt-4 pt-4 border-t border-slate-800 text-sm">
+        <div class="flex items-center gap-6 mt-4 pt-4 border-t border-slate-200 text-sm">
           <div class="flex items-center gap-2">
             <div class="w-3 h-3 rounded bg-green-500"></div>
-            <span class="text-slate-400">Final (8)</span>
+            <span class="text-slate-500">Final (8)</span>
           </div>
           <div class="flex items-center gap-2">
             <div class="w-3 h-3 rounded bg-yellow-500"></div>
-            <span class="text-slate-400">Draft (4)</span>
+            <span class="text-slate-500">Draft (4)</span>
           </div>
           <div class="flex items-center gap-2">
             <div class="w-3 h-3 rounded bg-blue-500"></div>
-            <span class="text-slate-400">Outline (3)</span>
+            <span class="text-slate-500">Outline (3)</span>
           </div>
           <div class="flex items-center gap-2">
             <div class="w-3 h-3 rounded border-2 border-dashed border-slate-600"></div>
-            <span class="text-slate-400">Idea (0)</span>
+            <span class="text-slate-500">Idea (0)</span>
           </div>
         </div>
       </div>
@@ -411,17 +411,17 @@
       document.getElementById('view-progress').classList.add('hidden');
       
       // Reset all tabs
-      document.getElementById('tab-outline').classList.remove('bg-violet-600', 'text-white');
-      document.getElementById('tab-outline').classList.add('bg-slate-800', 'text-slate-300');
-      document.getElementById('tab-manuscript').classList.remove('bg-violet-600', 'text-white');
-      document.getElementById('tab-manuscript').classList.add('bg-slate-800', 'text-slate-300');
-      document.getElementById('tab-progress').classList.remove('bg-violet-600', 'text-white');
-      document.getElementById('tab-progress').classList.add('bg-slate-800', 'text-slate-300');
+      document.getElementById('tab-outline').classList.remove('bg-violet-600', 'text-slate-900');
+      document.getElementById('tab-outline').classList.add('bg-slate-100', 'text-slate-700');
+      document.getElementById('tab-manuscript').classList.remove('bg-violet-600', 'text-slate-900');
+      document.getElementById('tab-manuscript').classList.add('bg-slate-100', 'text-slate-700');
+      document.getElementById('tab-progress').classList.remove('bg-violet-600', 'text-slate-900');
+      document.getElementById('tab-progress').classList.add('bg-slate-100', 'text-slate-700');
       
       // Show selected view
       document.getElementById('view-' + view).classList.remove('hidden');
-      document.getElementById('tab-' + view).classList.add('bg-violet-600', 'text-white');
-      document.getElementById('tab-' + view).classList.remove('bg-slate-800', 'text-slate-300');
+      document.getElementById('tab-' + view).classList.add('bg-violet-600', 'text-slate-900');
+      document.getElementById('tab-' + view).classList.remove('bg-slate-100', 'text-slate-700');
     }
   </script>
 
