@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from 'react'
 import { Card, CardBody, CardHeader, Chip } from '@heroui/react'
-import { Flame, ChevronDown, ChevronUp, Check } from 'lucide-react'
+import { Flame, ChevronDown, ChevronUp, Check, Trash2 } from 'lucide-react'
 
 interface CompletedTask {
   id: string
@@ -15,9 +15,10 @@ interface FireProgressProps {
   completedCount: number
   goal?: number
   todayTasks?: CompletedTask[]
+  onDeleteTask?: (taskId: string) => void
 }
 
-export default function FireProgress({ completedCount, goal = 8, todayTasks = [] }: FireProgressProps) {
+export default function FireProgress({ completedCount, goal = 8, todayTasks = [], onDeleteTask }: FireProgressProps) {
   const [expanded, setExpanded] = useState(false)
   const percent = Math.min((completedCount / goal) * 100, 100)
   const exceeded = completedCount > goal
@@ -213,7 +214,7 @@ export default function FireProgress({ completedCount, goal = 8, todayTasks = []
             {todayTasks.map(task => (
               <div 
                 key={task.id} 
-                className="flex items-center gap-2 p-2 bg-white/60 dark:bg-slate-800/60 rounded-lg text-sm"
+                className="flex items-center gap-2 p-2 bg-white/60 dark:bg-slate-800/60 rounded-lg text-sm group"
               >
                 <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
                   <Check className="w-3 h-3 text-white" />
@@ -221,6 +222,15 @@ export default function FireProgress({ completedCount, goal = 8, todayTasks = []
                 <span className="flex-1 truncate text-slate-700 dark:text-slate-300">{task.title}</span>
                 {task.project?.name && (
                   <Chip size="sm" variant="flat" className="text-xs">{task.project.name}</Chip>
+                )}
+                {onDeleteTask && (
+                  <button
+                    onClick={() => onDeleteTask(task.id)}
+                    className="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700 transition-all p-1"
+                    title="Delete task"
+                  >
+                    <Trash2 className="w-4 h-4" />
+                  </button>
                 )}
               </div>
             ))}

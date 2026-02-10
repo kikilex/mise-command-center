@@ -896,7 +896,16 @@ export default function Home() {
         <div className="flex flex-col lg:flex-row gap-8">
           <div className="flex-1 space-y-8">
             {/* 🔥 Today's Progress - Fire Bar */}
-            <FireProgress completedCount={todayCompletedCount} goal={8} todayTasks={todayCompletedList} />
+            <FireProgress 
+              completedCount={todayCompletedCount} 
+              goal={8} 
+              todayTasks={todayCompletedList}
+              onDeleteTask={async (taskId) => {
+                await supabase.from('tasks').delete().eq('id', taskId)
+                setTodayCompletedList(prev => prev.filter(t => t.id !== taskId))
+                setTodayCompletedCount(prev => prev - 1)
+              }}
+            />
 
             {/* ⚡ Focus Queue */}
             <FocusQueue 
