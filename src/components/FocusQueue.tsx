@@ -342,7 +342,9 @@ export default function FocusQueue({ tasks, todayCompletedCount = 0, onTaskCompl
             </div>
             <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 group-hover:text-violet-600 dark:group-hover:text-violet-400 transition-colors">{currentTask.title}</h3>
             {currentTask.description && (
-              <p className="text-slate-500 text-sm mt-1 line-clamp-2">{currentTask.description}</p>
+              <p className="text-slate-500 text-sm mt-1 line-clamp-2">
+                {currentTask.description.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()}
+              </p>
             )}
             <p className="text-xs text-slate-400 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">Click to view details</p>
           </div>

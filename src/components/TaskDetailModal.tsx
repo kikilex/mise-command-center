@@ -756,9 +756,10 @@ export default function TaskDetailModal({
                     {formData.description && (
                       <div>
                         <label className="text-sm font-medium text-slate-500 dark:text-slate-400">Description</label>
-                        <div className="text-slate-700 dark:text-slate-300 mt-1 prose prose-slate dark:prose-invert max-w-none">
-                          <ReactMarkdown remarkPlugins={[remarkGfm]}>{formData.description || ''}</ReactMarkdown>
-                        </div>
+                        <div 
+                          className="text-slate-700 dark:text-slate-300 mt-1 prose prose-slate dark:prose-invert max-w-none prose-sm"
+                          dangerouslySetInnerHTML={{ __html: formData.description }}
+                        />
                       </div>
                     )}
                     
