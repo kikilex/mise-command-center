@@ -1,0 +1,428 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Book Builder v3 - Inline Editing Flow</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { font-family: 'Inter', system-ui, sans-serif; }
+    .editor-content { min-height: 400px; }
+    .editor-content:focus { outline: none; }
+    .view-btn.active { background: #7c3aed; color: white; }
+    .chapter-row { transition: all 0.2s ease; }
+    .chapter-row:hover { background: #f8fafc; }
+    .chapter-row.expanded { background: #f1f5f9; border-left: 3px solid #7c3aed; }
+  </style>
+</head>
+<body class="bg-slate-50 text-slate-900 min-h-screen">
+  
+  <!-- Header -->
+  <nav class="bg-white border-b border-slate-200 px-6 py-3 flex items-center justify-between sticky top-0 z-50">
+    <div class="flex items-center gap-4">
+      <div class="text-xl font-bold text-violet-600">⚡ Command Center</div>
+      <span class="text-slate-300">/</span>
+      <span class="text-slate-500">Faithstone Books</span>
+      <span class="text-slate-300">/</span>
+      <span class="font-medium">SWP Extended Edition</span>
+    </div>
+    <div class="flex items-center gap-3">
+      <button class="px-4 py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm font-medium flex items-center gap-2">
+        ⚙️ Settings
+      </button>
+      <button class="px-4 py-2 bg-violet-600 hover:bg-violet-500 text-white rounded-lg text-sm font-medium flex items-center gap-2">
+        📥 Export Book
+      </button>
+    </div>
+  </nav>
+
+  <!-- Page Selector -->
+  <div class="bg-white border-b border-slate-200 px-6 py-3">
+    <div class="flex items-center gap-2">
+      <span class="text-sm text-slate-500 mr-2">View:</span>
+      <button onclick="showView('outline')" id="btn-outline" class="view-btn active px-3 py-1.5 rounded-lg text-sm font-medium transition">Outline</button>
+      <button onclick="showView('expanded')" id="btn-expanded" class="view-btn px-3 py-1.5 rounded-lg text-sm font-medium bg-slate-100 hover:bg-slate-200 transition">Expanded Edit</button>
+      <button onclick="showView('sidepanel')" id="btn-sidepanel" class="view-btn px-3 py-1.5 rounded-lg text-sm font-medium bg-slate-100 hover:bg-slate-200 transition">Side Panel Edit</button>
+    </div>
+  </div>
+
+  <!-- VIEW 1: Outline View (Collapsed) -->
+  <div id="view-outline" class="max-w-5xl mx-auto px-6 py-6">
+    <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+      <!-- Book Header -->
+      <div class="p-6 border-b border-slate-200 bg-gradient-to-r from-violet-50 to-purple-50">
+        <div class="flex items-start justify-between">
+          <div>
+            <h1 class="text-2xl font-bold text-slate-800 flex items-center gap-3">
+              📖 Spiritual Warfare Prayers: Extended Edition
+            </h1>
+            <p class="text-slate-500 mt-1">110 prayers across 15 chapters • Target: 45,000 words</p>
+            <div class="flex items-center gap-4 mt-4">
+              <div class="flex items-center gap-2">
+                <div class="w-32 h-2 bg-slate-200 rounded-full overflow-hidden">
+                  <div class="h-full bg-violet-500 rounded-full" style="width: 63%"></div>
+                </div>
+                <span class="text-sm font-medium text-violet-600">63%</span>
+              </div>
+              <span class="text-sm text-slate-500">28,450 / 45,000 words</span>
+            </div>
+          </div>
+          <button class="px-4 py-2 bg-green-500 hover:bg-green-600 text-white rounded-lg text-sm font-medium">
+            + Add Chapter
+          </button>
+        </div>
+      </div>
+
+      <!-- Chapters List -->
+      <div class="divide-y divide-slate-100">
+        <!-- Part Header -->
+        <div class="px-6 py-3 bg-slate-50 flex items-center gap-2">
+          <span class="text-sm font-semibold text-slate-700">Part I: Foundations</span>
+          <span class="text-xs text-slate-400">4 chapters • 12,340 words</span>
+        </div>
+
+        <!-- Chapter 1 -->
+        <div class="chapter-row px-6 py-4 flex items-center gap-4 cursor-pointer" onclick="showView('expanded')">
+          <div class="text-slate-400 cursor-grab">⋮⋮</div>
+          <div class="w-8 h-8 bg-green-100 text-green-600 rounded-lg flex items-center justify-center text-sm font-bold">1</div>
+          <div class="flex-1">
+            <div class="flex items-center gap-2">
+              <span class="font-medium text-slate-800">Understanding Spiritual Warfare</span>
+              <span class="px-2 py-0.5 bg-green-100 text-green-600 text-xs font-medium rounded-full">Final ✓</span>
+            </div>
+            <p class="text-sm text-slate-500 mt-0.5">Introduction to spiritual warfare and prayer</p>
+          </div>
+          <div class="text-right">
+            <div class="text-sm font-medium text-slate-700">3,245 words</div>
+            <div class="text-xs text-slate-400">8 prayers</div>
+          </div>
+          <button class="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-violet-600">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+          </button>
+          <button class="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+          </button>
+        </div>
+
+        <!-- Chapter 2 -->
+        <div class="chapter-row px-6 py-4 flex items-center gap-4 cursor-pointer">
+          <div class="text-slate-400 cursor-grab">⋮⋮</div>
+          <div class="w-8 h-8 bg-green-100 text-green-600 rounded-lg flex items-center justify-center text-sm font-bold">2</div>
+          <div class="flex-1">
+            <div class="flex items-center gap-2">
+              <span class="font-medium text-slate-800">The Armor of God</span>
+              <span class="px-2 py-0.5 bg-green-100 text-green-600 text-xs font-medium rounded-full">Final ✓</span>
+            </div>
+            <p class="text-sm text-slate-500 mt-0.5">Prayers for putting on spiritual armor</p>
+          </div>
+          <div class="text-right">
+            <div class="text-sm font-medium text-slate-700">4,120 words</div>
+            <div class="text-xs text-slate-400">7 prayers</div>
+          </div>
+          <button class="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-violet-600">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+          </button>
+          <button class="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+          </button>
+        </div>
+
+        <!-- Chapter 3 - Draft -->
+        <div class="chapter-row px-6 py-4 flex items-center gap-4 cursor-pointer bg-yellow-50/50">
+          <div class="text-slate-400 cursor-grab">⋮⋮</div>
+          <div class="w-8 h-8 bg-yellow-100 text-yellow-600 rounded-lg flex items-center justify-center text-sm font-bold">3</div>
+          <div class="flex-1">
+            <div class="flex items-center gap-2">
+              <span class="font-medium text-slate-800">Breaking Generational Curses</span>
+              <span class="px-2 py-0.5 bg-yellow-100 text-yellow-600 text-xs font-medium rounded-full">Draft</span>
+              <span class="text-xs text-slate-400">• Matthew working</span>
+            </div>
+            <p class="text-sm text-slate-500 mt-0.5">Prayers for breaking family patterns</p>
+          </div>
+          <div class="text-right">
+            <div class="text-sm font-medium text-slate-700">2,890 words</div>
+            <div class="text-xs text-slate-400">5 prayers</div>
+          </div>
+          <button class="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-violet-600">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+          </button>
+          <button class="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+          </button>
+        </div>
+
+        <!-- Chapter 4 - Outline -->
+        <div class="chapter-row px-6 py-4 flex items-center gap-4 cursor-pointer">
+          <div class="text-slate-400 cursor-grab">⋮⋮</div>
+          <div class="w-8 h-8 bg-blue-100 text-blue-600 rounded-lg flex items-center justify-center text-sm font-bold">4</div>
+          <div class="flex-1">
+            <div class="flex items-center gap-2">
+              <span class="font-medium text-slate-800">Authority in Christ</span>
+              <span class="px-2 py-0.5 bg-blue-100 text-blue-600 text-xs font-medium rounded-full">Outline</span>
+            </div>
+            <p class="text-sm text-slate-500 mt-0.5 italic">Click to start writing...</p>
+          </div>
+          <div class="text-right">
+            <div class="text-sm font-medium text-slate-400">850 words</div>
+            <div class="text-xs text-slate-400">0 prayers</div>
+          </div>
+          <button class="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-violet-600">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"></path></svg>
+          </button>
+          <button class="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-slate-600">
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+    
+    <p class="text-center text-slate-400 text-sm mt-6">👆 Click any chapter to see inline editing options</p>
+  </div>
+
+  <!-- VIEW 2: Expanded Inline Edit -->
+  <div id="view-expanded" class="max-w-5xl mx-auto px-6 py-6 hidden">
+    <div class="bg-white border border-slate-200 rounded-xl overflow-hidden">
+      <!-- Book Header (Collapsed) -->
+      <div class="p-4 border-b border-slate-200 bg-slate-50 flex items-center justify-between">
+        <div class="flex items-center gap-3">
+          <span class="text-lg font-bold">📖 SWP Extended Edition</span>
+          <span class="text-sm text-slate-500">28,450 / 45,000 words (63%)</span>
+        </div>
+        <button onclick="showView('outline')" class="text-sm text-violet-600 hover:text-violet-800 font-medium">
+          ← Back to Outline
+        </button>
+      </div>
+
+      <!-- Chapters with one expanded -->
+      <div class="divide-y divide-slate-100">
+        <!-- Chapter 1 - Collapsed -->
+        <div class="chapter-row px-6 py-3 flex items-center gap-4 cursor-pointer hover:bg-slate-50">
+          <div class="w-6 h-6 bg-green-100 text-green-600 rounded flex items-center justify-center text-xs font-bold">1</div>
+          <span class="font-medium text-slate-600">Understanding Spiritual Warfare</span>
+          <span class="px-2 py-0.5 bg-green-100 text-green-600 text-xs rounded-full ml-auto">Final</span>
+          <span class="text-xs text-slate-400">3,245 words</span>
+        </div>
+
+        <!-- Chapter 2 - EXPANDED for editing -->
+        <div class="expanded bg-white">
+          <div class="px-6 py-3 bg-violet-50 border-l-4 border-violet-500 flex items-center gap-4">
+            <div class="w-6 h-6 bg-violet-600 text-white rounded flex items-center justify-center text-xs font-bold">2</div>
+            <span class="font-semibold text-slate-800">The Armor of God</span>
+            <span class="px-2 py-0.5 bg-green-100 text-green-600 text-xs rounded-full">Final</span>
+            <div class="ml-auto flex items-center gap-2">
+              <span class="text-sm text-slate-500">4,120 words</span>
+              <button class="p-1.5 bg-white border border-slate-200 rounded-lg text-slate-400 hover:text-violet-600 hover:border-violet-300">
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+              </button>
+              <button class="px-3 py-1.5 bg-violet-600 text-white text-sm rounded-lg font-medium">
+                Save
+              </button>
+            </div>
+          </div>
+          
+          <!-- Editor Area -->
+          <div class="p-6 border-l-4 border-violet-200">
+            <div class="mb-4 flex items-center gap-2 pb-3 border-b border-slate-100">
+              <button class="p-1.5 hover:bg-slate-100 rounded font-bold text-slate-600">B</button>
+              <button class="p-1.5 hover:bg-slate-100 rounded italic text-slate-600">I</button>
+              <button class="p-1.5 hover:bg-slate-100 rounded text-slate-600">H1</button>
+              <button class="p-1.5 hover:bg-slate-100 rounded text-slate-600">H2</button>
+              <div class="w-px h-5 bg-slate-200 mx-1"></div>
+              <button class="p-1.5 hover:bg-slate-100 rounded text-slate-600">📝 Quote</button>
+              <button class="p-1.5 hover:bg-slate-100 rounded text-slate-600">🙏 Prayer Block</button>
+            </div>
+            
+            <div class="editor-content prose max-w-none" contenteditable="true">
+              <h2 class="text-xl font-bold text-slate-800 mb-4">The Armor of God</h2>
+              
+              <p class="text-slate-700 mb-4">Put on the whole armour of God, that ye may be able to stand against the wiles of the devil. — Ephesians 6:11</p>
+              
+              <p class="text-slate-600 mb-4">The Apostle Paul, writing under the inspiration of the Holy Spirit, gave us a detailed description of the spiritual armor available to every believer. This is not merely symbolic language — these are real spiritual weapons designed for real spiritual combat.</p>
+              
+              <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">Prayer: The Belt of Truth</h3>
+              
+              <div class="bg-violet-50 border-l-4 border-violet-400 p-4 rounded-r-lg my-4">
+                <p class="text-slate-700 italic">Heavenly Father, I put on the belt of truth today. Let Your truth guard my heart and mind against every lie of the enemy. Help me to walk in integrity and honesty in all my dealings. I reject every deception and embrace Your Word as the standard of truth in my life. In Jesus' name, Amen.</p>
+              </div>
+              
+              <h3 class="text-lg font-semibold text-slate-800 mt-6 mb-3">Prayer: The Breastplate of Righteousness</h3>
+              
+              <div class="bg-violet-50 border-l-4 border-violet-400 p-4 rounded-r-lg my-4">
+                <p class="text-slate-700 italic">Lord, I put on the breastplate of righteousness. I stand in the righteousness of Christ, not my own. Guard my heart from condemnation and shame. Let me walk uprightly before You, protected by Your righteousness that covers me completely. In Jesus' name, Amen.</p>
+              </div>
+              
+              <p class="text-slate-400 mt-8">[ Continue writing... ]</p>
+            </div>
+          </div>
+        </div>
+
+        <!-- Chapter 3 - Collapsed -->
+        <div class="chapter-row px-6 py-3 flex items-center gap-4 cursor-pointer hover:bg-slate-50">
+          <div class="w-6 h-6 bg-yellow-100 text-yellow-600 rounded flex items-center justify-center text-xs font-bold">3</div>
+          <span class="font-medium text-slate-600">Breaking Generational Curses</span>
+          <span class="px-2 py-0.5 bg-yellow-100 text-yellow-600 text-xs rounded-full ml-auto">Draft</span>
+          <span class="text-xs text-slate-400">2,890 words</span>
+        </div>
+
+        <!-- Chapter 4 - Collapsed -->
+        <div class="chapter-row px-6 py-3 flex items-center gap-4 cursor-pointer hover:bg-slate-50">
+          <div class="w-6 h-6 bg-blue-100 text-blue-600 rounded flex items-center justify-center text-xs font-bold">4</div>
+          <span class="font-medium text-slate-600">Authority in Christ</span>
+          <span class="px-2 py-0.5 bg-blue-100 text-blue-600 text-xs rounded-full ml-auto">Outline</span>
+          <span class="text-xs text-slate-400">850 words</span>
+        </div>
+      </div>
+    </div>
+    
+    <p class="text-center text-slate-400 text-sm mt-6">👆 Chapter 2 is expanded for inline editing. Other chapters stay collapsed but accessible.</p>
+  </div>
+
+  <!-- VIEW 3: Side Panel Edit -->
+  <div id="view-sidepanel" class="hidden">
+    <div class="flex h-[calc(100vh-120px)]">
+      <!-- Left: Chapter List (Narrow) -->
+      <div class="w-80 bg-white border-r border-slate-200 overflow-y-auto">
+        <div class="p-4 border-b border-slate-200 bg-slate-50">
+          <h2 class="font-bold text-slate-800">📖 SWP Extended Edition</h2>
+          <div class="flex items-center gap-2 mt-2">
+            <div class="flex-1 h-1.5 bg-slate-200 rounded-full overflow-hidden">
+              <div class="h-full bg-violet-500 rounded-full" style="width: 63%"></div>
+            </div>
+            <span class="text-xs text-slate-500">63%</span>
+          </div>
+        </div>
+        
+        <div class="divide-y divide-slate-100">
+          <div class="px-4 py-3 flex items-center gap-3 cursor-pointer hover:bg-slate-50">
+            <div class="w-6 h-6 bg-green-100 text-green-600 rounded flex items-center justify-center text-xs font-bold">1</div>
+            <div class="flex-1 min-w-0">
+              <div class="text-sm font-medium text-slate-700 truncate">Understanding Spiritual Warfare</div>
+              <div class="text-xs text-slate-400">3,245 words</div>
+            </div>
+          </div>
+          
+          <div class="px-4 py-3 flex items-center gap-3 cursor-pointer bg-violet-50 border-l-4 border-violet-500">
+            <div class="w-6 h-6 bg-violet-600 text-white rounded flex items-center justify-center text-xs font-bold">2</div>
+            <div class="flex-1 min-w-0">
+              <div class="text-sm font-medium text-slate-800 truncate">The Armor of God</div>
+              <div class="text-xs text-slate-500">4,120 words • Editing</div>
+            </div>
+          </div>
+          
+          <div class="px-4 py-3 flex items-center gap-3 cursor-pointer hover:bg-slate-50">
+            <div class="w-6 h-6 bg-yellow-100 text-yellow-600 rounded flex items-center justify-center text-xs font-bold">3</div>
+            <div class="flex-1 min-w-0">
+              <div class="text-sm font-medium text-slate-700 truncate">Breaking Generational Curses</div>
+              <div class="text-xs text-slate-400">2,890 words</div>
+            </div>
+          </div>
+          
+          <div class="px-4 py-3 flex items-center gap-3 cursor-pointer hover:bg-slate-50">
+            <div class="w-6 h-6 bg-blue-100 text-blue-600 rounded flex items-center justify-center text-xs font-bold">4</div>
+            <div class="flex-1 min-w-0">
+              <div class="text-sm font-medium text-slate-700 truncate">Authority in Christ</div>
+              <div class="text-xs text-slate-400">850 words</div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="p-4">
+          <button class="w-full py-2 bg-slate-100 hover:bg-slate-200 rounded-lg text-sm font-medium text-slate-600">
+            + Add Chapter
+          </button>
+        </div>
+      </div>
+      
+      <!-- Right: Editor Panel -->
+      <div class="flex-1 bg-slate-50 overflow-y-auto">
+        <div class="max-w-3xl mx-auto p-8">
+          <!-- Chapter Header -->
+          <div class="flex items-center justify-between mb-6">
+            <div>
+              <div class="flex items-center gap-2 text-sm text-slate-500 mb-1">
+                <span>Chapter 2</span>
+                <span>•</span>
+                <span class="px-2 py-0.5 bg-green-100 text-green-600 text-xs rounded-full">Final</span>
+              </div>
+              <input type="text" value="The Armor of God" class="text-2xl font-bold text-slate-800 bg-transparent border-none outline-none w-full" />
+            </div>
+            <div class="flex items-center gap-2">
+              <span class="text-sm text-slate-500">4,120 words</span>
+              <button class="p-2 hover:bg-white rounded-lg text-slate-400 hover:text-violet-600 border border-transparent hover:border-slate-200">
+                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4"></path></svg>
+              </button>
+              <button class="px-4 py-2 bg-violet-600 text-white text-sm rounded-lg font-medium hover:bg-violet-700">
+                Save Changes
+              </button>
+            </div>
+          </div>
+          
+          <!-- Editor Toolbar -->
+          <div class="flex items-center gap-1 p-2 bg-white rounded-t-xl border border-slate-200 border-b-0">
+            <button class="p-2 hover:bg-slate-100 rounded font-bold text-slate-600">B</button>
+            <button class="p-2 hover:bg-slate-100 rounded italic text-slate-600">I</button>
+            <div class="w-px h-5 bg-slate-200 mx-1"></div>
+            <button class="p-2 hover:bg-slate-100 rounded text-slate-600 text-sm">H1</button>
+            <button class="p-2 hover:bg-slate-100 rounded text-slate-600 text-sm">H2</button>
+            <button class="p-2 hover:bg-slate-100 rounded text-slate-600 text-sm">H3</button>
+            <div class="w-px h-5 bg-slate-200 mx-1"></div>
+            <button class="p-2 hover:bg-slate-100 rounded text-slate-600">•</button>
+            <button class="p-2 hover:bg-slate-100 rounded text-slate-600">1.</button>
+            <div class="w-px h-5 bg-slate-200 mx-1"></div>
+            <button class="px-3 py-1.5 hover:bg-violet-50 rounded text-violet-600 text-sm font-medium">🙏 Add Prayer</button>
+            <button class="px-3 py-1.5 hover:bg-slate-100 rounded text-slate-600 text-sm">📖 Add Scripture</button>
+          </div>
+          
+          <!-- Editor Content -->
+          <div class="bg-white border border-slate-200 rounded-b-xl p-8 min-h-[500px]" contenteditable="true">
+            <p class="text-slate-700 mb-4 text-lg leading-relaxed">Put on the whole armour of God, that ye may be able to stand against the wiles of the devil. — Ephesians 6:11</p>
+            
+            <p class="text-slate-600 mb-4 leading-relaxed">The Apostle Paul, writing under the inspiration of the Holy Spirit, gave us a detailed description of the spiritual armor available to every believer. This is not merely symbolic language — these are real spiritual weapons designed for real spiritual combat.</p>
+            
+            <h2 class="text-xl font-bold text-slate-800 mt-8 mb-4">The Belt of Truth</h2>
+            
+            <p class="text-slate-600 mb-4 leading-relaxed">The first piece of armor Paul mentions is the belt of truth. In Roman times, the belt held everything together and allowed the soldier to move freely. Truth operates the same way in our spiritual lives.</p>
+            
+            <div class="bg-violet-50 border-l-4 border-violet-500 p-5 rounded-r-xl my-6">
+              <div class="text-xs font-semibold text-violet-600 mb-2">PRAYER</div>
+              <p class="text-slate-700 italic leading-relaxed">Heavenly Father, I put on the belt of truth today. Let Your truth guard my heart and mind against every lie of the enemy. Help me to walk in integrity and honesty in all my dealings. I reject every deception and embrace Your Word as the standard of truth in my life. In Jesus' name, Amen.</p>
+            </div>
+            
+            <h2 class="text-xl font-bold text-slate-800 mt-8 mb-4">The Breastplate of Righteousness</h2>
+            
+            <p class="text-slate-600 mb-4 leading-relaxed">The breastplate protected the soldier's vital organs, especially the heart. The righteousness of Christ protects our hearts from the accusations and condemnation of the enemy.</p>
+            
+            <div class="bg-violet-50 border-l-4 border-violet-500 p-5 rounded-r-xl my-6">
+              <div class="text-xs font-semibold text-violet-600 mb-2">PRAYER</div>
+              <p class="text-slate-700 italic leading-relaxed">Lord, I put on the breastplate of righteousness. I stand in the righteousness of Christ, not my own. Guard my heart from condemnation and shame. Let me walk uprightly before You, protected by Your righteousness that covers me completely. In Jesus' name, Amen.</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    
+    <p class="text-center text-slate-400 text-sm py-4 bg-white border-t border-slate-200">👆 Side panel view: Chapter list on left, full editor on right. Click chapters to switch.</p>
+  </div>
+
+  <script>
+    function showView(view) {
+      document.getElementById('view-outline').classList.add('hidden');
+      document.getElementById('view-expanded').classList.add('hidden');
+      document.getElementById('view-sidepanel').classList.add('hidden');
+      
+      document.getElementById('btn-outline').classList.remove('active');
+      document.getElementById('btn-outline').classList.add('bg-slate-100');
+      document.getElementById('btn-expanded').classList.remove('active');
+      document.getElementById('btn-expanded').classList.add('bg-slate-100');
+      document.getElementById('btn-sidepanel').classList.remove('active');
+      document.getElementById('btn-sidepanel').classList.add('bg-slate-100');
+      
+      document.getElementById('view-' + view).classList.remove('hidden');
+      document.getElementById('btn-' + view).classList.add('active');
+      document.getElementById('btn-' + view).classList.remove('bg-slate-100');
+    }
+  </script>
+
+</body>
+</html>
