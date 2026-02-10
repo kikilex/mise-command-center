@@ -9,7 +9,6 @@ import {
   CardHeader,
   Avatar,
   Spinner,
-  Textarea,
   ScrollShadow,
 } from '@heroui/react'
 import { 
@@ -18,6 +17,7 @@ import {
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { showErrorToast, showSuccessToast } from '@/lib/errors'
+import RichTextEditor from './RichTextEditor'
 
 interface Note {
   id: string
@@ -311,19 +311,12 @@ export default function FloatingNoteWidget() {
                       classNames={{ input: 'font-semibold' }}
                     />
                   </div>
-                  <div className="flex-1 p-3 overflow-hidden">
-                    <Textarea
-                      value={editContent}
-                      onValueChange={(v) => { setEditContent(v); setHasChanges(true) }}
+                  <div className="flex-1 p-3 overflow-y-auto">
+                    <RichTextEditor
+                      content={editContent}
+                      onChange={(v) => { setEditContent(v); setHasChanges(true) }}
                       placeholder="Write your note..."
-                      variant="bordered"
-                      minRows={10}
-                      maxRows={20}
-                      classNames={{ 
-                        inputWrapper: 'h-full',
-                        input: 'h-full resize-none'
-                      }}
-                      className="h-full"
+                      minHeight="200px"
                     />
                   </div>
                   <div className="p-3 border-t border-default-100 flex items-center justify-between">
@@ -391,19 +384,12 @@ export default function FloatingNoteWidget() {
                     classNames={{ input: 'font-semibold' }}
                   />
                 </div>
-                <div className="flex-1 p-3 overflow-hidden">
-                  <Textarea
-                    value={newContent}
-                    onValueChange={setNewContent}
+                <div className="flex-1 p-3 overflow-y-auto">
+                  <RichTextEditor
+                    content={newContent}
+                    onChange={setNewContent}
                     placeholder="Write your note..."
-                    variant="bordered"
-                    minRows={10}
-                    maxRows={20}
-                    classNames={{ 
-                      inputWrapper: 'h-full',
-                      input: 'h-full resize-none'
-                    }}
-                    className="h-full"
+                    minHeight="200px"
                   />
                 </div>
                 <div className="p-3 border-t border-default-100 flex items-center justify-between">
