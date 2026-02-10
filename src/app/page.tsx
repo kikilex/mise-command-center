@@ -28,6 +28,8 @@ import { useState, useEffect, useMemo } from "react";
 import { createClient } from '@/lib/supabase/client'
 import Navbar from '@/components/Navbar'
 import EditAgentModal from '@/components/EditAgentModal'
+import FocusQueue from '@/components/FocusQueue'
+import FireProgress from '@/components/FireProgress'
 import { showErrorToast, showSuccessToast } from '@/lib/errors'
 import { ErrorFallback } from '@/components/ErrorBoundary'
 import { 
@@ -762,75 +764,14 @@ export default function Home() {
         <div className="flex flex-col lg:flex-row gap-8">
           <div className="flex-1 space-y-8">
             {/* 🔥 Today's Progress - Fire Bar */}
-            <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
-              <CardHeader className="bg-slate-50 dark:bg-slate-800/50 px-6 py-4 border-b border-slate-200 dark:border-slate-800">
-                <div className="flex items-center justify-between w-full">
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-xl bg-orange-500 flex items-center justify-center">
-                      <Flame className="w-6 h-6 text-white" />
-                    </div>
-                    <div>
-                      <h2 className="text-lg font-bold text-slate-800 dark:text-slate-100">Today's Progress</h2>
-                      <p className="text-xs text-slate-500">
-                        {todayCompletedCount === 0 ? 'Light your first fire!' : todayCompletedCount < 3 ? 'Good start!' : todayCompletedCount < 5 ? 'On fire!' : 'Legendary! 🏆'}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardBody className="px-6 py-5">
-                {/* Fire Emoji Progress Bar with Animated Background */}
-                <div className="relative">
-                  {/* Background track */}
-                  <div className="h-12 bg-slate-100 dark:bg-slate-800 rounded-xl overflow-hidden">
-                    {/* Animated flame progress bar */}
-                    <div 
-                      className={`h-full transition-all duration-500 ease-out relative ${todayCompletedCount > 0 ? 'flame-shimmer' : ''}`}
-                      style={{ 
-                        width: `${Math.min(todayCompletedCount * 10, 100)}%`,
-                        background: 'linear-gradient(90deg, #f97316, #ea580c, #f97316, #fb923c)',
-                        backgroundSize: '200% 100%',
-                      }}
-                    >
-                      {/* Flame glow overlay */}
-                      <div 
-                        className={`absolute inset-0 ${todayCompletedCount > 0 ? 'flame-pulse' : ''}`}
-                        style={{
-                          background: 'linear-gradient(180deg, rgba(255,255,255,0.3) 0%, transparent 50%, rgba(0,0,0,0.1) 100%)',
-                        }}
-                      />
-                    </div>
-                  </div>
-                  
-                  {/* Fire emojis overlay */}
-                  <div className="absolute inset-0 flex items-center justify-between px-2">
-                    {Array.from({ length: 10 }).map((_, i) => (
-                      <div 
-                        key={i} 
-                        className={`flex-1 flex items-center justify-center transition-all duration-300 ${i < todayCompletedCount ? 'fire-float' : 'opacity-20'}`}
-                        style={{
-                          animationDelay: `${i * 0.1}s`,
-                          animationDuration: `${0.8 + (i % 3) * 0.2}s`
-                        }}
-                      >
-                        {i < todayCompletedCount ? (
-                          <span className="text-2xl drop-shadow-lg" style={{ filter: 'drop-shadow(0 0 4px rgba(249, 115, 22, 0.8))' }}>🔥</span>
-                        ) : (
-                          <div className="w-2 h-2 rounded-full bg-slate-300 dark:bg-slate-500" />
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                  
-                  {/* Overflow badge */}
-                  {todayCompletedCount > 10 && (
-                    <div className="absolute -right-1 -top-1 bg-orange-500 text-white text-xs font-bold px-2 py-0.5 rounded-full shadow-lg animate-pulse">
-                      +{todayCompletedCount - 10}
-                    </div>
-                  )}
-                </div>
-              </CardBody>
-            </Card>
+            <FireProgress completedCount={todayCompletedCount} goal={8} />
+
+            {/* ⚡ Focus Queue */}
+            <FocusQueue 
+              tasks={todaysTasks.filter(t => t.status !== 'done').slice(0, 5)} 
+              onTaskComplete={() => loadData()}
+              onRefresh={() => loadData()}
+            />
 
             {/* 📊 Project Progress Cards */}
             <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
