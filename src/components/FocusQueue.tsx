@@ -32,13 +32,25 @@ interface Task {
 
 interface FocusQueueProps {
   tasks: Task[]
+  todayCompletedCount?: number
   onTaskComplete?: (taskId: string) => void
   onRefresh?: () => void
 }
 
 const SESSION_EMOJIS = ['🎯', '⚡', '🔥', '💪', '🚀', '💎', '👑', '🦁', '⭐', '🏆']
 
-export default function FocusQueue({ tasks, onTaskComplete, onRefresh }: FocusQueueProps) {
+const BREAK_MESSAGES = [
+  { text: "Get your ass up", emoji: "🖕" },
+  { text: "Move it", emoji: "🏃" },
+  { text: "Stand the fuck up", emoji: "🦵" },
+  { text: "Water check", emoji: "💧" },
+  { text: "Touch grass", emoji: "🌿" },
+  { text: "Eyes off screen", emoji: "👀" },
+  { text: "Deep breath bitch", emoji: "😤" },
+  { text: "Walk it off", emoji: "🚶" },
+]
+
+export default function FocusQueue({ tasks, todayCompletedCount = 0, onTaskComplete, onRefresh }: FocusQueueProps) {
   const [currentTaskIndex, setCurrentTaskIndex] = useState(0)
   const [timerState, setTimerState] = useState<'stopped' | 'running' | 'paused'>('stopped')
   const [sessionCount, setSessionCount] = useState(1)
@@ -253,21 +265,36 @@ export default function FocusQueue({ tasks, onTaskComplete, onRefresh }: FocusQu
         </div>
       )}
 
-      <Card className="bg-white dark:bg-slate-900 border-2 border-violet-500 shadow-lg overflow-hidden">
+      <Card className={`bg-white dark:bg-slate-900 border-2 shadow-lg overflow-hidden transition-all ${
+        timerState === 'running' 
+          ? 'border-green-500 shadow-green-500/30 shadow-xl animate-pulse-border' 
+          : 'border-violet-500'
+      }`}>
         {/* Header */}
-        <CardHeader className="bg-gradient-to-r from-violet-600 to-purple-600 px-6 py-4 flex items-center justify-between">
+        <CardHeader className={`px-6 py-4 flex items-center justify-between transition-all ${
+          timerState === 'running'
+            ? 'bg-gradient-to-r from-green-600 to-emerald-600'
+            : 'bg-gradient-to-r from-violet-600 to-purple-600'
+        }`}>
           <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center">
+            <div className={`w-10 h-10 rounded-xl bg-white/20 flex items-center justify-center ${timerState === 'running' ? 'animate-bounce' : ''}`}>
               <Zap className="w-6 h-6 text-white" />
             </div>
             <div>
               <h2 className="font-bold text-white">Focus Queue</h2>
-              <p className="text-xs text-violet-200">
-                {currentTaskIndex + 1} of {Math.min(tasks.length, 5)} • Stay locked in
+              <p className="text-xs text-white/70">
+                {currentTaskIndex + 1} of {Math.min(tasks.length, 5)} • {timerState === 'running' ? 'LOCKED IN 🔥' : 'Stay locked in'}
               </p>
             </div>
           </div>
           <div className="flex items-center gap-3">
+            {/* Break Reminder Pill */}
+            {todayCompletedCount >= 3 && todayCompletedCount % 5 >= 3 && (
+              <div className="flex items-center gap-1.5 bg-amber-500 text-white text-xs font-bold px-3 py-1.5 rounded-full animate-bounce">
+                <span>{BREAK_MESSAGES[todayCompletedCount % BREAK_MESSAGES.length].emoji}</span>
+                <span>{BREAK_MESSAGES[todayCompletedCount % BREAK_MESSAGES.length].text}</span>
+              </div>
+            )}
             {/* Session Badge */}
             <div className={`flex items-center gap-2 rounded-full px-3 py-1.5 transition-all ${getSessionBadgeStyle()}`}>
               <span className="text-sm font-medium">Session {getSessionEmoji()}</span>
@@ -314,13 +341,21 @@ export default function FocusQueue({ tasks, onTaskComplete, onRefresh }: FocusQu
 
           {/* Timer */}
           <div className="flex items-center justify-center my-6">
-            <div className="bg-slate-100 dark:bg-slate-800 rounded-2xl px-8 py-5 text-center">
-              <div className="text-5xl font-mono font-bold text-slate-800 dark:text-slate-100">
+            <div className={`rounded-2xl px-8 py-5 text-center transition-all ${
+              timerState === 'running'
+                ? 'bg-gradient-to-br from-green-100 to-emerald-100 dark:from-green-900/30 dark:to-emerald-900/30 ring-2 ring-green-400 ring-offset-2 dark:ring-offset-slate-900'
+                : 'bg-slate-100 dark:bg-slate-800'
+            }`}>
+              <div className={`text-5xl font-mono font-bold transition-colors ${
+                timerState === 'running' 
+                  ? 'text-green-600 dark:text-green-400 animate-pulse' 
+                  : 'text-slate-800 dark:text-slate-100'
+              }`}>
                 {formatTime(elapsedMs)}
               </div>
-              <div className="text-sm text-slate-500 mt-2">
+              <div className={`text-sm mt-2 ${timerState === 'running' ? 'text-green-600 dark:text-green-400 font-medium' : 'text-slate-500'}`}>
                 {timerState === 'stopped' && sessions.length === 0 && 'Ready to start'}
-                {timerState === 'running' && `Session ${sessionCount} in progress...`}
+                {timerState === 'running' && `🔥 Session ${sessionCount} • GO GO GO`}
                 {timerState === 'paused' && `Paused — Resume = Session ${sessionCount + 1}`}
                 {timerState === 'stopped' && sessions.length > 0 && `Completed in ${sessions.length} sessions`}
               </div>
