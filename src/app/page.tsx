@@ -1003,7 +1003,7 @@ export default function Home() {
             <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">
               <CardHeader className="bg-slate-50 dark:bg-slate-800/50 px-5 py-4 border-b border-slate-200 dark:border-slate-700">
                 <div className="flex items-center justify-between w-full">
-                  <span className="font-bold text-slate-800 dark:text-slate-100">Today's Queue</span>
+                  <span className="font-bold text-slate-800 dark:text-slate-100">Today's Queue ({focusQueue.length})</span>
                   <div className="flex gap-1">
                     <Popover placement="bottom-end">
                       <PopoverTrigger>
