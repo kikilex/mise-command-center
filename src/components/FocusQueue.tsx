@@ -288,8 +288,8 @@ export default function FocusQueue({ tasks, todayCompletedCount = 0, onTaskCompl
             </div>
           </div>
           <div className="flex items-center gap-3">
-            {/* Break Reminder Pill */}
-            {todayCompletedCount >= 3 && todayCompletedCount % 5 >= 3 && (
+            {/* Break Reminder Pill - shows after 3+ tasks */}
+            {todayCompletedCount >= 3 && (
               <div className="flex items-center gap-1.5 bg-amber-500 text-white text-xs font-bold px-3 py-1.5 rounded-full animate-bounce">
                 <span>{BREAK_MESSAGES[todayCompletedCount % BREAK_MESSAGES.length].emoji}</span>
                 <span>{BREAK_MESSAGES[todayCompletedCount % BREAK_MESSAGES.length].text}</span>
