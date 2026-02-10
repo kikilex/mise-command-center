@@ -207,6 +207,9 @@ export default function Home() {
   // What's Next tab state
   const [whatsNextTab, setWhatsNextTab] = useState<'top3' | 'dueToday'>('top3');
   
+  // Focus Queue expand state
+  const [isQueueExpanded, setIsQueueExpanded] = useState(false);
+  
   const supabase = createClient();
   const router = useRouter();
 
@@ -1038,16 +1041,20 @@ export default function Home() {
                 </div>
               </CardHeader>
               <CardBody className="p-3 space-y-2">
-                {focusQueue.map((task, idx) => {
+                {focusQueue.slice(0, isQueueExpanded ? 10 : 5).map((task, idx) => {
                   const isCurrent = idx === 0
                   return (
                     <div 
                       key={task.id}
-                      className={`flex items-center gap-3 p-2.5 rounded-xl transition-colors group ${
+                      className={`flex items-center gap-3 p-2.5 rounded-xl transition-colors group cursor-pointer ${
                         isCurrent 
                           ? 'bg-violet-50 dark:bg-violet-900/20 border border-violet-300 dark:border-violet-700' 
                           : 'hover:bg-slate-50 dark:hover:bg-slate-800/50'
                       }`}
+                      onClick={() => {
+                        setSelectedTask(task)
+                        onTaskModalOpen()
+                      }}
                     >
                       <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold ${
                         isCurrent 
@@ -1068,7 +1075,8 @@ export default function Home() {
                       )}
                       <button 
                         className="opacity-0 group-hover:opacity-100 text-slate-400 hover:text-red-500 transition-all"
-                        onClick={async () => {
+                        onClick={async (e) => {
+                          e.stopPropagation()
                           await supabase.from('tasks').update({ focus_queue_order: null }).eq('id', task.id)
                           setFocusQueue(prev => prev.filter(t => t.id !== task.id))
                         }}
@@ -1079,6 +1087,14 @@ export default function Home() {
                     </div>
                   )
                 })}
+                {focusQueue.length > 5 && (
+                  <button
+                    className="w-full text-center py-2 text-sm text-violet-600 dark:text-violet-400 hover:bg-violet-50 dark:hover:bg-violet-900/20 rounded-lg transition-colors"
+                    onClick={() => setIsQueueExpanded(!isQueueExpanded)}
+                  >
+                    {isQueueExpanded ? '▲ Show less' : `▼ Show ${Math.min(focusQueue.length - 5, 5)} more`}
+                  </button>
+                )}
                 {focusQueue.length === 0 && (
                   <div className="text-center py-6">
                     <p className="text-slate-400 text-sm mb-2">Queue is empty</p>

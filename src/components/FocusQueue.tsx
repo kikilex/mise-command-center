@@ -60,7 +60,7 @@ export default function FocusQueue({ tasks, todayCompletedCount = 0, onTaskCompl
   const [sessions, setSessions] = useState<Session[]>([])
   const [showHistory, setShowHistory] = useState(false)
   const [hypeMessage, setHypeMessage] = useState<string | null>(null)
-  const [viewTaskId, setViewTaskId] = useState<string | null>(null)
+  const [viewTask, setViewTask] = useState<Task | null>(null)
   
   const timerRef = useRef<NodeJS.Timeout | null>(null)
   const sessionStartRef = useRef<number | null>(null)
@@ -327,7 +327,7 @@ export default function FocusQueue({ tasks, todayCompletedCount = 0, onTaskCompl
           {/* Task Info - Clickable to view details */}
           <div 
             className="mb-4 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 -mx-2 px-2 py-2 rounded-lg transition-colors group"
-            onClick={() => setViewTaskId(currentTask.id)}
+            onClick={() => setViewTask(currentTask)}
           >
             <div className="flex items-center gap-2 mb-2">
               <Chip size="sm" color={currentTask.priority === 'high' ? 'danger' : currentTask.priority === 'medium' ? 'warning' : 'default'}>
@@ -484,7 +484,7 @@ export default function FocusQueue({ tasks, todayCompletedCount = 0, onTaskCompl
               <div className="text-xs text-slate-400 uppercase font-medium mb-2">Up Next</div>
               <div 
                 className="flex items-center gap-3 text-slate-600 dark:text-slate-400 cursor-pointer hover:text-violet-600 dark:hover:text-violet-400 transition-colors"
-                onClick={() => setViewTaskId(tasks[currentTaskIndex + 1].id)}
+                onClick={() => setViewTask(tasks[currentTaskIndex + 1])}
               >
                 <div className="w-7 h-7 bg-slate-200 dark:bg-slate-700 rounded-lg flex items-center justify-center text-sm font-medium">
                   {currentTaskIndex + 2}
@@ -501,11 +501,11 @@ export default function FocusQueue({ tasks, todayCompletedCount = 0, onTaskCompl
       
       {/* Task Detail Modal */}
       <TaskDetailModal
-        taskId={viewTaskId}
-        isOpen={!!viewTaskId}
-        onClose={() => setViewTaskId(null)}
-        onUpdate={() => {
-          setViewTaskId(null)
+        task={viewTask}
+        isOpen={!!viewTask}
+        onClose={() => setViewTask(null)}
+        onTaskUpdated={() => {
+          setViewTask(null)
           onRefresh?.()
         }}
       />
