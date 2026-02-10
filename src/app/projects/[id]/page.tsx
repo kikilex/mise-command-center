@@ -1713,28 +1713,40 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                             )}
                           </div>
                           {/* Add to Focus Queue button */}
-                          <Tooltip content="Add to Today">
-                            <button
-                              className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-warning-100 text-warning-500"
-                              onClick={async (e) => {
-                                e.stopPropagation()
-                                const supabase = createClient()
-                                // Get max order
-                                const { data: maxData } = await supabase
-                                  .from('tasks')
-                                  .select('focus_queue_order')
-                                  .gte('focus_queue_order', 0)
-                                  .order('focus_queue_order', { ascending: false })
-                                  .limit(1)
-                                  .single()
-                                const maxOrder = maxData?.focus_queue_order || 0
-                                await supabase.from('tasks').update({ focus_queue_order: maxOrder + 1 }).eq('id', task.id)
-                                showSuccessToast('Added to today\'s queue')
-                              }}
-                            >
-                              <Sun className="w-4 h-4" />
-                            </button>
-                          </Tooltip>
+                          {!task.focus_queue_order && (
+                            <Tooltip content="Add to Today">
+                              <button
+                                className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-warning-100 text-warning-500"
+                                onClick={async (e) => {
+                                  e.stopPropagation()
+                                  const supabase = createClient()
+                                  // Get max order
+                                  const { data: maxData } = await supabase
+                                    .from('tasks')
+                                    .select('focus_queue_order')
+                                    .gte('focus_queue_order', 0)
+                                    .order('focus_queue_order', { ascending: false })
+                                    .limit(1)
+                                    .single()
+                                  const maxOrder = maxData?.focus_queue_order || 0
+                                  const newOrder = maxOrder + 1
+                                  await supabase.from('tasks').update({ focus_queue_order: newOrder }).eq('id', task.id)
+                                  // Update local state
+                                  setProjectTasks(prev => prev.map(t => 
+                                    t.id === task.id ? { ...t, focus_queue_order: newOrder } : t
+                                  ))
+                                  showSuccessToast('Added to today\'s queue')
+                                }}
+                              >
+                                <Sun className="w-4 h-4" />
+                              </button>
+                            </Tooltip>
+                          )}
+                          {task.focus_queue_order && (
+                            <Chip size="sm" variant="flat" color="warning" className="text-xs">
+                              In Queue
+                            </Chip>
+                          )}
                           {task.priority && (
                             <Chip size="sm" variant="flat" color={
                               task.priority === 'critical' ? 'danger' :
