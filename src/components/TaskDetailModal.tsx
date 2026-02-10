@@ -45,6 +45,7 @@ interface Task {
   requested_by?: string | null
   creator?: { name: string; display_name?: string } | null
   requester?: { name: string; display_name?: string } | null
+  focus_queue_order?: number | null
 }
 
 interface AIAgent {
@@ -1109,9 +1110,37 @@ export default function TaskDetailModal({
               </Button>
             </>
           ) : (
-            <Button variant="flat" onPress={onClose}>
-              Close
-            </Button>
+            <div className="flex gap-2 w-full justify-between">
+              <div>
+                {task && task.status !== 'done' && !task.focus_queue_order && (
+                  <Button 
+                    variant="flat" 
+                    color="secondary"
+                    onPress={async () => {
+                      const { data: maxTask } = await supabase
+                        .from('tasks')
+                        .select('focus_queue_order')
+                        .not('focus_queue_order', 'is', null)
+                        .order('focus_queue_order', { ascending: false })
+                        .limit(1)
+                        .single()
+                      const nextOrder = (maxTask?.focus_queue_order || 0) + 1
+                      await supabase.from('tasks').update({ focus_queue_order: nextOrder }).eq('id', task.id)
+                      showSuccessToast("Added to Today's Queue!")
+                      onUpdate?.()
+                    }}
+                  >
+                    ☀️ Add to Today
+                  </Button>
+                )}
+                {task && task.focus_queue_order && (
+                  <Chip color="secondary" variant="flat">In Today's Queue</Chip>
+                )}
+              </div>
+              <Button variant="flat" onPress={onClose}>
+                Close
+              </Button>
+            </div>
           )}
         </ModalFooter>
       </ModalContent>

@@ -45,6 +45,7 @@ import * as LucideIcons from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import Navbar from '@/components/Navbar'
 import RichTextEditor from '@/components/RichTextEditor'
+import TaskDetailModal from '@/components/TaskDetailModal'
 import { showErrorToast, showSuccessToast } from '@/lib/errors'
 import { formatDistanceToNow, format } from 'date-fns'
 import ReactMarkdown from 'react-markdown'
@@ -163,6 +164,9 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   const [showCompleted, setShowCompleted] = useState(false)
   const [newUpdate, setNewUpdate] = useState('')
   const [posting, setPosting] = useState(false)
+
+  // Task detail modal
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
 
   // Phase modal
   const { isOpen: isPhaseOpen, onOpen: onPhaseOpen, onClose: onPhaseClose } = useDisclosure()
@@ -1694,7 +1698,11 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                     </div>
                     <div className="space-y-2">
                       {tasks.map(task => (
-                        <div key={task.id} className="flex items-center gap-3 p-2 rounded-lg bg-default-50 hover:bg-default-100 transition-colors">
+                        <div 
+                          key={task.id} 
+                          className="flex items-center gap-3 p-2 rounded-lg bg-default-50 hover:bg-default-100 transition-colors cursor-pointer"
+                          onClick={() => setSelectedTaskId(task.id)}
+                        >
                           <div className="flex-1 min-w-0">
                             <p className="text-sm font-medium truncate">{task.title}</p>
                             {task.assignee && (
@@ -2412,6 +2420,17 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
           </ModalFooter>
         </ModalContent>
       </Modal>
+
+      {/* Task Detail Modal */}
+      <TaskDetailModal
+        taskId={selectedTaskId}
+        isOpen={!!selectedTaskId}
+        onClose={() => setSelectedTaskId(null)}
+        onUpdate={() => {
+          setSelectedTaskId(null)
+          loadProject()
+        }}
+      />
     </div>
   )
 }
