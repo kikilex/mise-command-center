@@ -200,11 +200,10 @@ export default function FireProgress({ completedCount, goal = 8, todayTasks = []
         {todayTasks.length > 0 && (
           <button
             onClick={() => setExpanded(!expanded)}
-            className="w-full mt-3 flex items-center justify-center gap-2 text-sm py-2 rounded-lg hover:bg-white/50 transition-colors"
+            className="w-full mt-2 flex items-center justify-center py-1 rounded-lg hover:bg-white/30 transition-colors"
             style={{ color: subColor }}
           >
-            {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-            {expanded ? 'Hide' : 'Show'} completed tasks
+            {expanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
           </button>
         )}
         

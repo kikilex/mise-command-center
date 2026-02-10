@@ -901,9 +901,11 @@ export default function Home() {
               goal={8} 
               todayTasks={todayCompletedList}
               onDeleteTask={async (taskId) => {
-                await supabase.from('tasks').delete().eq('id', taskId)
+                // Mark as not done instead of deleting
+                await supabase.from('tasks').update({ status: 'todo' }).eq('id', taskId)
                 setTodayCompletedList(prev => prev.filter(t => t.id !== taskId))
                 setTodayCompletedCount(prev => prev - 1)
+                loadData() // Refresh to show task back in lists
               }}
             />
 
