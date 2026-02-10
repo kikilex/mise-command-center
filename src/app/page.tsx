@@ -785,7 +785,6 @@ export default function Home() {
             {/* ⚡ Focus Queue */}
             <FocusQueue 
               tasks={todaysTasks.filter(t => t.status !== 'done').slice(0, 5)} 
-              todayCompletedCount={todayCompletedCount}
               onTaskComplete={() => loadData()}
               onRefresh={() => loadData()}
             />
@@ -1038,6 +1037,19 @@ export default function Home() {
                 )}
               </CardBody>
             </Card>
+
+            {/* Break Reminder */}
+            {todayCompletedCount >= 3 && (
+              <div className="bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-2xl p-4">
+                <div className="flex items-center gap-3">
+                  <span className="text-2xl">🧘</span>
+                  <div>
+                    <div className="font-medium text-blue-800 dark:text-blue-200">Break in {Math.max(1, 5 - (todayCompletedCount % 5))} task{5 - (todayCompletedCount % 5) !== 1 ? 's' : ''}</div>
+                    <div className="text-xs text-blue-600 dark:text-blue-400">Stretch those legs</div>
+                  </div>
+                </div>
+              </div>
+            )}
 
             {/* Project Progress - Sidebar Version */}
             <Card className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 shadow-sm overflow-hidden">

@@ -32,14 +32,13 @@ interface Task {
 
 interface FocusQueueProps {
   tasks: Task[]
-  todayCompletedCount?: number
   onTaskComplete?: (taskId: string) => void
   onRefresh?: () => void
 }
 
 const SESSION_EMOJIS = ['🎯', '⚡', '🔥', '💪', '🚀', '💎', '👑', '🦁', '⭐', '🏆']
 
-export default function FocusQueue({ tasks, todayCompletedCount = 0, onTaskComplete, onRefresh }: FocusQueueProps) {
+export default function FocusQueue({ tasks, onTaskComplete, onRefresh }: FocusQueueProps) {
   const [currentTaskIndex, setCurrentTaskIndex] = useState(0)
   const [timerState, setTimerState] = useState<'stopped' | 'running' | 'paused'>('stopped')
   const [sessionCount, setSessionCount] = useState(1)
@@ -295,19 +294,6 @@ export default function FocusQueue({ tasks, todayCompletedCount = 0, onTaskCompl
         </CardHeader>
 
         <CardBody className="p-6">
-          {/* Break Reminder */}
-          {todayCompletedCount >= 3 && (
-            <div className="mb-6 bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-800 rounded-2xl p-4">
-              <div className="flex items-center gap-3">
-                <span className="text-2xl">🧘</span>
-                <div>
-                  <div className="font-medium text-blue-800 dark:text-blue-200">Break in {Math.max(1, 5 - (todayCompletedCount % 5))} task{5 - (todayCompletedCount % 5) !== 1 ? 's' : ''}</div>
-                  <div className="text-xs text-blue-600 dark:text-blue-400">Stretch those legs</div>
-                </div>
-              </div>
-            </div>
-          )}
-
           {/* Task Info */}
           <div className="mb-4">
             <div className="flex items-center gap-2 mb-2">

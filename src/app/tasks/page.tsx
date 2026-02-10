@@ -251,9 +251,9 @@ function TasksPageContent() {
         .from('tasks')
         .select('*, creator:created_by(name, display_name), requester:requested_by(name, display_name)')
       
-      // Only filter by assignee if viewing "My Tasks"
+      // "My Tasks" = assigned to me, OR unassigned tasks I created
       if (viewMode === 'mine') {
-        query = query.eq('assignee_id', authUser.id)
+        query = query.or(`assignee_id.eq.${authUser.id},and(assignee_id.is.null,created_by.eq.${authUser.id})`)
       }
       
       if (localSpaceId && localSpaceId !== 'all') {
@@ -625,40 +625,10 @@ function TasksPageContent() {
             </div>
           </div>
 
-          <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
-            <Button
-              size="sm"
-              variant={localSpaceId === 'all' ? 'solid' : 'flat'}
-              color={localSpaceId === 'all' ? 'primary' : 'default'}
-              onPress={() => setLocalSpaceId('all')}
-              className="rounded-full"
-            >
-              All Spaces
-            </Button>
-            {spaces.map(space => (
-              <Button
-                key={space.id}
-                size="sm"
-                variant={localSpaceId === space.id ? 'solid' : 'flat'}
-                color={localSpaceId === space.id ? 'primary' : 'default'}
-                onPress={() => setLocalSpaceId(space.id)}
-                className="rounded-full whitespace-nowrap"
-                startContent={
-                  <div 
-                    className="w-2 h-2 rounded-full" 
-                    style={{ backgroundColor: space.color || '#3b82f6' }} 
-                  />
-                }
-              >
-                {space.name}
-              </Button>
-            ))}
-          </div>
-
-          {/* Admin toggle: My Tasks vs All Tasks */}
-          {isAdmin && (
-            <div className="flex items-center gap-2 pt-2 border-t border-slate-200 dark:border-slate-700">
-              <span className="text-xs text-slate-500 dark:text-slate-400">View:</span>
+          {/* Filters row - clean single line */}
+          <div className="flex items-center gap-3">
+            {/* View toggle */}
+            {isAdmin && (
               <div className="flex rounded-lg bg-slate-100 dark:bg-slate-800 p-0.5">
                 <Button
                   size="sm"
@@ -668,7 +638,7 @@ function TasksPageContent() {
                   className="rounded-md min-w-0 px-3"
                   startContent={<User className="w-3 h-3" />}
                 >
-                  My Tasks
+                  Mine
                 </Button>
                 <Button
                   size="sm"
@@ -678,11 +648,46 @@ function TasksPageContent() {
                   className="rounded-md min-w-0 px-3"
                   startContent={<Users className="w-3 h-3" />}
                 >
-                  All Tasks
+                  Team
                 </Button>
               </div>
-            </div>
-          )}
+            )}
+
+            {/* Space dropdown */}
+            <Select
+              size="sm"
+              selectedKeys={[localSpaceId]}
+              onChange={(e) => setLocalSpaceId(e.target.value || 'all')}
+              className="w-48"
+              classNames={{
+                trigger: "bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-lg h-9",
+                value: "text-sm",
+              }}
+              startContent={
+                localSpaceId !== 'all' && spaces.find(s => s.id === localSpaceId) ? (
+                  <div 
+                    className="w-2 h-2 rounded-full flex-shrink-0" 
+                    style={{ backgroundColor: spaces.find(s => s.id === localSpaceId)?.color || '#3b82f6' }} 
+                  />
+                ) : null
+              }
+            >
+              <SelectItem key="all">All Spaces</SelectItem>
+              {spaces.map(space => (
+                <SelectItem 
+                  key={space.id}
+                  startContent={
+                    <div 
+                      className="w-2 h-2 rounded-full" 
+                      style={{ backgroundColor: space.color || '#3b82f6' }} 
+                    />
+                  }
+                >
+                  {space.name}
+                </SelectItem>
+              ))}
+            </Select>
+          </div>
         </div>
 
         {/* Error State */}
