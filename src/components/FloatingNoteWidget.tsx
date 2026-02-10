@@ -14,7 +14,7 @@ import {
 } from '@heroui/react'
 import { 
   StickyNote, X, Search, Pin, PinOff, Minimize2, Maximize2, 
-  Plus, ChevronDown, Save
+  Plus, ChevronDown, Save, Pencil
 } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { showErrorToast, showSuccessToast } from '@/lib/errors'
@@ -48,6 +48,7 @@ export default function FloatingNoteWidget() {
   
   // Selected note
   const [selectedNote, setSelectedNote] = useState<Note | null>(null)
+  const [isEditing, setIsEditing] = useState(false)
   const [editContent, setEditContent] = useState('')
   const [editTitle, setEditTitle] = useState('')
   const [saving, setSaving] = useState(false)
@@ -111,13 +112,19 @@ export default function FloatingNoteWidget() {
     (note.content && note.content.toLowerCase().includes(searchQuery.toLowerCase()))
   )
   
-  // Select a note
+  // Select a note (view mode by default)
   function handleSelectNote(note: Note) {
     setSelectedNote(note)
     setEditTitle(note.title)
     setEditContent(note.content || '')
     setHasChanges(false)
+    setIsEditing(false)
     setIsCreating(false)
+  }
+  
+  // Enter edit mode
+  function handleStartEdit() {
+    setIsEditing(true)
   }
   
   // Save note changes
@@ -144,6 +151,7 @@ export default function FloatingNoteWidget() {
       ))
       setSelectedNote(prev => prev ? { ...prev, title: editTitle, content: editContent } : null)
       setHasChanges(false)
+      setIsEditing(false)
       showSuccessToast('Note saved')
     } catch (error) {
       showErrorToast(error, 'Failed to save note')
@@ -288,54 +296,87 @@ export default function FloatingNoteWidget() {
           </CardHeader>
           
           <CardBody className="p-0 flex flex-col h-[calc(100%-48px)]">
-            {/* Note editing view */}
+            {/* Note view/edit */}
             {selectedNote && !isCreating ? (
-              <div className="flex flex-col h-full">
-                <div className="p-3 border-b border-default-100">
-                  <Input
-                    value={editTitle}
-                    onValueChange={(v) => { setEditTitle(v); setHasChanges(true) }}
-                    placeholder="Note title"
-                    variant="bordered"
-                    size="sm"
-                    classNames={{ input: 'font-semibold' }}
-                  />
+              isEditing ? (
+                /* Edit mode */
+                <div className="flex flex-col h-full">
+                  <div className="p-3 border-b border-default-100">
+                    <Input
+                      value={editTitle}
+                      onValueChange={(v) => { setEditTitle(v); setHasChanges(true) }}
+                      placeholder="Note title"
+                      variant="bordered"
+                      size="sm"
+                      classNames={{ input: 'font-semibold' }}
+                    />
+                  </div>
+                  <div className="flex-1 p-3 overflow-hidden">
+                    <Textarea
+                      value={editContent}
+                      onValueChange={(v) => { setEditContent(v); setHasChanges(true) }}
+                      placeholder="Write your note..."
+                      variant="bordered"
+                      minRows={10}
+                      maxRows={20}
+                      classNames={{ 
+                        inputWrapper: 'h-full',
+                        input: 'h-full resize-none'
+                      }}
+                      className="h-full"
+                    />
+                  </div>
+                  <div className="p-3 border-t border-default-100 flex items-center justify-between">
+                    <Button
+                      size="sm"
+                      variant="flat"
+                      onPress={() => { setIsEditing(false); setHasChanges(false); setEditContent(selectedNote.content || ''); setEditTitle(selectedNote.title) }}
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      size="sm"
+                      color="primary"
+                      isLoading={saving}
+                      isDisabled={!hasChanges}
+                      onPress={handleSaveNote}
+                      startContent={<Save className="w-4 h-4" />}
+                    >
+                      Save
+                    </Button>
+                  </div>
                 </div>
-                <div className="flex-1 p-3 overflow-hidden">
-                  <Textarea
-                    value={editContent}
-                    onValueChange={(v) => { setEditContent(v); setHasChanges(true) }}
-                    placeholder="Write your note..."
-                    variant="bordered"
-                    minRows={10}
-                    maxRows={20}
-                    classNames={{ 
-                      inputWrapper: 'h-full',
-                      input: 'h-full resize-none'
-                    }}
-                    className="h-full"
-                  />
+              ) : (
+                /* View mode - render HTML */
+                <div className="flex flex-col h-full">
+                  <div className="p-3 border-b border-default-100">
+                    <h3 className="font-semibold text-lg">{selectedNote.title}</h3>
+                  </div>
+                  <ScrollShadow className="flex-1 p-3 overflow-y-auto">
+                    <div 
+                      className="prose prose-sm dark:prose-invert max-w-none"
+                      dangerouslySetInnerHTML={{ __html: selectedNote.content || '<p class="text-default-400">Empty note</p>' }}
+                    />
+                  </ScrollShadow>
+                  <div className="p-3 border-t border-default-100 flex items-center justify-between">
+                    <Button
+                      size="sm"
+                      variant="flat"
+                      onPress={() => { setSelectedNote(null); setHasChanges(false) }}
+                    >
+                      ← Back
+                    </Button>
+                    <Button
+                      size="sm"
+                      color="primary"
+                      onPress={handleStartEdit}
+                      startContent={<Pencil className="w-4 h-4" />}
+                    >
+                      Edit
+                    </Button>
+                  </div>
                 </div>
-                <div className="p-3 border-t border-default-100 flex items-center justify-between">
-                  <Button
-                    size="sm"
-                    variant="flat"
-                    onPress={() => { setSelectedNote(null); setHasChanges(false) }}
-                  >
-                    ← Back
-                  </Button>
-                  <Button
-                    size="sm"
-                    color="primary"
-                    isLoading={saving}
-                    isDisabled={!hasChanges}
-                    onPress={handleSaveNote}
-                    startContent={<Save className="w-4 h-4" />}
-                  >
-                    Save
-                  </Button>
-                </div>
-              </div>
+              )
             ) : isCreating ? (
               /* New note form */
               <div className="flex flex-col h-full">
