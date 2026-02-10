@@ -2,10 +2,11 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Card, CardBody, CardHeader, Button, Chip, Progress } from '@heroui/react'
-import { Zap, Pause, Play, Check, RotateCcw } from 'lucide-react'
+import { Zap, Pause, Play, Check, RotateCcw, ExternalLink } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useCelebrations } from '@/hooks/useCelebrations'
 import { showErrorToast, showSuccessToast } from '@/lib/errors'
+import TaskDetailModal from './TaskDetailModal'
 
 interface Session {
   num: number
@@ -58,6 +59,7 @@ export default function FocusQueue({ tasks, todayCompletedCount = 0, onTaskCompl
   const [sessions, setSessions] = useState<Session[]>([])
   const [showHistory, setShowHistory] = useState(false)
   const [hypeMessage, setHypeMessage] = useState<string | null>(null)
+  const [viewTaskId, setViewTaskId] = useState<string | null>(null)
   
   const timerRef = useRef<NodeJS.Timeout | null>(null)
   const sessionStartRef = useRef<number | null>(null)
@@ -321,8 +323,11 @@ export default function FocusQueue({ tasks, todayCompletedCount = 0, onTaskCompl
         </CardHeader>
 
         <CardBody className="p-6">
-          {/* Task Info */}
-          <div className="mb-4">
+          {/* Task Info - Clickable to view details */}
+          <div 
+            className="mb-4 cursor-pointer hover:bg-slate-50 dark:hover:bg-slate-800/50 -mx-2 px-2 py-2 rounded-lg transition-colors group"
+            onClick={() => setViewTaskId(currentTask.id)}
+          >
             <div className="flex items-center gap-2 mb-2">
               <Chip size="sm" color={currentTask.priority === 'high' ? 'danger' : currentTask.priority === 'medium' ? 'warning' : 'default'}>
                 {currentTask.priority?.toUpperCase()}
@@ -332,11 +337,13 @@ export default function FocusQueue({ tasks, todayCompletedCount = 0, onTaskCompl
                   {currentTask.project.icon} {currentTask.project.name}
                 </Chip>
               )}
+              <ExternalLink className="w-4 h-4 text-slate-400 opacity-0 group-hover:opacity-100 transition-opacity ml-auto" />
             </div>
-            <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100">{currentTask.title}</h3>
+            <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 group-hover:text-violet-600 dark:group-hover:text-violet-400 transition-colors">{currentTask.title}</h3>
             {currentTask.description && (
               <p className="text-slate-500 text-sm mt-1 line-clamp-2">{currentTask.description}</p>
             )}
+            <p className="text-xs text-slate-400 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">Click to view details</p>
           </div>
 
           {/* Timer */}
@@ -474,7 +481,10 @@ export default function FocusQueue({ tasks, todayCompletedCount = 0, onTaskCompl
           {tasks[currentTaskIndex + 1] && (
             <div className="mt-6 pt-4 border-t border-slate-200 dark:border-slate-700">
               <div className="text-xs text-slate-400 uppercase font-medium mb-2">Up Next</div>
-              <div className="flex items-center gap-3 text-slate-600 dark:text-slate-400">
+              <div 
+                className="flex items-center gap-3 text-slate-600 dark:text-slate-400 cursor-pointer hover:text-violet-600 dark:hover:text-violet-400 transition-colors"
+                onClick={() => setViewTaskId(tasks[currentTaskIndex + 1].id)}
+              >
                 <div className="w-7 h-7 bg-slate-200 dark:bg-slate-700 rounded-lg flex items-center justify-center text-sm font-medium">
                   {currentTaskIndex + 2}
                 </div>
@@ -487,6 +497,17 @@ export default function FocusQueue({ tasks, todayCompletedCount = 0, onTaskCompl
           )}
         </CardBody>
       </Card>
+      
+      {/* Task Detail Modal */}
+      <TaskDetailModal
+        taskId={viewTaskId}
+        isOpen={!!viewTaskId}
+        onClose={() => setViewTaskId(null)}
+        onUpdate={() => {
+          setViewTaskId(null)
+          onRefresh?.()
+        }}
+      />
     </>
   )
 }
