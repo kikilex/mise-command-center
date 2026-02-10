@@ -39,7 +39,7 @@ import {
   CheckCircle2, Circle, MessageSquare, GripVertical,
   User, Calendar, ChevronDown, ChevronUp, Users,
   Bold, Italic, Highlighter, RotateCcw, Save,
-  Upload, File, Image as ImageIcon, Search, StickyNote, CheckSquare
+  Upload, File, Image as ImageIcon, Search, StickyNote, CheckSquare, Sun
 } from 'lucide-react'
 import * as LucideIcons from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
@@ -1700,7 +1700,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                       {tasks.map(task => (
                         <div 
                           key={task.id} 
-                          className="flex items-center gap-3 p-2 rounded-lg bg-default-50 hover:bg-default-100 transition-colors cursor-pointer"
+                          className="group flex items-center gap-3 p-2 rounded-lg bg-default-50 hover:bg-default-100 transition-colors cursor-pointer"
                           onClick={() => setSelectedTaskId(task.id)}
                         >
                           <div className="flex-1 min-w-0">
@@ -1712,6 +1712,29 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                               </div>
                             )}
                           </div>
+                          {/* Add to Focus Queue button */}
+                          <Tooltip content="Add to Today">
+                            <button
+                              className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded hover:bg-warning-100 text-warning-500"
+                              onClick={async (e) => {
+                                e.stopPropagation()
+                                const supabase = createClient()
+                                // Get max order
+                                const { data: maxData } = await supabase
+                                  .from('tasks')
+                                  .select('focus_queue_order')
+                                  .not('focus_queue_order', 'is', null)
+                                  .order('focus_queue_order', { ascending: false })
+                                  .limit(1)
+                                  .single()
+                                const maxOrder = maxData?.focus_queue_order || 0
+                                await supabase.from('tasks').update({ focus_queue_order: maxOrder + 1 }).eq('id', task.id)
+                                showSuccessToast('Added to today\'s queue')
+                              }}
+                            >
+                              <Sun className="w-4 h-4" />
+                            </button>
+                          </Tooltip>
                           {task.priority && (
                             <Chip size="sm" variant="flat" color={
                               task.priority === 'critical' ? 'danger' :
