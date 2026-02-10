@@ -290,7 +290,7 @@ export default function Home() {
         supabase.from('tasks')
           .select('*, project:projects(name, icon)')
           .neq('status', 'done')
-          .not('focus_queue_order', 'is', null)
+          .neq('focus_queue_order', null)
           .or(`created_by.eq.${authUser.id},assignee_id.eq.${authUser.id}`)
           .order('focus_queue_order', { ascending: true })
       ]);
