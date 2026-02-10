@@ -247,7 +247,7 @@ export default function Home() {
         is_admin: profile?.is_admin || false
       });
 
-      const [spacesRes, tasksRes, completedRes, inboxRes, messagesRes, agentsRes, workLogRes, projectsRes, allTasksRes] = await Promise.all([
+      const [spacesRes, tasksRes, completedRes, inboxRes, messagesRes, agentsRes, workLogRes, projectsRes, allTasksRes, userCompletedRes] = await Promise.all([
         supabase.from('spaces').select('id, name, color, space_members!inner(user_id)').eq('space_members.user_id', authUser.id),
         supabase.from('tasks')
           .select('*')
@@ -274,7 +274,12 @@ export default function Home() {
         supabase.from('ai_agents').select('*').order('created_at', { ascending: true }),
         supabase.from('ai_work_log').select('agent_name,action,created_at').order('created_at', { ascending: false }).limit(10),
         supabase.from('projects').select('*').order('created_at', { ascending: false }),
-        supabase.from('tasks').select('*').not('project_id', 'is', null)
+        supabase.from('tasks').select('*').not('project_id', 'is', null),
+        // User's completed tasks today for progress tracking
+        supabase.from('tasks')
+          .select('*')
+          .eq('status', 'done')
+          .or(`created_by.eq.${authUser.id},assignee_id.eq.${authUser.id}`)
       ]);
 
       // Merge latest work log action into agents
@@ -332,11 +337,12 @@ export default function Home() {
       
       setProjectStats(stats);
 
-      // Count tasks completed today
+      // Count tasks completed today (only current user's tasks)
       const today = new Date();
       today.setHours(0, 0, 0, 0);
-      const todayDone = allTasks.filter(t => {
-        if (t.status !== 'done' || !t.updated_at) return false;
+      const userTasks: Task[] = userCompletedRes.data || [];
+      const todayDone = userTasks.filter(t => {
+        if (!t.updated_at) return false;
         const updated = new Date(t.updated_at);
         updated.setHours(0, 0, 0, 0);
         return updated.getTime() === today.getTime();
