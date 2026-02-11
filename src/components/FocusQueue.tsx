@@ -406,6 +406,17 @@ export default function FocusQueue({ tasks, todayCompletedCount = 0, onTaskCompl
         })
         .eq('id', currentTask.id)
 
+      // Sync completion to phase_item if this task is linked to one
+      if (currentTask.phase_item_id) {
+        await supabase
+          .from('phase_items')
+          .update({
+            completed: true,
+            completed_at: new Date().toISOString()
+          })
+          .eq('id', currentTask.phase_item_id)
+      }
+
       // Celebrate!
       const result = celebrate()
       setHypeMessage(result.hypeMessage)
