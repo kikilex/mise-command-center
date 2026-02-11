@@ -86,6 +86,7 @@ interface Task {
   id: string
   title: string
   description: string | null
+  notes?: string | null
   status: string
   priority: string
   space_id: string | null
@@ -96,6 +97,7 @@ interface Task {
   updated_at?: string
   created_at?: string
   focus_queue_order?: number | null
+  phase_item_id?: string | null
 }
 
 interface InboxItem {
@@ -1388,6 +1390,23 @@ export default function Home() {
                     )
                   ) : (
                     <p className="text-default-400 italic">No description</p>
+                  )}
+                </div>
+
+                {/* Notes */}
+                <div>
+                  <label className="text-xs font-bold uppercase tracking-wider text-default-500 mb-2 block">Notes</label>
+                  {selectedTask.notes ? (
+                    selectedTask.notes.includes('<') && selectedTask.notes.includes('>') ? (
+                      <div 
+                        className="text-default-600 prose prose-sm dark:prose-invert max-w-none bg-default-50 dark:bg-default-100 p-3 rounded-lg"
+                        dangerouslySetInnerHTML={{ __html: selectedTask.notes }}
+                      />
+                    ) : (
+                      <p className="text-default-600 whitespace-pre-wrap bg-default-50 dark:bg-default-100 p-3 rounded-lg">{selectedTask.notes}</p>
+                    )
+                  ) : (
+                    <p className="text-default-400 italic">No notes</p>
                   )}
                 </div>
 
