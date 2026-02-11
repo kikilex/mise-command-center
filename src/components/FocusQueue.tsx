@@ -420,7 +420,7 @@ export default function FocusQueue({ tasks, todayCompletedCount = 0, onTaskCompl
       // Celebrate!
       const result = celebrate()
       setHypeMessage(result.hypeMessage)
-      setTimeout(() => setHypeMessage(null), 2500)
+      setTimeout(() => setHypeMessage(null), 10000)
       
       showSuccessToast(`Completed in ${finalSessions.length} session${finalSessions.length > 1 ? 's' : ''}!`)
       
@@ -479,7 +479,7 @@ export default function FocusQueue({ tasks, todayCompletedCount = 0, onTaskCompl
       // Celebrate - this counts!
       const result = celebrate()
       setHypeMessage(result.hypeMessage)
-      setTimeout(() => setHypeMessage(null), 2500)
+      setTimeout(() => setHypeMessage(null), 10000)
       
       showSuccessToast(`Handed off to ${assignee.display_name || assignee.name || assignee.email}!`)
       
@@ -542,7 +542,7 @@ export default function FocusQueue({ tasks, todayCompletedCount = 0, onTaskCompl
       // Celebrate - this counts!
       const result = celebrate()
       setHypeMessage(result.hypeMessage)
-      setTimeout(() => setHypeMessage(null), 2500)
+      setTimeout(() => setHypeMessage(null), 10000)
       
       const dateLabel = days === 1 ? 'tomorrow' : days === 7 ? 'next week' : `in ${days} days`
       showSuccessToast(`Following up ${specificDate ? 'on ' + followUpDate : dateLabel}!`)
