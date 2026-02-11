@@ -1,0 +1,300 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Discord-Style Space Switcher</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    * { font-family: 'Inter', system-ui, sans-serif; }
+    
+    .space-icon {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      transition: all 0.2s ease;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 20px;
+      position: relative;
+    }
+    
+    .space-icon:hover {
+      border-radius: 16px;
+    }
+    
+    .space-icon.active {
+      border-radius: 16px;
+    }
+    
+    .space-icon.active::before {
+      content: '';
+      position: absolute;
+      left: -12px;
+      width: 4px;
+      height: 40px;
+      background: white;
+      border-radius: 0 4px 4px 0;
+    }
+    
+    .space-icon:not(.active):hover::before {
+      content: '';
+      position: absolute;
+      left: -12px;
+      width: 4px;
+      height: 20px;
+      background: white;
+      border-radius: 0 4px 4px 0;
+    }
+    
+    .space-divider {
+      width: 32px;
+      height: 2px;
+      background: rgba(255,255,255,0.1);
+      margin: 8px auto;
+      border-radius: 1px;
+    }
+    
+    .tooltip {
+      position: absolute;
+      left: 70px;
+      background: #111;
+      color: white;
+      padding: 8px 12px;
+      border-radius: 6px;
+      font-size: 14px;
+      font-weight: 600;
+      white-space: nowrap;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.15s;
+      z-index: 100;
+    }
+    
+    .tooltip::before {
+      content: '';
+      position: absolute;
+      left: -6px;
+      top: 50%;
+      transform: translateY(-50%);
+      border: 6px solid transparent;
+      border-right-color: #111;
+    }
+    
+    .space-icon:hover .tooltip {
+      opacity: 1;
+    }
+    
+    .add-space {
+      width: 48px;
+      height: 48px;
+      border-radius: 50%;
+      border: 2px dashed rgba(255,255,255,0.3);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: rgba(255,255,255,0.5);
+      font-size: 24px;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    
+    .add-space:hover {
+      border-color: #22c55e;
+      color: #22c55e;
+      border-radius: 16px;
+    }
+  </style>
+</head>
+<body class="bg-slate-900 text-white min-h-screen">
+  
+  <div class="flex h-screen">
+    
+    <!-- Space Bar (Discord-style) -->
+    <div class="w-[72px] bg-slate-950 flex flex-col items-center py-3 gap-2">
+      
+      <!-- Home / Dashboard -->
+      <div class="space-icon bg-violet-600 active" onclick="selectSpace(this, 'home')">
+        <span class="tooltip">Dashboard</span>
+        ⚡
+      </div>
+      
+      <div class="space-divider"></div>
+      
+      <!-- Spaces -->
+      <div class="space-icon bg-gradient-to-br from-amber-500 to-orange-600" onclick="selectSpace(this, 'faithstone')">
+        <span class="tooltip">Faithstone</span>
+        📿
+      </div>
+      
+      <div class="space-icon bg-gradient-to-br from-blue-500 to-cyan-600" onclick="selectSpace(this, 'ops')">
+        <span class="tooltip">CS / Ops</span>
+        💼
+      </div>
+      
+      <div class="space-icon bg-gradient-to-br from-green-500 to-emerald-600" onclick="selectSpace(this, 'books')">
+        <span class="tooltip">Faithstone Books</span>
+        📖
+      </div>
+      
+      <div class="space-icon bg-gradient-to-br from-purple-500 to-pink-600" onclick="selectSpace(this, 'content')">
+        <span class="tooltip">Content</span>
+        🎬
+      </div>
+      
+      <div class="space-icon bg-gradient-to-br from-red-500 to-rose-600" onclick="selectSpace(this, 'legal')">
+        <span class="tooltip">Legal / IP</span>
+        ⚖️
+      </div>
+      
+      <!-- Add Space -->
+      <div class="mt-auto">
+        <div class="add-space" onclick="alert('Create new space')">
+          <span class="tooltip">Add a Space</span>
+          +
+        </div>
+      </div>
+      
+    </div>
+    
+    <!-- Main Sidebar -->
+    <div class="w-60 bg-slate-800 flex flex-col">
+      
+      <!-- Space Header -->
+      <div class="p-4 border-b border-slate-700">
+        <h2 class="font-bold text-lg flex items-center gap-2" id="space-title">
+          <span>⚡</span> Dashboard
+        </h2>
+      </div>
+      
+      <!-- Navigation -->
+      <nav class="flex-1 p-2 space-y-1">
+        <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-lg bg-slate-700 text-white">
+          <span>📋</span> Tasks
+        </a>
+        <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-700/50 text-slate-300">
+          <span>📁</span> Projects
+        </a>
+        <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-700/50 text-slate-300">
+          <span>📄</span> Docs
+        </a>
+        <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-700/50 text-slate-300">
+          <span>📅</span> Calendar
+        </a>
+        
+        <div class="pt-4 pb-2">
+          <span class="text-xs font-semibold text-slate-500 px-3">PROJECTS</span>
+        </div>
+        
+        <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-700/50 text-slate-300">
+          <span class="w-2 h-2 rounded-full bg-green-500"></span> SWP Extended
+        </a>
+        <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-700/50 text-slate-300">
+          <span class="w-2 h-2 rounded-full bg-yellow-500"></span> TikTok Content
+        </a>
+        <a href="#" class="flex items-center gap-3 px-3 py-2 rounded-lg hover:bg-slate-700/50 text-slate-300">
+          <span class="w-2 h-2 rounded-full bg-blue-500"></span> Our Story Page
+        </a>
+      </nav>
+      
+      <!-- User -->
+      <div class="p-3 border-t border-slate-700">
+        <div class="flex items-center gap-3 px-2 py-2 rounded-lg hover:bg-slate-700/50 cursor-pointer">
+          <div class="w-8 h-8 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center text-sm">
+            A
+          </div>
+          <div class="flex-1 min-w-0">
+            <div class="text-sm font-medium truncate">Alex</div>
+            <div class="text-xs text-slate-400">Online</div>
+          </div>
+          <span class="text-slate-400">⚙️</span>
+        </div>
+      </div>
+      
+    </div>
+    
+    <!-- Main Content -->
+    <div class="flex-1 bg-slate-900">
+      
+      <!-- Header -->
+      <header class="h-14 border-b border-slate-700 flex items-center px-6">
+        <h1 class="text-lg font-semibold">Tasks</h1>
+        <div class="ml-auto flex items-center gap-3">
+          <button class="px-3 py-1.5 bg-violet-600 hover:bg-violet-500 rounded-lg text-sm font-medium">
+            + Add Task
+          </button>
+        </div>
+      </header>
+      
+      <!-- Content -->
+      <div class="p-6">
+        <div class="bg-slate-800 rounded-xl p-6 mb-4">
+          <div class="flex items-center gap-4 mb-4">
+            <div class="w-10 h-10 rounded-xl bg-violet-600 flex items-center justify-center">
+              ⚡
+            </div>
+            <div>
+              <h2 class="font-bold text-xl">Quick Access</h2>
+              <p class="text-slate-400 text-sm">Click any space icon on the left to switch instantly</p>
+            </div>
+          </div>
+          
+          <div class="grid grid-cols-3 gap-4">
+            <div class="bg-slate-700/50 rounded-lg p-4 hover:bg-slate-700 cursor-pointer transition">
+              <div class="text-2xl mb-2">📿</div>
+              <div class="font-medium">Faithstone</div>
+              <div class="text-sm text-slate-400">5 active tasks</div>
+            </div>
+            <div class="bg-slate-700/50 rounded-lg p-4 hover:bg-slate-700 cursor-pointer transition">
+              <div class="text-2xl mb-2">📖</div>
+              <div class="font-medium">Books</div>
+              <div class="text-sm text-slate-400">3 chapters in progress</div>
+            </div>
+            <div class="bg-slate-700/50 rounded-lg p-4 hover:bg-slate-700 cursor-pointer transition">
+              <div class="text-2xl mb-2">💼</div>
+              <div class="font-medium">CS / Ops</div>
+              <div class="text-sm text-slate-400">8 open tickets</div>
+            </div>
+          </div>
+        </div>
+        
+        <div class="text-center text-slate-500 mt-12">
+          <p class="text-lg mb-2">👆 Try clicking the space icons on the left</p>
+          <p class="text-sm">Hover for space name • Click to switch • No more drilling down</p>
+        </div>
+      </div>
+      
+    </div>
+    
+  </div>
+
+  <script>
+    const spaceData = {
+      home: { icon: '⚡', title: 'Dashboard' },
+      faithstone: { icon: '📿', title: 'Faithstone' },
+      ops: { icon: '💼', title: 'CS / Ops' },
+      books: { icon: '📖', title: 'Faithstone Books' },
+      content: { icon: '🎬', title: 'Content' },
+      legal: { icon: '⚖️', title: 'Legal / IP' },
+    };
+    
+    function selectSpace(el, spaceId) {
+      // Remove active from all
+      document.querySelectorAll('.space-icon').forEach(icon => {
+        icon.classList.remove('active');
+      });
+      
+      // Add active to clicked
+      el.classList.add('active');
+      
+      // Update title
+      const space = spaceData[spaceId];
+      document.getElementById('space-title').innerHTML = `<span>${space.icon}</span> ${space.title}`;
+    }
+  </script>
+
+</body>
+</html>

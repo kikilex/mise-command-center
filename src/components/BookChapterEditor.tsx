@@ -5,7 +5,7 @@ import { Button, Input, Tooltip, Select, SelectItem } from '@heroui/react'
 import { 
   Save, ChevronLeft, ChevronRight, Scissors, 
   Bold, Italic, Heading1, Heading2, 
-  BookOpen, Type, ChevronDown, ChevronUp
+  BookOpen, Type
 } from 'lucide-react'
 import { useEditor, EditorContent } from '@tiptap/react'
 import StarterKit from '@tiptap/starter-kit'
@@ -48,14 +48,6 @@ const STATUS_OPTIONS = [
   { key: 'revision', label: 'Revision' },
   { key: 'final', label: 'Final' },
 ]
-
-const STATUS_COLORS: Record<string, 'default' | 'primary' | 'secondary' | 'success' | 'warning' | 'danger'> = {
-  idea: 'default',
-  outline: 'primary',
-  draft: 'warning',
-  revision: 'secondary',
-  final: 'success',
-}
 
 // Count words in text (strip HTML)
 function countWords(html: string): number {
@@ -417,7 +409,7 @@ export default function BookChapterEditor({
               isDisabled={currentPage <= 1}
               onPress={() => scrollToPage(currentPage - 1)}
             >
-              <ChevronDown className="w-4 h-4 rotate-90" />
+              <ChevronLeft className="w-4 h-4" />
             </Button>
             <span className="text-sm text-default-600 font-medium">
               Page {currentPage} of {pageCount}
@@ -429,7 +421,7 @@ export default function BookChapterEditor({
               isDisabled={currentPage >= pageCount}
               onPress={() => scrollToPage(currentPage + 1)}
             >
-              <ChevronUp className="w-4 h-4 rotate-90" />
+              <ChevronRight className="w-4 h-4" />
             </Button>
           </div>
         </div>
