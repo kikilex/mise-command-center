@@ -16,9 +16,10 @@ interface FireProgressProps {
   goal?: number
   todayTasks?: CompletedTask[]
   onDeleteTask?: (taskId: string) => void
+  onTaskClick?: (task: CompletedTask) => void
 }
 
-export default function FireProgress({ completedCount, goal = 8, todayTasks = [], onDeleteTask }: FireProgressProps) {
+export default function FireProgress({ completedCount, goal = 8, todayTasks = [], onDeleteTask, onTaskClick }: FireProgressProps) {
   const [expanded, setExpanded] = useState(false)
   const percent = Math.min((completedCount / goal) * 100, 100)
   const exceeded = completedCount > goal
@@ -213,7 +214,8 @@ export default function FireProgress({ completedCount, goal = 8, todayTasks = []
             {todayTasks.map(task => (
               <div 
                 key={task.id} 
-                className="flex items-center gap-2 p-2 bg-white/60 dark:bg-slate-800/60 rounded-lg text-sm group"
+                className={`flex items-center gap-2 p-2 bg-white/60 dark:bg-slate-800/60 rounded-lg text-sm group ${onTaskClick ? 'cursor-pointer hover:bg-white/80 dark:hover:bg-slate-700/60' : ''}`}
+                onClick={() => onTaskClick?.(task)}
               >
                 <div className="w-5 h-5 rounded-full bg-green-500 flex items-center justify-center flex-shrink-0">
                   <Check className="w-3 h-3 text-white" />
@@ -224,7 +226,7 @@ export default function FireProgress({ completedCount, goal = 8, todayTasks = []
                 )}
                 {onDeleteTask && (
                   <button
-                    onClick={() => onDeleteTask(task.id)}
+                    onClick={(e) => { e.stopPropagation(); onDeleteTask(task.id); }}
                     className="opacity-0 group-hover:opacity-100 text-red-500 hover:text-red-700 transition-all p-1"
                     title="Delete task"
                   >

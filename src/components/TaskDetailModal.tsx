@@ -237,7 +237,13 @@ export default function TaskDetailModal({
           .eq('id', task.id)
         if (!error) {
           lastSavedNotesRef.current = formData.notes
-          // Subtle feedback - no toast, just silent save
+          // Also sync to phase_item if linked
+          if (task.phase_item_id) {
+            await supabase
+              .from('phase_items')
+              .update({ notes: formData.notes || null })
+              .eq('id', task.phase_item_id)
+          }
         }
       } catch (e) {
         console.error('Auto-save notes failed:', e)
