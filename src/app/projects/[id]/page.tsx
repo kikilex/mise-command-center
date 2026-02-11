@@ -1743,8 +1743,14 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
               const reviewTasks = filteredTasks.filter(t => t.status === 'review')
               const doneTasks = filteredTasks.filter(t => t.status === 'done')
               
+              const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({})
+              
               const renderTaskGroup = (tasks: any[], label: string, color: string) => {
                 if (tasks.length === 0) return null
+                const isExpanded = expandedGroups[label] ?? false
+                const displayTasks = isExpanded ? tasks : tasks.slice(0, 4)
+                const hasMore = tasks.length > 4
+                
                 return (
                   <div className="mb-4">
                     <div className="flex items-center gap-2 mb-2">
@@ -1752,7 +1758,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                       <span className="text-xs text-default-400">{tasks.length}</span>
                     </div>
                     <div className="space-y-2">
-                      {tasks.map(task => (
+                      {displayTasks.map(task => (
                         <div 
                           key={task.id} 
                           className="group flex items-center gap-3 p-2 rounded-lg bg-default-50 hover:bg-default-100 transition-colors cursor-pointer"
@@ -1814,6 +1820,16 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                         </div>
                       ))}
                     </div>
+                    {hasMore && (
+                      <Button
+                        size="sm"
+                        variant="light"
+                        className="mt-2 w-full"
+                        onPress={() => setExpandedGroups(prev => ({ ...prev, [label]: !isExpanded }))}
+                      >
+                        {isExpanded ? `▲ Show less` : `▼ Show ${tasks.length - 4} more`}
+                      </Button>
+                    )}
                   </div>
                 )
               }
@@ -2520,7 +2536,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
         onClose={() => setSelectedTask(null)}
         onTaskUpdated={() => {
           setSelectedTask(null)
-          loadProject()
+          loadData()
         }}
         userId={user?.id}
       />
@@ -2956,6 +2972,55 @@ function ItemRowContent({
         
         {item.due_date && (
           <span className="text-xs text-default-400">{format(new Date(item.due_date.includes('T') ? item.due_date : item.due_date + 'T00:00:00'), 'MMM d')}</span>
+        )}
+        
+        {/* Add to Today button - shows on hover */}
+        {!item.completed && (
+          <div onClick={(e) => e.stopPropagation()} data-add-today-btn>
+            <Tooltip content="Add to Today">
+              <Button
+                isIconOnly
+                size="sm"
+                variant="light"
+                className="opacity-0 group-hover/item:opacity-100 transition-opacity min-w-6 w-6 h-6 text-warning"
+                onPress={async () => {
+                  const supabase = createClient()
+                  // Find the synced task for this phase item
+                  const { data: taskData } = await supabase
+                    .from('tasks')
+                    .select('id, focus_queue_order')
+                    .eq('phase_item_id', item.id)
+                    .single()
+                  
+                  if (!taskData) {
+                    showErrorToast(new Error('Task not found'), 'Task not synced yet')
+                    return
+                  }
+                  
+                  if (taskData.focus_queue_order !== null && taskData.focus_queue_order >= 0) {
+                    showSuccessToast('Already in today\'s queue')
+                    return
+                  }
+                  
+                  // Get max order
+                  const { data: maxData } = await supabase
+                    .from('tasks')
+                    .select('focus_queue_order')
+                    .gte('focus_queue_order', 0)
+                    .order('focus_queue_order', { ascending: false })
+                    .limit(1)
+                    .single()
+                  const maxOrder = maxData?.focus_queue_order || 0
+                  const newOrder = maxOrder + 1
+                  
+                  await supabase.from('tasks').update({ focus_queue_order: newOrder }).eq('id', taskData.id)
+                  showSuccessToast('Added to today\'s queue')
+                }}
+              >
+                <Sun className="w-3.5 h-3.5" />
+              </Button>
+            </Tooltip>
+          </div>
         )}
         
         {/* Delete button - shows on hover */}
