@@ -49,7 +49,7 @@ import { createClient } from '@/lib/supabase/client'
 import Navbar from '@/components/Navbar'
 import RichTextEditor from '@/components/RichTextEditor'
 import TaskDetailModal from '@/components/TaskDetailModal'
-// import BookBuilder from '@/components/BookBuilder'
+import BookBuilder from '@/components/BookBuilder'
 import { showErrorToast, showSuccessToast } from '@/lib/errors'
 import { formatDistanceToNow, format } from 'date-fns'
 import ReactMarkdown from 'react-markdown'
@@ -226,6 +226,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   const [noteContent, setNoteContent] = useState('')
   const [savingNote, setSavingNote] = useState(false)
   const [editingNoteId, setEditingNoteId] = useState<string | null>(null)
+  const [expandedTaskGroups, setExpandedTaskGroups] = useState<Record<string, boolean>>({})
   
   // Image preview modal
   const { isOpen: isImageOpen, onOpen: onImageOpen, onClose: onImageClose } = useDisclosure()
@@ -372,7 +373,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
         .from('books')
         .select('id')
         .eq('project_id', id)
-        .single()
+        .maybeSingle()
       setHasBook(!!bookData)
 
       // Load phases with items
@@ -1476,7 +1477,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
 
         {/* Tab Content */}
         {selectedTab === 'book' ? (
-          <div className="p-8 text-center text-default-400">Book Builder temporarily disabled</div>
+          <BookBuilder projectId={id} spaceId={project.space_id} userId={user?.id || ''} />
         ) : (
         <>
         {/* Phases */}
@@ -1743,11 +1744,9 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
               const reviewTasks = filteredTasks.filter(t => t.status === 'review')
               const doneTasks = filteredTasks.filter(t => t.status === 'done')
               
-              const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({})
-              
               const renderTaskGroup = (tasks: any[], label: string, color: string) => {
                 if (tasks.length === 0) return null
-                const isExpanded = expandedGroups[label] ?? false
+                const isExpanded = expandedTaskGroups[label] ?? false
                 const displayTasks = isExpanded ? tasks : tasks.slice(0, 4)
                 const hasMore = tasks.length > 4
                 
@@ -1825,7 +1824,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                         size="sm"
                         variant="light"
                         className="mt-2 w-full"
-                        onPress={() => setExpandedGroups(prev => ({ ...prev, [label]: !isExpanded }))}
+                        onPress={() => setExpandedTaskGroups(prev => ({ ...prev, [label]: !isExpanded }))}
                       >
                         {isExpanded ? `▲ Show less` : `▼ Show ${tasks.length - 4} more`}
                       </Button>
