@@ -79,7 +79,8 @@ interface SavedTimerState {
 }
 
 export default function FocusQueue({ tasks, todayCompletedCount = 0, onTaskComplete, onRefresh, onRemoveFromQueue }: FocusQueueProps) {
-  const [currentTaskIndex, setCurrentTaskIndex] = useState(0)
+  // Always show tasks[0] as current - parent controls queue order
+  // When task is completed/removed, next task naturally becomes tasks[0]
   const [timerState, setTimerState] = useState<'stopped' | 'running' | 'paused'>('stopped')
   const [sessionCount, setSessionCount] = useState(1)
   const [elapsedMs, setElapsedMs] = useState(0)
@@ -99,9 +100,8 @@ export default function FocusQueue({ tasks, todayCompletedCount = 0, onTaskCompl
   const supabase = createClient()
   const { celebrate, getRandomHype } = useCelebrations()
   
-  const currentTask = tasks[currentTaskIndex] || null
+  const currentTask = tasks[0] || null
   const queuedTasks = tasks.slice(0, 5)
-  const completedCount = currentTaskIndex
 
   // Save to localStorage for instant persistence
   const saveToLocalStorage = useCallback((state: SavedTimerState) => {
@@ -408,18 +408,13 @@ export default function FocusQueue({ tasks, todayCompletedCount = 0, onTaskCompl
       sessionStartRef.current = null
       clearLocalStorage()
       
-      // Move to next task
-      if (currentTaskIndex < tasks.length - 1) {
-        setCurrentTaskIndex(prev => prev + 1)
-      }
-      
       onTaskComplete?.(currentTask.id)
       onRefresh?.()
     } catch (error) {
       console.error('Error completing task:', error)
       showErrorToast(error, 'Failed to complete task')
     }
-  }, [currentTask, sessions, timerState, currentTaskIndex, tasks.length, celebrate, onTaskComplete, onRefresh, clearLocalStorage])
+  }, [currentTask, sessions, timerState, celebrate, onTaskComplete, onRefresh, clearLocalStorage])
 
   // Hand off task to someone else - counts as completed for today
   const handOffTask = useCallback(async (assigneeId: string) => {
@@ -472,18 +467,13 @@ export default function FocusQueue({ tasks, todayCompletedCount = 0, onTaskCompl
       sessionStartRef.current = null
       clearLocalStorage()
       
-      // Move to next task
-      if (currentTaskIndex < tasks.length - 1) {
-        setCurrentTaskIndex(prev => prev + 1)
-      }
-      
       onTaskComplete?.(currentTask.id)
       onRefresh?.()
     } catch (error) {
       console.error('Error handing off task:', error)
       showErrorToast(error, 'Failed to hand off task')
     }
-  }, [currentTask, sessions, timerState, teamMembers, currentTaskIndex, tasks.length, celebrate, onTaskComplete, onRefresh, clearLocalStorage])
+  }, [currentTask, sessions, timerState, teamMembers, celebrate, onTaskComplete, onRefresh, clearLocalStorage])
 
   // Follow up later - counts as completed for today, stays assigned to me
   const followUpLater = useCallback(async (days: number, specificDate?: string) => {
@@ -543,18 +533,13 @@ export default function FocusQueue({ tasks, todayCompletedCount = 0, onTaskCompl
       setShowDatePicker(false)
       setCustomDate('')
       
-      // Move to next task
-      if (currentTaskIndex < tasks.length - 1) {
-        setCurrentTaskIndex(prev => prev + 1)
-      }
-      
       onTaskComplete?.(currentTask.id)
       onRefresh?.()
     } catch (error) {
       console.error('Error setting follow up:', error)
       showErrorToast(error, 'Failed to set follow up')
     }
-  }, [currentTask, sessions, timerState, currentTaskIndex, tasks.length, celebrate, onTaskComplete, onRefresh, clearLocalStorage])
+  }, [currentTask, sessions, timerState, celebrate, onTaskComplete, onRefresh, clearLocalStorage])
 
   const resetTimer = useCallback(() => {
     setTimerState('stopped')
@@ -619,7 +604,7 @@ export default function FocusQueue({ tasks, todayCompletedCount = 0, onTaskCompl
             <div>
               <h2 className="font-bold text-white">Focus Queue</h2>
               <p className="text-xs text-white/70">
-                {currentTaskIndex + 1} of {Math.min(tasks.length, 5)} • {timerState === 'running' ? 'LOCKED IN 🔥' : 'Stay locked in'}
+                1 of {Math.min(tasks.length, 5)} • {timerState === 'running' ? 'LOCKED IN 🔥' : 'Stay locked in'}
               </p>
             </div>
           </div>
@@ -644,11 +629,9 @@ export default function FocusQueue({ tasks, todayCompletedCount = 0, onTaskCompl
                 <div 
                   key={i} 
                   className={`w-3 h-3 rounded-full ${
-                    i < currentTaskIndex 
-                      ? 'bg-green-400' 
-                      : i === currentTaskIndex 
-                        ? 'bg-yellow-400 animate-pulse' 
-                        : 'bg-white/30'
+                    i === 0 
+                      ? 'bg-yellow-400 animate-pulse' 
+                      : 'bg-white/30'
                   }`} 
                 />
               ))}
@@ -905,19 +888,19 @@ export default function FocusQueue({ tasks, todayCompletedCount = 0, onTaskCompl
           )}
 
           {/* Up Next */}
-          {tasks[currentTaskIndex + 1] && (
+          {tasks[1] && (
             <div className="mt-6 pt-4 border-t border-slate-200 dark:border-slate-700">
               <div className="text-xs text-slate-400 uppercase font-medium mb-2">Up Next</div>
               <div 
                 className="flex items-center gap-3 text-slate-600 dark:text-slate-400 cursor-pointer hover:text-violet-600 dark:hover:text-violet-400 transition-colors"
-                onClick={() => setViewTask(tasks[currentTaskIndex + 1])}
+                onClick={() => setViewTask(tasks[1])}
               >
                 <div className="w-7 h-7 bg-slate-200 dark:bg-slate-700 rounded-lg flex items-center justify-center text-sm font-medium">
-                  {currentTaskIndex + 2}
+                  2
                 </div>
-                <span className="line-clamp-1">{tasks[currentTaskIndex + 1].title}</span>
+                <span className="line-clamp-1">{tasks[1].title}</span>
                 <Chip size="sm" variant="flat" className="ml-auto">
-                  {tasks[currentTaskIndex + 1].priority?.toUpperCase()}
+                  {tasks[1].priority?.toUpperCase()}
                 </Chip>
               </div>
             </div>
