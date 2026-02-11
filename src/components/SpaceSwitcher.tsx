@@ -171,6 +171,7 @@ export default function SpaceSwitcher() {
             exit={{ opacity: 0, x: -100 }}
             transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
             className="fixed left-0 top-1/2 -translate-y-1/2 z-[1000] p-4 pr-6"
+            onClick={(e) => e.stopPropagation()}
             style={{
               background: 'rgba(255, 255, 255, 0.95)',
               backdropFilter: 'blur(20px)',
@@ -189,11 +190,16 @@ export default function SpaceSwitcher() {
             />
 
             {/* Pinned spaces */}
-            <div className="flex flex-col gap-3">
+            <div className="flex flex-col gap-3" onClick={(e) => e.stopPropagation()}>
               {pinnedSpaces.map((space) => (
                 <button
+                  type="button"
                   key={space.id}
-                  onClick={() => handleSpaceClick(space)}
+                  onClick={(e) => {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    handleSpaceClick(space)
+                  }}
                   className={`flex flex-col items-center gap-1 cursor-pointer transition-all ${
                     currentSpace?.id === space.id ? 'opacity-100' : 'opacity-80 hover:opacity-100'
                   }`}
