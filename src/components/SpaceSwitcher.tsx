@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import Link from 'next/link'
 import { motion, AnimatePresence } from 'framer-motion'
 import * as LucideIcons from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
@@ -200,7 +201,7 @@ export default function SpaceSwitcher() {
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -100 }}
             transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
-            className="fixed left-0 top-1/2 -translate-y-1/2 z-[1000] p-4 pr-6"
+            className="fixed left-0 top-1/2 -translate-y-1/2 z-[1000] p-4 pr-6 pointer-events-auto"
             style={{
               background: 'rgba(255, 255, 255, 0.95)',
               backdropFilter: 'blur(20px)',
@@ -220,15 +221,13 @@ export default function SpaceSwitcher() {
             />
 
             {/* Pinned spaces */}
-            <div className="flex flex-col gap-3">
+            <nav className="flex flex-col gap-3 relative z-[1001] pointer-events-auto">
               {pinnedSpaces.map((space) => (
-                <a
+                <Link
                   key={space.id}
                   href={`/spaces/${space.id}`}
-                  onClick={(e) => {
-                    e.preventDefault()
-                    handleSpaceClick(space)
-                  }}
+                  onClick={() => setIsOpen(false)}
+                  style={{ pointerEvents: 'auto' }}
                   className={`flex flex-col items-center gap-1 cursor-pointer transition-all no-underline ${
                     currentSpace?.id === space.id ? 'opacity-100' : 'opacity-80 hover:opacity-100'
                   }`}
@@ -243,9 +242,9 @@ export default function SpaceSwitcher() {
                   <span className="text-xs font-medium text-gray-600 max-w-[64px] truncate">
                     {space.name}
                   </span>
-                </a>
+                </Link>
               ))}
-            </div>
+            </nav>
           </motion.div>
         )}
       </AnimatePresence>
