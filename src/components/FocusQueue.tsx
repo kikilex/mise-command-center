@@ -7,6 +7,8 @@ import { createClient } from '@/lib/supabase/client'
 import { useCelebrations } from '@/hooks/useCelebrations'
 import { showErrorToast, showSuccessToast } from '@/lib/errors'
 import TaskDetailModal from './TaskDetailModal'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
 
 interface Session {
   num: number
@@ -740,9 +742,18 @@ export default function FocusQueue({ tasks, todayCompletedCount = 0, onTaskCompl
             </div>
             <h3 className="text-lg font-bold text-slate-800 dark:text-slate-100 group-hover:text-violet-600 dark:group-hover:text-violet-400 transition-colors">{currentTask.title}</h3>
             {currentTask.description && (
-              <p className="text-slate-500 text-sm mt-1 line-clamp-2">
-                {currentTask.description.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim()}
-              </p>
+              <div className="text-slate-500 text-sm mt-1 line-clamp-2 prose prose-sm dark:prose-invert max-w-none prose-p:my-0 prose-headings:my-0">
+                {currentTask.description.includes('<') && currentTask.description.includes('>') ? (
+                  <span dangerouslySetInnerHTML={{ __html: currentTask.description.replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim() }} />
+                ) : (
+                  <ReactMarkdown remarkPlugins={[remarkGfm]} components={{
+                    p: ({children}) => <span>{children}</span>,
+                    h1: ({children}) => <span className="font-bold">{children}</span>,
+                    h2: ({children}) => <span className="font-bold">{children}</span>,
+                    h3: ({children}) => <span className="font-bold">{children}</span>,
+                  }}>{currentTask.description}</ReactMarkdown>
+                )}
+              </div>
             )}
             <p className="text-xs text-slate-400 mt-1 opacity-0 group-hover:opacity-100 transition-opacity">Click to view details</p>
           </div>
