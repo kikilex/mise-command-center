@@ -905,7 +905,7 @@ export default function Home() {
               completedCount={todayCompletedCount} 
               goal={8} 
               todayTasks={todayCompletedList}
-              onTaskClick={(task) => setSelectedTask(task as Task)}
+              onTaskClick={(task) => { setSelectedTask(task as Task); onTaskModalOpen(); }}
               onDeleteTask={async (taskId) => {
                 // Mark as not done instead of deleting
                 await supabase.from('tasks').update({ status: 'todo' }).eq('id', taskId)
