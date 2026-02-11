@@ -12,6 +12,11 @@ import {
   ModalHeader,
   ModalBody,
   ModalFooter,
+  Drawer,
+  DrawerContent,
+  DrawerHeader,
+  DrawerBody,
+  DrawerFooter,
   Input,
   Textarea,
   Select,
@@ -1317,11 +1322,16 @@ export default function Home() {
         </div>
       </main>
 
-      {/* Task Detail Modal */}
-      <Modal isOpen={isTaskModalOpen} onClose={onTaskModalClose} size="lg">
-        <ModalContent>
-          <ModalHeader className="flex flex-col gap-1">
-            <div className="flex items-center justify-between">
+      {/* Task Detail Drawer (slide-in from right) */}
+      <Drawer 
+        isOpen={isTaskModalOpen} 
+        onClose={onTaskModalClose} 
+        placement="right"
+        size="md"
+      >
+        <DrawerContent>
+          <DrawerHeader className="border-b border-default-200">
+            <div className="flex items-center justify-between w-full">
               <div className="flex items-center gap-2">
                 <div className={`w-3 h-3 rounded-full ${getPriorityColor(selectedTask?.priority || 'medium')}`} />
                 <h2 className="text-lg font-bold">Task Details</h2>
@@ -1333,127 +1343,147 @@ export default function Home() {
                 </Button>
               )}
             </div>
-          </ModalHeader>
-          <ModalBody className="pb-6">
+          </DrawerHeader>
+          <DrawerBody className="py-4">
             {selectedTask && (
-              <div className="space-y-4">
+              <div className="space-y-5">
                 {/* Title */}
                 <div>
-                  <label className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1 block">Title</label>
+                  <label className="text-xs font-bold uppercase tracking-wider text-default-500 mb-2 block">Title</label>
                   {isEditingTask ? (
                     <Input
                       value={taskEditData.title}
                       onChange={(e) => setTaskEditData(prev => ({ ...prev, title: e.target.value }))}
                       size="sm"
+                      variant="bordered"
                       className="w-full"
                     />
                   ) : (
-                    <p className="text-slate-800 dark:text-slate-200 font-medium">{selectedTask.title}</p>
+                    <p className="text-foreground font-semibold text-lg">{selectedTask.title}</p>
                   )}
                 </div>
 
                 {/* Description */}
                 <div>
-                  <label className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1 block">Description</label>
+                  <label className="text-xs font-bold uppercase tracking-wider text-default-500 mb-2 block">Description</label>
                   {isEditingTask ? (
                     <Textarea
                       value={taskEditData.description}
                       onChange={(e) => setTaskEditData(prev => ({ ...prev, description: e.target.value }))}
                       size="sm"
+                      variant="bordered"
                       className="w-full"
-                      minRows={3}
+                      minRows={4}
                     />
+                  ) : selectedTask.description ? (
+                    // Check if description contains HTML and render accordingly
+                    selectedTask.description.includes('<') && selectedTask.description.includes('>') ? (
+                      <div 
+                        className="text-default-600 prose prose-sm dark:prose-invert max-w-none"
+                        dangerouslySetInnerHTML={{ __html: selectedTask.description }}
+                      />
+                    ) : (
+                      <p className="text-default-600 whitespace-pre-wrap">{selectedTask.description}</p>
+                    )
                   ) : (
-                    <p className="text-slate-600 dark:text-slate-400 whitespace-pre-wrap">
-                      {selectedTask.description || 'No description'}
-                    </p>
+                    <p className="text-default-400 italic">No description</p>
                   )}
                 </div>
 
-                {/* Status */}
-                <div>
-                  <label className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1 block">Status</label>
-                  {isEditingTask ? (
-                    <Select
-                      selectedKeys={[taskEditData.status]}
-                      onChange={(e) => setTaskEditData(prev => ({ ...prev, status: e.target.value }))}
-                      size="sm"
-                      className="w-full"
-                    >
-                      <SelectItem key="todo">To Do</SelectItem>
-                      <SelectItem key="in_progress">In Progress</SelectItem>
-                      <SelectItem key="review">Review</SelectItem>
-                      <SelectItem key="done">Done</SelectItem>
-                    </Select>
-                  ) : (
-                    <div className="flex items-center gap-2">
+                {/* Status & Priority row */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs font-bold uppercase tracking-wider text-default-500 mb-2 block">Status</label>
+                    {isEditingTask ? (
+                      <Select
+                        selectedKeys={[taskEditData.status]}
+                        onChange={(e) => setTaskEditData(prev => ({ ...prev, status: e.target.value }))}
+                        size="sm"
+                        variant="bordered"
+                        className="w-full"
+                      >
+                        <SelectItem key="todo">To Do</SelectItem>
+                        <SelectItem key="in_progress">In Progress</SelectItem>
+                        <SelectItem key="review">Review</SelectItem>
+                        <SelectItem key="done">Done</SelectItem>
+                      </Select>
+                    ) : (
                       <Chip 
-                        size="sm" 
+                        size="md" 
                         variant="flat" 
-                        color={selectedTask.status === 'done' ? 'success' : 'default'}
+                        color={selectedTask.status === 'done' ? 'success' : selectedTask.status === 'in_progress' ? 'primary' : 'default'}
                         className="cursor-pointer"
                         onClick={() => handleTaskStatusChange(selectedTask.status === 'done' ? 'todo' : 'done')}
                       >
                         {selectedTask.status.replace('_', ' ')}
                       </Chip>
-                      <span className="text-xs text-slate-400">(Click to toggle)</span>
-                    </div>
-                  )}
+                    )}
+                  </div>
+                  
+                  <div>
+                    <label className="text-xs font-bold uppercase tracking-wider text-default-500 mb-2 block">Priority</label>
+                    {isEditingTask ? (
+                      <Select
+                        selectedKeys={[taskEditData.priority]}
+                        onChange={(e) => setTaskEditData(prev => ({ ...prev, priority: e.target.value }))}
+                        size="sm"
+                        variant="bordered"
+                        className="w-full"
+                      >
+                        {priorityOptions.map(option => (
+                          <SelectItem key={option.key}>{option.label}</SelectItem>
+                        ))}
+                      </Select>
+                    ) : (
+                      <Chip 
+                        size="md" 
+                        variant="flat" 
+                        color={
+                          selectedTask.priority === 'critical' ? 'danger' :
+                          selectedTask.priority === 'high' ? 'warning' :
+                          selectedTask.priority === 'medium' ? 'primary' : 'default'
+                        }
+                      >
+                        {selectedTask.priority}
+                      </Chip>
+                    )}
+                  </div>
                 </div>
 
-                {/* Priority */}
-                <div>
-                  <label className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1 block">Priority</label>
-                  {isEditingTask ? (
-                    <Select
-                      selectedKeys={[taskEditData.priority]}
-                      onChange={(e) => setTaskEditData(prev => ({ ...prev, priority: e.target.value }))}
-                      size="sm"
-                      className="w-full"
-                    >
-                      {priorityOptions.map(option => (
-                        <SelectItem key={option.key}>{option.label}</SelectItem>
-                      ))}
-                    </Select>
-                  ) : (
-                    <Chip size="sm" variant="flat" className={`${getPriorityColor(selectedTask.priority)} text-white`}>
-                      {selectedTask.priority}
+                {/* Space & Due Date row */}
+                <div className="grid grid-cols-2 gap-4">
+                  <div>
+                    <label className="text-xs font-bold uppercase tracking-wider text-default-500 mb-2 block">Space</label>
+                    <Chip size="md" variant="flat" color="secondary">
+                      {spaces.find(s => s.id === selectedTask.space_id)?.name || 'General'}
                     </Chip>
-                  )}
-                </div>
+                  </div>
 
-                {/* Project */}
-                <div>
-                  <label className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1 block">Project</label>
-                  <Chip size="sm" variant="flat" color="default">
-                    {spaces.find(s => s.id === selectedTask.space_id)?.name || 'General'}
-                  </Chip>
-                </div>
-
-                {/* Due Date */}
-                <div>
-                  <label className="text-xs font-bold uppercase tracking-wider text-slate-400 mb-1 block">Due Date</label>
-                  {isEditingTask ? (
-                    <Input
-                      type="date"
-                      value={taskEditData.due_date || ''}
-                      onChange={(e) => setTaskEditData(prev => ({ ...prev, due_date: e.target.value }))}
-                      size="sm"
-                      className="w-full"
-                    />
-                  ) : (
-                    <p className="text-slate-600 dark:text-slate-400">
-                      {selectedTask.due_date ? new Date(selectedTask.due_date).toLocaleDateString() : 'No due date'}
-                    </p>
-                  )}
+                  <div>
+                    <label className="text-xs font-bold uppercase tracking-wider text-default-500 mb-2 block">Due Date</label>
+                    {isEditingTask ? (
+                      <Input
+                        type="date"
+                        value={taskEditData.due_date || ''}
+                        onChange={(e) => setTaskEditData(prev => ({ ...prev, due_date: e.target.value }))}
+                        size="sm"
+                        variant="bordered"
+                        className="w-full"
+                      />
+                    ) : (
+                      <p className="text-default-600">
+                        {selectedTask.due_date ? new Date(selectedTask.due_date).toLocaleDateString() : 'No due date'}
+                      </p>
+                    )}
+                  </div>
                 </div>
               </div>
             )}
-          </ModalBody>
-          <ModalFooter>
+          </DrawerBody>
+          <DrawerFooter className="border-t border-default-200">
             {isEditingTask ? (
               <>
-                <Button variant="light" onPress={() => setIsEditingTask(false)}>
+                <Button variant="flat" onPress={() => setIsEditingTask(false)}>
                   Cancel
                 </Button>
                 <Button color="primary" onPress={handleTaskSave}>
@@ -1461,13 +1491,13 @@ export default function Home() {
                 </Button>
               </>
             ) : (
-              <Button color="primary" onPress={onTaskModalClose}>
+              <Button color="primary" variant="flat" onPress={onTaskModalClose}>
                 Close
               </Button>
             )}
-          </ModalFooter>
-        </ModalContent>
-      </Modal>
+          </DrawerFooter>
+        </DrawerContent>
+      </Drawer>
 
       {/* Agent Detail Modal */}
       <Modal isOpen={isAgentModalOpen} onClose={onAgentModalClose} size="lg">
