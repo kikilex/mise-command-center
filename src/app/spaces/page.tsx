@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import {
   Card,
@@ -18,12 +18,13 @@ import {
   ModalBody,
   ModalFooter,
 } from '@heroui/react'
-import { Plus, User, MoreVertical, Edit, Trash2 } from 'lucide-react'
+import { Plus, User, MoreVertical, Edit, Trash2, Pin, PinOff } from 'lucide-react'
 import * as LucideIcons from 'lucide-react'
 import Navbar from '@/components/Navbar'
 import AddSpaceModal from '@/components/AddSpaceModal'
 import EditSpaceModal from '@/components/EditSpaceModal'
 import TransferDeleteSpaceModal from '@/components/TransferDeleteSpaceModal'
+import ManagePinnedSpacesModal from '@/components/ManagePinnedSpacesModal'
 import { useSpace, Space } from '@/lib/space-context'
 import { createClient } from '@/lib/supabase/client'
 import { showErrorToast, showSuccessToast } from '@/lib/errors'
@@ -40,12 +41,134 @@ export default function SpacesPage() {
   const { isOpen: isEditOpen, onOpen: onEditOpen, onClose: onEditClose } = useDisclosure()
   const { isOpen: isTransferOpen, onOpen: onTransferOpen, onClose: onTransferClose } = useDisclosure()
   const { isOpen: isDeleteOpen, onOpen: onDeleteOpen, onClose: onDeleteClose } = useDisclosure()
+  const { isOpen: isManagePinsOpen, onOpen: onManagePinsOpen, onClose: onManagePinsClose } = useDisclosure()
   const [selectedSpace, setSelectedSpace] = useState<Space | null>(null)
   const [spaceToDelete, setSpaceToDelete] = useState<Space | null>(null)
   const [deletingId, setDeletingId] = useState<string | null>(null)
   const [contentCounts, setContentCounts] = useState<ContentCounts>({ documents: 0, tasks: 0, projects: 0 })
+  const [pinnedSpaceIds, setPinnedSpaceIds] = useState<string[]>([])
+  const [spaceToPin, setSpaceToPin] = useState<Space | null>(null)
 
   const supabase = createClient()
+
+  // Fetch pinned spaces on mount
+  useEffect(() => {
+    async function fetchPinnedSpaces() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const { data: userData } = await supabase
+        .from('users')
+        .select('settings')
+        .eq('id', user.id)
+        .single()
+
+      const pinnedIds: string[] = userData?.settings?.pinned_spaces || []
+      setPinnedSpaceIds(pinnedIds)
+    }
+    fetchPinnedSpaces()
+  }, [supabase])
+
+  async function handlePinSpace(space: Space) {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+
+    // Check if already at max
+    if (pinnedSpaceIds.length >= 5) {
+      // Open manage modal to let user remove one
+      setSpaceToPin(space)
+      onManagePinsOpen()
+      return
+    }
+
+    // Pin the space
+    try {
+      const { data: userData } = await supabase
+        .from('users')
+        .select('settings')
+        .eq('id', user.id)
+        .single()
+
+      const currentSettings = userData?.settings || {}
+      const newPinnedIds = [...pinnedSpaceIds, space.id]
+
+      const { error } = await supabase
+        .from('users')
+        .update({
+          settings: {
+            ...currentSettings,
+            pinned_spaces: newPinnedIds,
+          },
+        })
+        .eq('id', user.id)
+
+      if (error) throw error
+
+      setPinnedSpaceIds(newPinnedIds)
+      showSuccessToast(`Pinned "${space.name}" to Quick Access`)
+      
+      // Dispatch event to refresh SpaceSwitcher
+      window.dispatchEvent(new CustomEvent('pinned-spaces-updated'))
+    } catch (error) {
+      console.error('Error pinning space:', error)
+      showErrorToast(error, 'Failed to pin space')
+    }
+  }
+
+  async function handleUnpinSpace(space: Space) {
+    const { data: { user } } = await supabase.auth.getUser()
+    if (!user) return
+
+    try {
+      const { data: userData } = await supabase
+        .from('users')
+        .select('settings')
+        .eq('id', user.id)
+        .single()
+
+      const currentSettings = userData?.settings || {}
+      const newPinnedIds = pinnedSpaceIds.filter(id => id !== space.id)
+
+      const { error } = await supabase
+        .from('users')
+        .update({
+          settings: {
+            ...currentSettings,
+            pinned_spaces: newPinnedIds,
+          },
+        })
+        .eq('id', user.id)
+
+      if (error) throw error
+
+      setPinnedSpaceIds(newPinnedIds)
+      showSuccessToast(`Unpinned "${space.name}" from Quick Access`)
+      
+      // Dispatch event to refresh SpaceSwitcher
+      window.dispatchEvent(new CustomEvent('pinned-spaces-updated'))
+    } catch (error) {
+      console.error('Error unpinning space:', error)
+      showErrorToast(error, 'Failed to unpin space')
+    }
+  }
+
+  function handleManagePinsSuccess() {
+    // Refresh pinned spaces
+    async function refresh() {
+      const { data: { user } } = await supabase.auth.getUser()
+      if (!user) return
+
+      const { data: userData } = await supabase
+        .from('users')
+        .select('settings')
+        .eq('id', user.id)
+        .single()
+
+      const pinnedIds: string[] = userData?.settings?.pinned_spaces || []
+      setPinnedSpaceIds(pinnedIds)
+    }
+    refresh()
+  }
 
   const renderSpaceIcon = (iconName: string | null, fallback: string) => {
     if (iconName) {
@@ -215,9 +338,28 @@ export default function SpacesPage() {
                               onEditOpen()
                             } else if (key === 'delete') {
                               handleDeleteSpace(space)
+                            } else if (key === 'pin') {
+                              handlePinSpace(space)
+                            } else if (key === 'unpin') {
+                              handleUnpinSpace(space)
                             }
                           }}
                         >
+                          {pinnedSpaceIds.includes(space.id) ? (
+                            <DropdownItem
+                              key="unpin"
+                              startContent={<PinOff className="w-4 h-4" />}
+                            >
+                              Unpin from Quick Access
+                            </DropdownItem>
+                          ) : (
+                            <DropdownItem
+                              key="pin"
+                              startContent={<Pin className="w-4 h-4" />}
+                            >
+                              Pin to Quick Access
+                            </DropdownItem>
+                          )}
                           <DropdownItem
                             key="edit"
                             startContent={<Edit className="w-4 h-4" />}
@@ -313,6 +455,18 @@ export default function SpacesPage() {
           </ModalFooter>
         </ModalContent>
       </Modal>
+
+      {/* Manage Pinned Spaces Modal */}
+      <ManagePinnedSpacesModal
+        isOpen={isManagePinsOpen}
+        onClose={() => {
+          onManagePinsClose()
+          setSpaceToPin(null)
+        }}
+        currentPinnedSpaces={spaces.filter(s => pinnedSpaceIds.includes(s.id))}
+        spaceToAdd={spaceToPin}
+        onSuccess={handleManagePinsSuccess}
+      />
     </div>
   )
 }
