@@ -81,11 +81,11 @@ export default function BookBuilder({ projectId, spaceId, userId }: BookBuilderP
         .from('books')
         .select('*')
         .eq('project_id', projectId)
-        .single()
+        .maybeSingle()
 
-      if (bookError && bookError.code !== 'PGRST116') {
-        // PGRST116 = not found, which is fine
-        throw bookError
+      if (bookError) {
+        console.error('Error loading book:', bookError)
+        // Don't throw - just treat as no book
       }
 
       if (bookData) {
@@ -137,7 +137,7 @@ export default function BookBuilder({ projectId, spaceId, userId }: BookBuilderP
         .from('projects')
         .select('name')
         .eq('id', projectId)
-        .single()
+        .maybeSingle()
 
       const { data, error } = await supabase
         .from('books')

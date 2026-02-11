@@ -162,6 +162,8 @@ export default function TaskDetailModal({
   const [viewFileUrl, setViewFileUrl] = useState<string | null>(null)
   const [isEditing, setIsEditing] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+  const notesAutoSaveRef = useRef<NodeJS.Timeout | null>(null)
+  const lastSavedNotesRef = useRef<string>('')
   
   const supabase = createClient()
 
@@ -203,6 +205,9 @@ export default function TaskDetailModal({
         } else {
           setSubItems([])
         }
+        
+        // Track last saved notes for auto-save comparison
+        lastSavedNotesRef.current = taskData.notes || ''
       }
       loadFreshTask()
       setIsEditing(false)
@@ -210,6 +215,41 @@ export default function TaskDetailModal({
       loadDropdownData(task.space_id)
     }
   }, [task, isOpen])
+
+  // Auto-save notes with debounce
+  useEffect(() => {
+    if (!task || !isOpen) return
+    
+    // Only auto-save if notes changed from last saved value
+    if (formData.notes === lastSavedNotesRef.current) return
+    
+    // Clear existing timer
+    if (notesAutoSaveRef.current) {
+      clearTimeout(notesAutoSaveRef.current)
+    }
+    
+    // Set new timer for 1.5 seconds after typing stops
+    notesAutoSaveRef.current = setTimeout(async () => {
+      try {
+        const { error } = await supabase
+          .from('tasks')
+          .update({ notes: formData.notes || null })
+          .eq('id', task.id)
+        if (!error) {
+          lastSavedNotesRef.current = formData.notes
+          // Subtle feedback - no toast, just silent save
+        }
+      } catch (e) {
+        console.error('Auto-save notes failed:', e)
+      }
+    }, 1500)
+    
+    return () => {
+      if (notesAutoSaveRef.current) {
+        clearTimeout(notesAutoSaveRef.current)
+      }
+    }
+  }, [formData.notes, task?.id, isOpen])
 
   async function loadDropdownData(spaceId: string | null) {
     setLoadingData(true)

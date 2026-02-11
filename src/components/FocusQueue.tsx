@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { Card, CardBody, CardHeader, Button, Chip, Progress, Dropdown, DropdownTrigger, DropdownMenu, DropdownItem, DropdownSection, Popover, PopoverTrigger, PopoverContent } from '@heroui/react'
-import { Zap, Pause, Play, Check, RotateCcw, ExternalLink, UserPlus, Clock, ChevronDown, User, Bot } from 'lucide-react'
+import { Zap, Pause, Play, Check, RotateCcw, ExternalLink, UserPlus, Clock, ChevronDown, User, Bot, SkipForward } from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import { useCelebrations } from '@/hooks/useCelebrations'
 import { showErrorToast, showSuccessToast } from '@/lib/errors'
@@ -203,17 +203,30 @@ export default function FocusQueue({ tasks, todayCompletedCount = 0, onTaskCompl
       return
     }
     
-    // Fall back to DB state (from task props)
-    if (currentTask.focus_sessions && currentTask.focus_sessions.length > 0) {
-      setSessions(currentTask.focus_sessions)
-      setSessionCount(currentTask.focus_sessions.length)
-      const totalElapsed = currentTask.focus_sessions.reduce((sum, s) => sum + (s.duration_ms || 0), 0)
-      setElapsedMs(totalElapsed)
+    // Fetch fresh state from DB (props may be stale)
+    async function loadFromDB() {
+      const { data: freshTask } = await supabase
+        .from('tasks')
+        .select('timer_state, current_session_start, focus_sessions, total_session_count')
+        .eq('id', currentTaskId)
+        .single()
+      
+      if (freshTask) {
+        if (freshTask.focus_sessions && freshTask.focus_sessions.length > 0) {
+          setSessions(freshTask.focus_sessions)
+          setSessionCount(freshTask.focus_sessions.length)
+          const totalElapsed = freshTask.focus_sessions.reduce((sum: number, s: any) => sum + (s.duration_ms || 0), 0)
+          setElapsedMs(totalElapsed)
+        }
+        if (freshTask.timer_state === 'running' && freshTask.current_session_start) {
+          sessionStartRef.current = new Date(freshTask.current_session_start).getTime()
+          setTimerState('running')
+        } else if (freshTask.timer_state === 'paused') {
+          setTimerState('paused')
+        }
+      }
     }
-    if (currentTask.timer_state === 'running' && currentTask.current_session_start) {
-      sessionStartRef.current = new Date(currentTask.current_session_start).getTime()
-      setTimerState('running')
-    }
+    loadFromDB()
   }, [currentTask?.id])
 
   // Fetch team members for handoff
@@ -552,6 +565,64 @@ export default function FocusQueue({ tasks, todayCompletedCount = 0, onTaskCompl
     saveTimerState('stopped', [])
   }, [clearLocalStorage])
 
+  // Skip task - move to end of queue, keep timer state
+  const skipTask = useCallback(async () => {
+    if (!currentTask) return
+    
+    // Complete current session if running
+    let finalSessions = sessions
+    if (timerState === 'running' && sessionStartRef.current) {
+      const duration = Date.now() - sessionStartRef.current
+      finalSessions = sessions.map((s, i) => 
+        i === sessions.length - 1 
+          ? { ...s, end: new Date().toLocaleTimeString(), duration_ms: duration }
+          : s
+      )
+      if (timerRef.current) clearInterval(timerRef.current)
+    }
+    
+    // Get the highest focus_queue_order to put this at the end
+    const { data: maxOrderTask } = await supabase
+      .from('tasks')
+      .select('focus_queue_order')
+      .not('focus_queue_order', 'is', null)
+      .order('focus_queue_order', { ascending: false })
+      .limit(1)
+      .single()
+    
+    const newOrder = (maxOrderTask?.focus_queue_order ?? 0) + 1
+    
+    try {
+      // Save current timer state and move to end of queue
+      await supabase
+        .from('tasks')
+        .update({
+          focus_queue_order: newOrder,
+          timer_state: timerState === 'running' ? 'paused' : timerState,
+          current_session_start: null,
+          focus_sessions: finalSessions,
+          total_session_count: finalSessions.length,
+          total_time_spent_ms: finalSessions.reduce((sum, s) => sum + (s.duration_ms || 0), 0)
+        })
+        .eq('id', currentTask.id)
+      
+      showSuccessToast('Skipped — moved to end of queue')
+      
+      // Reset local state for next task
+      setTimerState('stopped')
+      setSessions([])
+      setSessionCount(1)
+      setElapsedMs(0)
+      sessionStartRef.current = null
+      clearLocalStorage()
+      
+      onRefresh?.()
+    } catch (error) {
+      console.error('Error skipping task:', error)
+      showErrorToast(error, 'Failed to skip task')
+    }
+  }, [currentTask, sessions, timerState, clearLocalStorage, onRefresh])
+
   const getSessionBadgeStyle = () => {
     if (sessionCount >= 5) return 'bg-red-500 text-white'
     if (sessionCount >= 3) return 'bg-yellow-500 text-white'
@@ -844,16 +915,42 @@ export default function FocusQueue({ tasks, todayCompletedCount = 0, onTaskCompl
                     </div>
                   </PopoverContent>
                 </Popover>
+                
+                {/* Skip button */}
+                <Button 
+                  variant="flat"
+                  onPress={skipTask}
+                  startContent={<SkipForward className="w-4 h-4" />}
+                >
+                  Skip
+                </Button>
               </>
             )}
             {timerState === 'stopped' && sessions.length > 0 && (
-              <Button 
-                variant="flat" 
-                onPress={resetTimer}
-                startContent={<RotateCcw className="w-4 h-4" />}
-              >
-                Reset
-              </Button>
+              <>
+                <Button 
+                  color="success" 
+                  onPress={finishTask}
+                  startContent={<Check className="w-4 h-4" />}
+                  className="font-bold"
+                >
+                  Done ✓
+                </Button>
+                <Button 
+                  variant="flat"
+                  onPress={skipTask}
+                  startContent={<SkipForward className="w-4 h-4" />}
+                >
+                  Skip
+                </Button>
+                <Button 
+                  variant="flat" 
+                  onPress={resetTimer}
+                  startContent={<RotateCcw className="w-4 h-4" />}
+                >
+                  Reset
+                </Button>
+              </>
             )}
           </div>
 
