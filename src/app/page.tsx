@@ -722,6 +722,15 @@ export default function Home() {
   };
 
   const handleTaskEdit = () => {
+    if (selectedTask) {
+      setTaskEditData({
+        title: selectedTask.title || '',
+        description: selectedTask.description || '',
+        status: selectedTask.status || 'todo',
+        priority: selectedTask.priority || 'medium',
+        due_date: selectedTask.due_date || '',
+      });
+    }
     setIsEditingTask(true);
   };
 

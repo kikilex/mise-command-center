@@ -922,11 +922,11 @@ export default function ChatWidget() {
   /* ================================================================ */
 
   return (
-    <div className="fixed bottom-6 right-6 z-[100] flex flex-col items-end gap-4">
+    <div className="fixed bottom-6 right-6 z-[40] flex flex-col items-end gap-4">
       {isOpen && (
         <div
           style={isMobile ? undefined : { width: size.w, height: size.h }}
-          className="fixed inset-0 md:inset-auto md:relative bg-white dark:bg-slate-900 md:rounded-2xl shadow-2xl md:border border-slate-200 dark:border-slate-800 flex overflow-hidden md:mb-2 animate-in fade-in slide-in-from-bottom-4 duration-200 z-[101] md:z-auto"
+          className="fixed inset-0 md:inset-auto md:relative bg-white dark:bg-slate-900 md:rounded-2xl shadow-2xl md:border border-slate-200 dark:border-slate-800 flex overflow-hidden md:mb-2 animate-in fade-in slide-in-from-bottom-4 duration-200 z-[41] md:z-auto"
         >
           {/* resize handle — top-left corner (hidden on mobile) */}
           <div
