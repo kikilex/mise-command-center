@@ -1,7 +1,6 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
-import { useRouter } from 'next/navigation'
 import { motion, AnimatePresence } from 'framer-motion'
 import * as LucideIcons from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
@@ -18,15 +17,20 @@ export default function SpaceSwitcher() {
   const [isOpen, setIsOpen] = useState(false)
   const [pinnedSpaces, setPinnedSpaces] = useState<PinnedSpace[]>([])
   const [loading, setLoading] = useState(true)
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
   const { currentSpace, setCurrentSpace, spaces } = useSpace()
-  const router = useRouter()
   const supabase = createClient()
 
   const fetchPinnedSpaces = useCallback(async () => {
     try {
-      // Get current user's settings
       const { data: { user } } = await supabase.auth.getUser()
-      if (!user) return
+      if (!user) {
+        setIsAuthenticated(false)
+        setPinnedSpaces([])
+        return
+      }
+      
+      setIsAuthenticated(true)
 
       const { data: userData } = await supabase
         .from('users')
@@ -61,11 +65,26 @@ export default function SpaceSwitcher() {
     }
   }, [supabase])
 
+  // Initial fetch
   useEffect(() => {
     fetchPinnedSpaces()
   }, [fetchPinnedSpaces])
 
-  // Listen for pinned spaces updates
+  // Listen for auth state changes (login/logout)
+  useEffect(() => {
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((event) => {
+      if (event === 'SIGNED_IN') {
+        fetchPinnedSpaces()
+      } else if (event === 'SIGNED_OUT') {
+        setPinnedSpaces([])
+        setIsAuthenticated(false)
+      }
+    })
+
+    return () => subscription.unsubscribe()
+  }, [supabase, fetchPinnedSpaces])
+
+  // Listen for pinned spaces updates (from Spaces page)
   useEffect(() => {
     const handlePinnedUpdate = () => {
       fetchPinnedSpaces()
@@ -75,13 +94,17 @@ export default function SpaceSwitcher() {
   }, [fetchPinnedSpaces])
 
   const handleSpaceClick = (space: PinnedSpace) => {
-    // Find full space data from context
+    // Update context if we have the full space data
     const fullSpace = spaces.find(s => s.id === space.id)
     if (fullSpace) {
       setCurrentSpace(fullSpace)
     }
-    router.push(`/spaces/${space.id}`)
+    
+    // Close drawer first
     setIsOpen(false)
+    
+    // Navigate using window.location for reliability
+    window.location.href = `/spaces/${space.id}`
   }
 
   const renderIcon = (iconName: string | null, fallbackName: string, color: string | null) => {
@@ -92,7 +115,7 @@ export default function SpaceSwitcher() {
       if (Icon) {
         return (
           <div
-            className="w-14 h-14 rounded-[16px] flex items-center justify-center text-white shadow-md transition-transform hover:scale-105 active:scale-95"
+            className="w-14 h-14 rounded-[16px] flex items-center justify-center text-white shadow-md"
             style={{ backgroundColor: bgColor }}
           >
             <Icon className="w-7 h-7" />
@@ -104,7 +127,7 @@ export default function SpaceSwitcher() {
     // Fallback to first letter
     return (
       <div
-        className="w-14 h-14 rounded-[16px] flex items-center justify-center text-white text-xl font-bold shadow-md transition-transform hover:scale-105 active:scale-95"
+        className="w-14 h-14 rounded-[16px] flex items-center justify-center text-white text-xl font-bold shadow-md"
         style={{ backgroundColor: bgColor }}
       >
         {fallbackName.charAt(0).toUpperCase()}
@@ -112,8 +135,13 @@ export default function SpaceSwitcher() {
     )
   }
 
-  // Don't render if no pinned spaces
-  if (!loading && pinnedSpaces.length === 0) {
+  // Don't render if not authenticated or no pinned spaces
+  if (!isAuthenticated || (!loading && pinnedSpaces.length === 0)) {
+    return null
+  }
+
+  // Don't render while loading
+  if (loading) {
     return null
   }
 
@@ -136,7 +164,7 @@ export default function SpaceSwitcher() {
       {/* Collapsed Tab */}
       <AnimatePresence>
         {!isOpen && (
-          <motion.button
+          <motion.div
             initial={{ opacity: 0, x: -24 }}
             animate={{ opacity: 1, x: 0 }}
             exit={{ opacity: 0, x: -24 }}
@@ -150,6 +178,8 @@ export default function SpaceSwitcher() {
               border: '1px solid rgba(0,0,0,0.08)',
               borderLeft: 'none',
             }}
+            role="button"
+            tabIndex={0}
             aria-label="Open space switcher"
           >
             <div 
@@ -158,7 +188,7 @@ export default function SpaceSwitcher() {
                 background: 'linear-gradient(180deg, #a855f7 0%, #7c3aed 100%)',
               }}
             />
-          </motion.button>
+          </motion.div>
         )}
       </AnimatePresence>
 
@@ -171,7 +201,6 @@ export default function SpaceSwitcher() {
             exit={{ opacity: 0, x: -100 }}
             transition={{ duration: 0.3, ease: [0.4, 0, 0.2, 1] }}
             className="fixed left-0 top-1/2 -translate-y-1/2 z-[1000] p-4 pr-6"
-            onClick={(e) => e.stopPropagation()}
             style={{
               background: 'rgba(255, 255, 255, 0.95)',
               backdropFilter: 'blur(20px)',
@@ -183,34 +212,38 @@ export default function SpaceSwitcher() {
             }}
           >
             {/* Close handle */}
-            <button
+            <div
               onClick={() => setIsOpen(false)}
               className="absolute right-2 top-1/2 -translate-y-1/2 w-1 h-10 bg-gray-300 hover:bg-gray-400 rounded-full transition-colors cursor-pointer"
+              role="button"
               aria-label="Close space switcher"
             />
 
             {/* Pinned spaces */}
-            <div className="flex flex-col gap-3" onClick={(e) => e.stopPropagation()}>
+            <div className="flex flex-col gap-3">
               {pinnedSpaces.map((space) => (
-                <button
-                  type="button"
+                <a
                   key={space.id}
+                  href={`/spaces/${space.id}`}
                   onClick={(e) => {
                     e.preventDefault()
-                    e.stopPropagation()
                     handleSpaceClick(space)
                   }}
-                  className={`flex flex-col items-center gap-1 cursor-pointer transition-all ${
+                  className={`flex flex-col items-center gap-1 cursor-pointer transition-all no-underline ${
                     currentSpace?.id === space.id ? 'opacity-100' : 'opacity-80 hover:opacity-100'
                   }`}
                 >
-                  <div className={currentSpace?.id === space.id ? 'ring-3 ring-violet-400 ring-offset-2 rounded-[18px]' : ''}>
+                  <div 
+                    className={`transition-transform hover:scale-105 active:scale-95 ${
+                      currentSpace?.id === space.id ? 'ring-3 ring-violet-400 ring-offset-2 rounded-[18px]' : ''
+                    }`}
+                  >
                     {renderIcon(space.icon, space.name, space.color)}
                   </div>
                   <span className="text-xs font-medium text-gray-600 max-w-[64px] truncate">
                     {space.name}
                   </span>
-                </button>
+                </a>
               ))}
             </div>
           </motion.div>
