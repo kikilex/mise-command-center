@@ -32,6 +32,8 @@ import {
   DrawerBody,
   DrawerFooter,
   Tooltip,
+  Tabs,
+  Tab,
 } from '@heroui/react'
 import { 
   ArrowLeft, Plus, Pin, FileText, Link as LinkIcon, 
@@ -39,13 +41,15 @@ import {
   CheckCircle2, Circle, MessageSquare, GripVertical,
   User, Calendar, ChevronDown, ChevronUp, Users,
   Bold, Italic, Highlighter, RotateCcw, Save,
-  Upload, File, Image as ImageIcon, Search, StickyNote, CheckSquare, Sun
+  Upload, File, Image as ImageIcon, Search, StickyNote, CheckSquare, Sun,
+  BookOpen, LayoutList
 } from 'lucide-react'
 import * as LucideIcons from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
 import Navbar from '@/components/Navbar'
 import RichTextEditor from '@/components/RichTextEditor'
 import TaskDetailModal from '@/components/TaskDetailModal'
+import BookBuilder from '@/components/BookBuilder'
 import { showErrorToast, showSuccessToast } from '@/lib/errors'
 import { formatDistanceToNow, format } from 'date-fns'
 import ReactMarkdown from 'react-markdown'
@@ -162,6 +166,8 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
   const [showCompleted, setShowCompleted] = useState(false)
+  const [selectedTab, setSelectedTab] = useState<string>('overview')
+  const [hasBook, setHasBook] = useState(false)
   const [newUpdate, setNewUpdate] = useState('')
   const [posting, setPosting] = useState(false)
 
@@ -360,6 +366,14 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
         .single()
       if (projectError) throw projectError
       setProject(projectData)
+
+      // Check if project has a book
+      const { data: bookData } = await supabase
+        .from('books')
+        .select('id')
+        .eq('project_id', id)
+        .single()
+      setHasBook(!!bookData)
 
       // Load phases with items
       const { data: phasesData } = await supabase
@@ -1425,6 +1439,46 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
           </div>
         </div>
 
+        {/* Tabs */}
+        <Tabs
+          selectedKey={selectedTab}
+          onSelectionChange={(key) => setSelectedTab(key as string)}
+          variant="underlined"
+          classNames={{
+            tabList: 'gap-6 mb-6',
+            tab: 'px-0 h-10',
+          }}
+        >
+          <Tab
+            key="overview"
+            title={
+              <div className="flex items-center gap-2">
+                <LayoutList className="w-4 h-4" />
+                <span>Overview</span>
+              </div>
+            }
+          />
+          <Tab
+            key="book"
+            title={
+              <div className="flex items-center gap-2">
+                <BookOpen className="w-4 h-4" />
+                <span>Book</span>
+                {!hasBook && (
+                  <Chip size="sm" variant="flat" color="default" className="ml-1">
+                    New
+                  </Chip>
+                )}
+              </div>
+            }
+          />
+        </Tabs>
+
+        {/* Tab Content */}
+        {selectedTab === 'book' ? (
+          <BookBuilder projectId={id} spaceId={project.space_id} userId={user?.id || ''} />
+        ) : (
+        <>
         {/* Phases */}
         <div className="mb-6">
           <div className="flex items-center justify-between mb-4">
@@ -1922,6 +1976,8 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
             )}
           </CardBody>
         </Card>
+        </>
+        )}
       </main>
 
       {/* Add Phase Modal */}
