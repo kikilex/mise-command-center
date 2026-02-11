@@ -49,7 +49,7 @@ import { createClient } from '@/lib/supabase/client'
 import Navbar from '@/components/Navbar'
 import RichTextEditor from '@/components/RichTextEditor'
 import TaskDetailModal from '@/components/TaskDetailModal'
-import BookBuilder from '@/components/BookBuilder'
+// import BookBuilder from '@/components/BookBuilder'
 import { showErrorToast, showSuccessToast } from '@/lib/errors'
 import { formatDistanceToNow, format } from 'date-fns'
 import ReactMarkdown from 'react-markdown'
@@ -1476,7 +1476,7 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
 
         {/* Tab Content */}
         {selectedTab === 'book' ? (
-          <BookBuilder projectId={id} spaceId={project.space_id} userId={user?.id || ''} />
+          <div className="p-8 text-center text-default-400">Book Builder temporarily disabled</div>
         ) : (
         <>
         {/* Phases */}
