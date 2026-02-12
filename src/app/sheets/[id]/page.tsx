@@ -133,6 +133,7 @@ export default function SpreadsheetPage() {
   const [showMentions, setShowMentions] = useState(false)
   const [mentionFilter, setMentionFilter] = useState('')
   const commentInputRef = useRef<HTMLInputElement>(null)
+  const [avatarMap, setAvatarMap] = useState<Map<string, string>>(new Map())
   
   const autoSaveTimeout = useRef<NodeJS.Timeout | null>(null)
   const pendingData = useRef<SpreadsheetData | null>(null)
@@ -140,6 +141,7 @@ export default function SpreadsheetPage() {
   useEffect(() => {
     loadUser()
     loadSpreadsheet()
+    loadAvatars()
     
     return () => {
       if (autoSaveTimeout.current) {
@@ -147,6 +149,22 @@ export default function SpreadsheetPage() {
       }
     }
   }, [id])
+
+  async function loadAvatars() {
+    const { data: usersData } = await supabase.from('users').select('slug, name, avatar_url')
+    const { data: agentsData } = await supabase.from('ai_agents').select('slug, avatar_url')
+    const avatars = new Map<string, string>()
+    usersData?.forEach(u => { 
+      if (u.avatar_url) {
+        avatars.set(u.slug?.toLowerCase() || '', u.avatar_url)
+        avatars.set(u.name?.toLowerCase() || '', u.avatar_url)
+      }
+    })
+    agentsData?.forEach(a => { 
+      if (a.avatar_url) avatars.set(a.slug?.toLowerCase() || '', a.avatar_url)
+    })
+    setAvatarMap(avatars)
+  }
 
   useEffect(() => {
     if (spreadsheet) {
@@ -868,7 +886,7 @@ export default function SpreadsheetPage() {
             ) : (
               comments.map(comment => (
                 <div key={comment.id} className="flex gap-3">
-                  <Avatar name={comment.author_name} size="sm" className="flex-shrink-0" />
+                  <Avatar name={comment.author_name} src={avatarMap.get(comment.author_name?.toLowerCase() || '')} size="sm" className="flex-shrink-0" />
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
                       <span className="text-sm font-medium text-slate-700 dark:text-slate-300">{comment.author_name}</span>
@@ -921,7 +939,7 @@ export default function SpreadsheetPage() {
                     className="w-full px-3 py-2 text-left text-sm hover:bg-slate-100 dark:hover:bg-slate-700 flex items-center gap-2"
                     onClick={() => insertMention(r.name)}
                   >
-                    <User className="w-4 h-4 text-slate-400" />
+                    <Avatar name={r.name} src={avatarMap.get(r.id.toLowerCase())} size="sm" className="w-6 h-6" />
                     <span>{r.name}</span>
                     <span className="text-xs text-slate-400">({r.type})</span>
                   </button>
