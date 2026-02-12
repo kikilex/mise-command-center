@@ -42,7 +42,7 @@ import {
   User, Calendar, ChevronDown, ChevronUp, Users,
   Bold, Italic, Highlighter, RotateCcw, Save,
   Upload, File, Image as ImageIcon, Search, StickyNote, CheckSquare, Sun,
-  BookOpen, LayoutList
+  BookOpen, LayoutList, Table2
 } from 'lucide-react'
 import * as LucideIcons from 'lucide-react'
 import { createClient } from '@/lib/supabase/client'
@@ -1594,6 +1594,44 @@ export default function ProjectPage({ params }: { params: Promise<{ id: string }
                 </Button>
                 <Button size="sm" variant="flat" startContent={<FileText className="w-4 h-4" />} onPress={openDocModal}>
                   Doc
+                </Button>
+                <Button 
+                  size="sm" 
+                  variant="flat" 
+                  startContent={<Table2 className="w-4 h-4" />} 
+                  onPress={async () => {
+                    if (!user) return toast.error('Please sign in')
+                    try {
+                      const { data, error } = await supabase
+                        .from('spreadsheets')
+                        .insert({
+                          title: 'Untitled Spreadsheet',
+                          space_id: project?.space_id || null,
+                          project_id: id,
+                          created_by: user.id,
+                          data: {
+                            columns: [
+                              { id: 'A', name: 'A', width: 120 },
+                              { id: 'B', name: 'B', width: 120 },
+                              { id: 'C', name: 'C', width: 120 },
+                            ],
+                            rows: [
+                              { id: '1', cells: {} },
+                              { id: '2', cells: {} },
+                              { id: '3', cells: {} },
+                            ],
+                          },
+                        })
+                        .select().single()
+                      if (error) throw error
+                      router.push(`/sheets/${data.id}`)
+                    } catch (error) {
+                      console.error('Create spreadsheet error:', error)
+                      toast.error('Failed to create spreadsheet')
+                    }
+                  }}
+                >
+                  Sheet
                 </Button>
                 <Button size="sm" variant="flat" startContent={<StickyNote className="w-4 h-4" />} onPress={() => {
                   setEditingNoteId(null)

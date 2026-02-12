@@ -887,33 +887,78 @@ export default function SpaceDetailPage() {
                   <h2 className="text-xl font-semibold text-foreground">Documents</h2>
                   <p className="text-sm text-default-500 mt-1">Research and intel in this space</p>
                 </div>
-                <Button 
-                  color="primary" 
-                  startContent={<Plus className="w-4 h-4" />}
-                  onPress={async () => {
-                    if (!user) return toast.error('Please sign in')
-                    try {
-                      const { data, error } = await supabase
-                        .from('documents')
-                        .insert({
-                          title: 'Untitled Document',
-                          content: '',
-                          status: 'draft',
-                          created_by: user.id,
-                          space_id: id,
-                          doc_type: 'document',
-                        })
-                        .select().single()
-                      if (error) throw error
-                      router.push(`/docs/${data.id}/edit`)
-                    } catch (error) {
-                      console.error('Create doc error:', error)
-                      toast.error('Failed to create document')
-                    }
-                  }}
-                >
-                  New Doc
-                </Button>
+                <Dropdown>
+                  <DropdownTrigger>
+                    <Button color="primary" startContent={<Plus className="w-4 h-4" />}>
+                      New
+                    </Button>
+                  </DropdownTrigger>
+                  <DropdownMenu aria-label="Create new item">
+                    <DropdownItem
+                      key="document"
+                      startContent={<FileText className="w-4 h-4" />}
+                      onPress={async () => {
+                        if (!user) return toast.error('Please sign in')
+                        try {
+                          const { data, error } = await supabase
+                            .from('documents')
+                            .insert({
+                              title: 'Untitled Document',
+                              content: '',
+                              status: 'draft',
+                              created_by: user.id,
+                              space_id: id,
+                              doc_type: 'document',
+                            })
+                            .select().single()
+                          if (error) throw error
+                          router.push(`/docs/${data.id}/edit`)
+                        } catch (error) {
+                          console.error('Create doc error:', error)
+                          toast.error('Failed to create document')
+                        }
+                      }}
+                    >
+                      Document
+                    </DropdownItem>
+                    <DropdownItem
+                      key="spreadsheet"
+                      startContent={<LucideIcons.Table2 className="w-4 h-4" />}
+                      onPress={async () => {
+                        if (!user) return toast.error('Please sign in')
+                        try {
+                          const { data, error } = await supabase
+                            .from('spreadsheets')
+                            .insert({
+                              title: 'Untitled Spreadsheet',
+                              space_id: id,
+                              created_by: user.id,
+                              data: {
+                                columns: [
+                                  { id: 'A', name: 'A', width: 120 },
+                                  { id: 'B', name: 'B', width: 120 },
+                                  { id: 'C', name: 'C', width: 120 },
+                                ],
+                                rows: [
+                                  { id: '1', cells: {} },
+                                  { id: '2', cells: {} },
+                                  { id: '3', cells: {} },
+                                ],
+                              },
+                            })
+                            .select().single()
+                          if (error) throw error
+                          router.push(`/sheets/${data.id}`)
+                        } catch (error) {
+                          console.error('Create spreadsheet error:', error)
+                          toast.error('Failed to create spreadsheet')
+                        }
+                      }}
+                    >
+                      Spreadsheet
+                    </DropdownItem>
+                  </DropdownMenu>
+                </Dropdown>
               </div>
 
               {documents.length === 0 ? (

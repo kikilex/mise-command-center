@@ -267,6 +267,19 @@ export default function ChatWidget() {
   /*  Effects                                                          */
   /* ================================================================ */
 
+  // Load avatars immediately on mount (before other data loads)
+  useEffect(() => {
+    async function loadAvatars() {
+      const { data: usersData } = await supabase.from('users').select('slug, avatar_url')
+      const { data: agentsData } = await supabase.from('ai_agents').select('slug, avatar_url')
+      const avatars = new Map<string, string>()
+      usersData?.forEach(u => { if (u.avatar_url) avatars.set(u.slug, u.avatar_url) })
+      agentsData?.forEach(a => { if (a.avatar_url) avatars.set(a.slug, a.avatar_url) })
+      setAvatarMap(avatars)
+    }
+    loadAvatars()
+  }, [])
+
   useEffect(() => {
     loadInitialData()
 

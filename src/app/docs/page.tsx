@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation'
 import { 
   FileText, Search, Plus, Clock, Tag, Archive, Eye, EyeOff,
   X, Check, Folder, Settings, Pencil, ListFilter, NotebookPen, Users, Globe,
-  MessageSquare, Send, RotateCcw
+  MessageSquare, Send, RotateCcw, Table2, ChevronDown
 } from 'lucide-react'
 import {
   Button,
@@ -24,6 +24,10 @@ import {
   Textarea,
   Divider,
   Avatar,
+  Dropdown,
+  DropdownTrigger,
+  DropdownMenu,
+  DropdownItem,
 } from '@heroui/react'
 import { createClient } from '@/lib/supabase/client'
 import { useSpace } from '@/lib/space-context'
@@ -52,6 +56,17 @@ interface Document {
   doc_type: 'document' | 'note'
   tasks?: { title: string } | null
   projects?: { name: string } | null
+  creator?: { id: string; name: string; display_name: string; avatar_url: string } | null
+}
+
+interface Spreadsheet {
+  id: string
+  title: string
+  space_id: string | null
+  created_by: string | null
+  created_at: string
+  updated_at: string
+  spaces?: { name: string; color: string } | null
   creator?: { id: string; name: string; display_name: string; avatar_url: string } | null
 }
 
@@ -180,6 +195,9 @@ function DocsPageContent() {
   const [mentionFilter, setMentionFilter] = useState('')
   const MENTION_USERS = ['Alex', 'Mom', 'Ax', 'Tony', 'Neo']
   
+  // Spreadsheets state
+  const [spreadsheets, setSpreadsheets] = useState<Spreadsheet[]>([])
+  
   const supabase = createClient()
   const router = useRouter()
   const { selectedSpaceId } = useSpace()
@@ -191,6 +209,7 @@ function DocsPageContent() {
   useEffect(() => {
     loadDocuments()
     loadSpaces()
+    loadSpreadsheets()
   }, [selectedSpaceId])
 
   async function loadUser() {
@@ -251,6 +270,20 @@ function DocsPageContent() {
     }
   }
 
+  async function loadSpreadsheets() {
+    try {
+      const { data, error } = await supabase
+        .from('spreadsheets')
+        .select('*, spaces:space_id (name, color), creator:created_by (id, name, display_name, avatar_url)')
+        .order('updated_at', { ascending: false })
+
+      if (error) throw error
+      setSpreadsheets(data || [])
+    } catch (error) {
+      console.error('Load spreadsheets error:', error)
+    }
+  }
+
   async function handleCreateDocument() {
     if (!user) return showErrorToast(null, 'Please sign in');
     try {
@@ -269,6 +302,24 @@ function DocsPageContent() {
       router.push(`/docs/${data.id}/edit`)
     } catch (error) {
       showErrorToast(error, 'Failed to create document')
+    }
+  }
+
+  async function handleCreateSpreadsheet() {
+    if (!user) return showErrorToast(null, 'Please sign in');
+    try {
+      const { data, error } = await supabase
+        .from('spreadsheets')
+        .insert({
+          title: 'Untitled Spreadsheet',
+          created_by: user.id,
+          space_id: selectedSpaceId,
+        })
+        .select().single()
+      if (error) throw error
+      router.push(`/sheets/${data.id}`)
+    } catch (error) {
+      showErrorToast(error, 'Failed to create spreadsheet')
     }
   }
 
@@ -460,6 +511,7 @@ function DocsPageContent() {
   }, [documents])
 
   const filteredDocuments = useMemo(() => {
+    if (docTypeFilter === 'spreadsheet') return [] // Spreadsheets handled separately
     return documents.filter(doc => {
       if (docTypeFilter !== 'all' && doc.doc_type !== docTypeFilter) return false
       if (!showArchived && doc.archived) return false
@@ -475,6 +527,17 @@ function DocsPageContent() {
       return true
     })
   }, [documents, searchQuery, statusFilter, spaceFilter, docTypeFilter, selectedTags, showArchived, showHidden])
+
+  const filteredSpreadsheets = useMemo(() => {
+    if (docTypeFilter !== 'all' && docTypeFilter !== 'spreadsheet') return []
+    return spreadsheets.filter(sheet => {
+      if (spaceFilter !== 'all' && sheet.space_id !== spaceFilter) return false
+      if (searchQuery) {
+        return sheet.title.toLowerCase().includes(searchQuery.toLowerCase())
+      }
+      return true
+    })
+  }, [spreadsheets, searchQuery, spaceFilter, docTypeFilter])
 
   const getPreview = (content: string) => {
     // Strip HTML tags and markdown symbols
@@ -498,12 +561,37 @@ function DocsPageContent() {
             <h1 className="text-2xl font-bold text-slate-800 dark:text-slate-100">Docs</h1>
           </div>
           <div className="flex gap-2">
-            <Button color="primary" size="sm" onPress={handleCreateDocument} startContent={<FileText className="w-4 h-4" />}>
-              New Doc
-            </Button>
-            <Button color="secondary" size="sm" variant="flat" onPress={handleCreateNote} startContent={<NotebookPen className="w-4 h-4" />}>
-              New Note
-            </Button>
+            <Dropdown>
+              <DropdownTrigger>
+                <Button color="primary" size="sm" endContent={<ChevronDown className="w-4 h-4" />}>
+                  <Plus className="w-4 h-4" />
+                  New
+                </Button>
+              </DropdownTrigger>
+              <DropdownMenu aria-label="Create new item">
+                <DropdownItem
+                  key="document"
+                  startContent={<FileText className="w-4 h-4" />}
+                  onPress={handleCreateDocument}
+                >
+                  Document
+                </DropdownItem>
+                <DropdownItem
+                  key="spreadsheet"
+                  startContent={<Table2 className="w-4 h-4" />}
+                  onPress={handleCreateSpreadsheet}
+                >
+                  Spreadsheet
+                </DropdownItem>
+                <DropdownItem
+                  key="note"
+                  startContent={<NotebookPen className="w-4 h-4" />}
+                  onPress={handleCreateNote}
+                >
+                  Quick Note
+                </DropdownItem>
+              </DropdownMenu>
+            </Dropdown>
           </div>
         </div>
 
@@ -526,6 +614,15 @@ function DocsPageContent() {
             className="rounded-full"
           >
             Documents
+          </Button>
+          <Button
+            size="sm"
+            variant={docTypeFilter === 'spreadsheet' ? 'solid' : 'flat'}
+            color={docTypeFilter === 'spreadsheet' ? 'primary' : 'default'}
+            onPress={() => setDocTypeFilter('spreadsheet')}
+            className="rounded-full"
+          >
+            Spreadsheets
           </Button>
           <Button
             size="sm"
@@ -571,10 +668,43 @@ function DocsPageContent() {
 
         {loading ? (
           <div className="flex items-center justify-center py-20"><Spinner size="lg" /></div>
-        ) : filteredDocuments.length === 0 ? (
-          <Card><CardBody className="text-center py-16 opacity-50"><FileText className="w-12 h-12 mx-auto mb-2" /><p>No docs found.</p></CardBody></Card>
+        ) : filteredDocuments.length === 0 && filteredSpreadsheets.length === 0 ? (
+          <Card><CardBody className="text-center py-16 opacity-50"><FileText className="w-12 h-12 mx-auto mb-2" /><p>No items found.</p></CardBody></Card>
         ) : (
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+            {/* Spreadsheets */}
+            {filteredSpreadsheets.map((sheet) => (
+              <Card key={sheet.id} isPressable onPress={() => router.push(`/sheets/${sheet.id}`)} className="border border-slate-200 dark:border-slate-700">
+                <CardBody className="p-4">
+                  <div className="flex items-start justify-between gap-2 mb-2">
+                    <h3 className="font-semibold line-clamp-1">{sheet.title}</h3>
+                    {sheet.spaces && (
+                      <Chip 
+                        size="sm" 
+                        variant="flat"
+                        style={{ backgroundColor: sheet.spaces.color + '20', color: sheet.spaces.color }}
+                      >
+                        {sheet.spaces.name}
+                      </Chip>
+                    )}
+                  </div>
+                  <p className="text-sm text-slate-500 mb-3">Spreadsheet</p>
+                  <div className="flex items-center justify-between text-[10px] text-slate-400">
+                    <div className="flex items-center gap-3">
+                      {sheet.creator && (
+                        <div className="flex items-center gap-1">
+                          <Avatar src={sheet.creator.avatar_url} name={sheet.creator.display_name || sheet.creator.name} size="sm" className="w-4 h-4" />
+                          <span>{(sheet.creator.display_name || sheet.creator.name || '').split(' ')[0]}</span>
+                        </div>
+                      )}
+                      <span>{new Date(sheet.updated_at).toLocaleDateString()}</span>
+                    </div>
+                    <Table2 className="w-4 h-4 text-emerald-500" />
+                  </div>
+                </CardBody>
+              </Card>
+            ))}
+            {/* Documents & Notes */}
             {filteredDocuments.map((doc) => (
               <Card key={doc.id} isPressable onPress={() => {
                 if (doc.doc_type === 'note') {
