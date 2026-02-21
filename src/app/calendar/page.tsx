@@ -78,7 +78,8 @@ const calendarColors: Record<string, { bg: string; text: string; border: string;
 
 const defaultCalendarColor = { bg: 'bg-slate-100', text: 'text-slate-700', border: 'border-slate-200', darkBg: 'dark:bg-slate-800', darkText: 'dark:text-slate-300' }
 
-const CALENDARS = ['Mise Family', 'Alex\'s Work', 'Ax']
+// Default calendar for new events
+const DEFAULT_CALENDAR = 'Personal'
 
 export default function CalendarPage() {
   const [tasks, setTasks] = useState<Task[]>([])
@@ -91,7 +92,7 @@ export default function CalendarPage() {
   
   // Filter state
   const [enabledSources, setEnabledSources] = useState<string[]>(['tasks', 'content', 'calendar'])
-  const [enabledCalendars, setEnabledCalendars] = useState<string[]>(CALENDARS)
+  const [enabledCalendars, setEnabledCalendars] = useState<string[]>([])
   
   // Event modal state
   const [isEventModalOpen, setIsEventModalOpen] = useState(false)
@@ -105,7 +106,7 @@ export default function CalendarPage() {
     end_time: '',
     all_day: false,
     location: '',
-    calendar_name: 'Mise Family',
+    calendar_name: DEFAULT_CALENDAR,
   })
   const [saving, setSaving] = useState(false)
   
@@ -147,6 +148,14 @@ export default function CalendarPage() {
   useEffect(() => {
     fetchCalendarEvents(currentDate)
   }, [currentDate, fetchCalendarEvents])
+
+  // Auto-enable all calendars when events load
+  useEffect(() => {
+    const cals = [...new Set(calendarEvents.map(e => e.calendar))].filter(Boolean)
+    if (cals.length > 0) {
+      setEnabledCalendars(cals)
+    }
+  }, [calendarEvents])
 
   async function loadData() {
     setLoading(true)
@@ -328,7 +337,7 @@ export default function CalendarPage() {
       end_time: '',
       all_day: false,
       location: '',
-      calendar_name: 'Mise Family',
+      calendar_name: DEFAULT_CALENDAR,
     })
   }
 
@@ -440,7 +449,8 @@ export default function CalendarPage() {
   }
 
   // Get unique calendars from events
-  const availableCalendars = [...new Set([...CALENDARS, ...calendarEvents.map(e => e.calendar)])]
+  // Only show calendars that exist in the user's events
+  const availableCalendars = [...new Set(calendarEvents.map(e => e.calendar))].filter(Boolean)
 
   return (
     <div className="min-h-screen bg-background">
@@ -824,7 +834,7 @@ export default function CalendarPage() {
                   selectedKeys={[eventForm.calendar_name]}
                   onChange={(e) => setEventForm(prev => ({ ...prev, calendar_name: e.target.value }))}
                 >
-                  {CALENDARS.map((cal) => (
+                  {(availableCalendars.length > 0 ? availableCalendars : [DEFAULT_CALENDAR]).map((cal) => (
                     <SelectItem key={cal} textValue={cal}>
                       <span className="flex items-center gap-2">
                         <span className={`w-2 h-2 rounded ${getCalendarColor(cal).bg}`} />
