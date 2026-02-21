@@ -56,6 +56,7 @@ import AgentChat from '@/components/AgentChat'
 import AddTaskModal from '@/components/AddTaskModal'
 import EditAgentModal from '@/components/EditAgentModal'
 import Navbar from '@/components/Navbar'
+import { useRouter } from 'next/navigation'
 
 export type ViewType = 'dashboard' | 'activity' | 'debriefs' | 'tasks'
 
@@ -118,6 +119,8 @@ export default function AIWorkspacePage() {
   const [workLogs, setWorkLogs] = useState<any[]>([])
   const [user, setUser] = useState<any>(null)
   const [loading, setLoading] = useState(true)
+  const [accessDenied, setAccessDenied] = useState(false)
+  const router = useRouter()
   const [currentView, setCurrentView] = useState<ViewType>('dashboard')
   const [selectedTask, setSelectedTask] = useState<AgentTask | null>(null)
   const [selectedAgent, setSelectedAgent] = useState<AIAgent | null>(null)
@@ -156,12 +159,20 @@ export default function AIWorkspacePage() {
     try {
       const { data: { user: authUser } } = await supabase.auth.getUser()
       if (authUser) {
-        // Fetch full profile including avatar
+        // Fetch full profile including avatar and role
         const { data: profile } = await supabase
           .from('users')
           .select('*')
           .eq('id', authUser.id)
           .single()
+        
+        // Check if user has admin/ai role - if not, deny access
+        const userRole = profile?.role || 'member'
+        if (userRole !== 'admin' && userRole !== 'ai') {
+          setAccessDenied(true)
+          setLoading(false)
+          return
+        }
         
         setUser({
           id: authUser.id,
@@ -169,6 +180,10 @@ export default function AIWorkspacePage() {
           name: profile?.name || authUser.email?.split('@')[0],
           avatar_url: profile?.avatar_url,
         })
+      } else {
+        // Not logged in - redirect to login
+        router.push('/login')
+        return
       }
 
       const [agentsRes, tasksRes, logsRes, usersRes, allTasksRes] = await Promise.all([
@@ -817,6 +832,23 @@ export default function AIWorkspacePage() {
             </div>
           )}
         </Card>
+      </div>
+    )
+  }
+
+  // Access denied screen
+  if (accessDenied) {
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950">
+        <Navbar user={user} />
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 py-6">
+          <div className="flex flex-col items-center justify-center h-96 gap-4">
+            <div className="text-6xl">🔒</div>
+            <h1 className="text-2xl font-bold text-slate-900 dark:text-white">Access Denied</h1>
+            <p className="text-slate-500 dark:text-slate-400">You don&apos;t have permission to view this page.</p>
+            <Button color="primary" onPress={() => router.push('/')}>Go to Dashboard</Button>
+          </div>
+        </main>
       </div>
     )
   }
