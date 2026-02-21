@@ -37,6 +37,7 @@ export const BUSINESS_MENU_OPTIONS = [
 interface MenuSettingsContextType {
   menuConfig: MenuConfig
   loading: boolean
+  userRole: string | null
   updateMenuConfig: (config: MenuConfig) => Promise<void>
   getActiveNavItems: (isBusinessMode: boolean) => { key: string; label: string; icon: string; href: string }[]
   refreshMenuSettings: () => Promise<void>
@@ -44,9 +45,13 @@ interface MenuSettingsContextType {
 
 const MenuSettingsContext = createContext<MenuSettingsContextType | undefined>(undefined)
 
+// Items that require admin/ai role
+const ADMIN_ONLY_ITEMS = ['ai']
+
 export function MenuSettingsProvider({ children }: { children: ReactNode }) {
   const [menuConfig, setMenuConfig] = useState<MenuConfig>(DEFAULT_MENU_CONFIG)
   const [loading, setLoading] = useState(true)
+  const [userRole, setUserRole] = useState<string | null>(null)
   
   const supabase = createClient()
 
@@ -60,16 +65,20 @@ export function MenuSettingsProvider({ children }: { children: ReactNode }) {
 
       const { data: profile } = await supabase
         .from('users')
-        .select('settings')
+        .select('settings, role')
         .eq('id', user.id)
         .single()
 
-      if (profile?.settings?.menus) {
-        setMenuConfig({
-          personal: profile.settings.menus.personal || DEFAULT_MENU_CONFIG.personal,
-          business: profile.settings.menus.business || DEFAULT_MENU_CONFIG.business,
-          hiddenItems: profile.settings.menus.hiddenItems || [],
-        })
+      if (profile) {
+        setUserRole(profile.role || 'member')
+        
+        if (profile.settings?.menus) {
+          setMenuConfig({
+            personal: profile.settings.menus.personal || DEFAULT_MENU_CONFIG.personal,
+            business: profile.settings.menus.business || DEFAULT_MENU_CONFIG.business,
+            hiddenItems: profile.settings.menus.hiddenItems || [],
+          })
+        }
       }
     } catch (error) {
       console.error('Failed to load menu settings:', error)
@@ -115,10 +124,13 @@ export function MenuSettingsProvider({ children }: { children: ReactNode }) {
     const enabledKeys = isBusinessMode ? menuConfig.business : menuConfig.personal
     const options = isBusinessMode ? BUSINESS_MENU_OPTIONS : PERSONAL_MENU_OPTIONS
     const hiddenItems = menuConfig.hiddenItems || []
+    const isAdmin = userRole === 'admin' || userRole === 'ai'
     
-    // Filter by enabled keys AND exclude admin-hidden items
+    // Filter by enabled keys, exclude admin-hidden items, and check role for admin-only items
     return options.filter(item => 
-      enabledKeys.includes(item.key) && !hiddenItems.includes(item.key)
+      enabledKeys.includes(item.key) && 
+      !hiddenItems.includes(item.key) &&
+      (!ADMIN_ONLY_ITEMS.includes(item.key) || isAdmin)
     )
   }
 
@@ -127,6 +139,7 @@ export function MenuSettingsProvider({ children }: { children: ReactNode }) {
       value={{
         menuConfig,
         loading,
+        userRole,
         updateMenuConfig,
         getActiveNavItems,
         refreshMenuSettings: loadMenuSettings,
