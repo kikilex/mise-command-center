@@ -379,11 +379,13 @@ export default function Home() {
           .select('*')
           .eq('item_type', 'thought')
           .eq('status', 'pending')
+          .eq('user_id', authUser.id)
           .order('created_at', { ascending: false })
           .limit(20),
         supabase.from('inbox')
           .select('*')
           .eq('item_type', 'message')
+          .eq('user_id', authUser.id)
           .order('created_at', { ascending: false })
           .limit(30),
         supabase.from('ai_agents').select('*').order('created_at', { ascending: true }),
