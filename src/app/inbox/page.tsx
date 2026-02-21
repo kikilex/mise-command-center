@@ -87,6 +87,14 @@ function InboxPageInner() {
   const [items, setItems] = useState<InboxItem[]>([])
   const [loading, setLoading] = useState(true)
   const [user, setUser] = useState<UserData | null>(null)
+  const [userRole, setUserRole] = useState<string>('member')
+  
+  // Filter recipients based on user role - non-admins can only message humans
+  const allowedRecipients = useMemo(() => {
+    const isAdmin = userRole === 'admin' || userRole === 'ai'
+    if (isAdmin) return RECIPIENTS
+    return RECIPIENTS.filter(r => r.type !== 'ai')
+  }, [userRole])
   const [newThought, setNewThought] = useState('')
   const [submitting, setSubmitting] = useState(false)
   const [projects, setProjects] = useState<any[]>([])
@@ -220,11 +228,12 @@ function InboxPageInner() {
 
         const { data: userData } = await supabase
           .from('users')
-          .select('id, email, name')
+          .select('id, email, name, role')
           .eq('id', authUser.id)
           .single()
 
         setUser(userData)
+        setUserRole(userData?.role || 'member')
 
         // Load pending inbox items
         const { data: inboxData, error } = await supabase
@@ -811,7 +820,7 @@ function InboxPageInner() {
                       trigger: "shadow-none bg-default-100",
                     }}
                   >
-                    {RECIPIENTS.map(r => (
+                    {allowedRecipients.map(r => (
                       <SelectItem key={r.id} textValue={r.name}>
                         <div className="flex items-center gap-2">
                           {r.type === 'ai' ? <Bot className="w-4 h-4 text-violet-500" /> : <User className="w-4 h-4 text-pink-500" />}
@@ -850,7 +859,7 @@ function InboxPageInner() {
                         trigger: "shadow-none bg-default-100",
                       }}
                     >
-                      {RECIPIENTS.filter(r => r.id !== composeTo).map(r => (
+                      {allowedRecipients.filter(r => r.id !== composeTo).map(r => (
                         <SelectItem key={r.id} textValue={r.name}>
                           <div className="flex items-center gap-2">
                             {r.type === 'ai' ? <Bot className="w-4 h-4 text-violet-500" /> : <User className="w-4 h-4 text-pink-500" />}

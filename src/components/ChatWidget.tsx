@@ -159,6 +159,14 @@ export default function ChatWidget() {
 
   /* ---- user avatars ---- */
   const [avatarMap, setAvatarMap] = useState<Map<string, string>>(new Map())
+  const [userRole, setUserRole] = useState<string>('member')
+  
+  // Filter recipients based on user role - non-admins can only message humans
+  const allowedRecipients = useMemo(() => {
+    const isAdmin = userRole === 'admin' || userRole === 'ai'
+    if (isAdmin) return RECIPIENTS
+    return RECIPIENTS.filter(r => r.type !== 'ai')
+  }, [userRole])
 
   /* ---- thread management ---- */
   const [editingTitle, setEditingTitle] = useState(false)
@@ -260,8 +268,8 @@ export default function ChatWidget() {
 
   const mentionCandidates = useMemo(() => {
     const f = mentionFilter.toLowerCase()
-    return RECIPIENTS.filter(r => r.name.toLowerCase().includes(f))
-  }, [mentionFilter])
+    return allowedRecipients.filter(r => r.name.toLowerCase().includes(f))
+  }, [mentionFilter, allowedRecipients])
 
   /* ================================================================ */
   /*  Effects                                                          */
@@ -422,10 +430,11 @@ export default function ChatWidget() {
     if (!user) return
     setUser(user)
     
-    // Fetch profile to get user slug for recipient matching
-    const { data: profile } = await supabase.from('users').select('slug').eq('id', user.id).single()
+    // Fetch profile to get user slug and role for recipient matching and filtering
+    const { data: profile } = await supabase.from('users').select('slug, role').eq('id', user.id).single()
     const userSlug = profile?.slug || user.email?.split('@')[0] || ''
     userNameRef.current = userSlug
+    setUserRole(profile?.role || 'member')
     
     await Promise.all([loadThreads(user.id, userSlug), loadSpacesAndProjects()])
   }
@@ -1269,7 +1278,7 @@ export default function ChatWidget() {
                       }}
                     >
                       <option value="">Add member…</option>
-                      {RECIPIENTS.filter(r => !activeThread.participants.includes(r.id)).map(r => (
+                      {allowedRecipients.filter(r => !activeThread.participants.includes(r.id)).map(r => (
                         <option key={r.id} value={r.id}>{r.name}</option>
                       ))}
                     </select>
@@ -1473,7 +1482,7 @@ export default function ChatWidget() {
                       onChange={(e) => setNewRecipient(e.target.value)}
                     >
                       <option value="">Select recipient…</option>
-                      {RECIPIENTS.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
+                      {allowedRecipients.map(r => <option key={r.id} value={r.id}>{r.name}</option>)}
                     </select>
                   </div>
                   <div className="space-y-1">
