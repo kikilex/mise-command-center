@@ -6,11 +6,13 @@ import { createClient } from '@/lib/supabase/client'
 export interface MenuConfig {
   personal: string[]
   business: string[]
+  hiddenItems?: string[]  // Admin-controlled hidden items per user
 }
 
 export const DEFAULT_MENU_CONFIG: MenuConfig = {
   personal: ['dashboard', 'spaces', 'tasks', 'docs', 'calendar', 'ai'],
   business: ['dashboard', 'spaces', 'tasks', 'content', 'docs', 'calendar', 'ai'],
+  hiddenItems: [],  // Admin can set this per-user to hide specific menu items
 }
 
 export const PERSONAL_MENU_OPTIONS = [
@@ -66,6 +68,7 @@ export function MenuSettingsProvider({ children }: { children: ReactNode }) {
         setMenuConfig({
           personal: profile.settings.menus.personal || DEFAULT_MENU_CONFIG.personal,
           business: profile.settings.menus.business || DEFAULT_MENU_CONFIG.business,
+          hiddenItems: profile.settings.menus.hiddenItems || [],
         })
       }
     } catch (error) {
@@ -111,8 +114,12 @@ export function MenuSettingsProvider({ children }: { children: ReactNode }) {
   function getActiveNavItems(isBusinessMode: boolean) {
     const enabledKeys = isBusinessMode ? menuConfig.business : menuConfig.personal
     const options = isBusinessMode ? BUSINESS_MENU_OPTIONS : PERSONAL_MENU_OPTIONS
+    const hiddenItems = menuConfig.hiddenItems || []
     
-    return options.filter(item => enabledKeys.includes(item.key))
+    // Filter by enabled keys AND exclude admin-hidden items
+    return options.filter(item => 
+      enabledKeys.includes(item.key) && !hiddenItems.includes(item.key)
+    )
   }
 
   return (

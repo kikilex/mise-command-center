@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { createServerClient } from '@supabase/ssr'
+import { cookies } from 'next/headers'
 import { exec } from 'child_process'
 import { promisify } from 'util'
 
@@ -10,6 +12,24 @@ const supabaseAdmin = createClient(
   process.env.NEXT_PUBLIC_SUPABASE_URL!,
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
+
+// Get authenticated user from request
+async function getAuthUser() {
+  const cookieStore = await cookies()
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll()
+        },
+      },
+    }
+  )
+  const { data: { user } } = await supabase.auth.getUser()
+  return user
+}
 
 export interface CalendarEvent {
   id: string
@@ -32,6 +52,12 @@ export interface CalendarEvent {
 // GET - List events from Supabase
 export async function GET(request: NextRequest) {
   try {
+    // Get authenticated user
+    const user = await getAuthUser()
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    
     const { searchParams } = new URL(request.url)
     const start = searchParams.get('start')
     const end = searchParams.get('end')
@@ -40,6 +66,7 @@ export async function GET(request: NextRequest) {
     let query = supabaseAdmin
       .from('calendar_events')
       .select('*')
+      .eq('created_by', user.id)  // Filter by user!
       .order('start_time', { ascending: true })
     
     if (start) {
@@ -90,6 +117,12 @@ export async function GET(request: NextRequest) {
 // POST - Create new event (also push to Apple Calendar)
 export async function POST(request: NextRequest) {
   try {
+    // Get authenticated user
+    const user = await getAuthUser()
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+    
     const body = await request.json()
     const { 
       title, 
@@ -136,6 +169,7 @@ export async function POST(request: NextRequest) {
         calendar_name,
         apple_event_id,
         business_id,
+        created_by: user.id,  // Set owner
         sync_status: apple_event_id ? 'synced' : 'pending_push',
         last_synced_at: apple_event_id ? new Date().toISOString() : null,
       })
