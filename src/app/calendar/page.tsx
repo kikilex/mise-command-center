@@ -175,10 +175,16 @@ export default function CalendarPage() {
         })
       }
 
-      const { data: tasksData, error: tasksError } = await supabase
+      let tasksQuery = supabase
         .from('tasks')
         .select('id, title, status, priority, due_date')
         .not('due_date', 'is', null)
+
+      if (authUser) {
+        tasksQuery = tasksQuery.or(`assignee_id.eq.${authUser.id},created_by.eq.${authUser.id}`)
+      }
+      
+      const { data: tasksData, error: tasksError } = await tasksQuery
       
       if (tasksError) {
         console.error('Tasks fetch error:', tasksError)
@@ -187,10 +193,16 @@ export default function CalendarPage() {
       
       setTasks(tasksData || [])
 
-      const { data: contentData, error: contentError } = await supabase
+      let contentQuery = supabase
         .from('content_items')
         .select('id, title, status, scheduled_date')
         .not('scheduled_date', 'is', null)
+
+      if (authUser) {
+        contentQuery = contentQuery.eq('created_by', authUser.id)
+      }
+
+      const { data: contentData, error: contentError } = await contentQuery
       
       if (contentError) {
         console.error('Content fetch error:', contentError)

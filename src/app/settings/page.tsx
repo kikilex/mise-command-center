@@ -18,6 +18,13 @@ import { createClient } from '@/lib/supabase/client'
 import Navbar from '@/components/Navbar'
 import { showErrorToast, showSuccessToast } from '@/lib/errors'
 import { BUILD_VERSION } from '@/lib/version'
+import {
+  DEFAULT_MENU_CONFIG,
+  MenuConfig,
+  PERSONAL_MENU_OPTIONS,
+  BUSINESS_MENU_OPTIONS,
+  useMenuSettings,
+} from '@/lib/menu-settings'
 
 interface UserData {
   id: string
@@ -63,9 +70,12 @@ export default function SettingsPage() {
   const [savingTheme, setSavingTheme] = useState(false)
   const [reminderSettings, setReminderSettings] = useState<ReminderSettings>(DEFAULT_REMINDER_SETTINGS)
   const [mounted, setMounted] = useState(false)
+  const [menuSettings, setMenuSettings] = useState<MenuConfig>(DEFAULT_MENU_CONFIG)
+  const [savingMenus, setSavingMenus] = useState(false)
   
   const { theme, setTheme } = useTheme()
   const supabase = createClient()
+  const { menuConfig, updateMenuConfig, loading: menuLoading } = useMenuSettings()
 
   useEffect(() => {
     setMounted(true)
@@ -74,6 +84,12 @@ export default function SettingsPage() {
   useEffect(() => {
     loadUserAndSettings()
   }, [])
+
+  useEffect(() => {
+    if (!menuLoading) {
+      setMenuSettings(menuConfig)
+    }
+  }, [menuConfig, menuLoading])
 
   async function loadUserAndSettings() {
     setLoading(true)
@@ -152,6 +168,33 @@ export default function SettingsPage() {
       showErrorToast(error, 'Failed to save settings')
     } finally {
       setSaving(false)
+    }
+  }
+
+  function toggleMenuItem(section: 'personal' | 'business', key: string) {
+    setMenuSettings(prev => {
+      const current = prev[section]
+      const updated = current.includes(key)
+        ? current.filter(item => item !== key)
+        : [...current, key]
+
+      return {
+        ...prev,
+        [section]: updated,
+      }
+    })
+  }
+
+  async function saveMenuSettings() {
+    setSavingMenus(true)
+    try {
+      await updateMenuConfig(menuSettings)
+      showSuccessToast('Menu settings saved')
+    } catch (error) {
+      console.error('Save menu settings error:', error)
+      showErrorToast(error, 'Failed to save menu settings')
+    } finally {
+      setSavingMenus(false)
     }
   }
 
@@ -398,6 +441,67 @@ export default function SettingsPage() {
                 isLoading={saving}
               >
                 Save Changes
+              </Button>
+            </div>
+          </CardBody>
+        </Card>
+
+        {/* Menu Settings Card */}
+        <Card className="bg-content1 mb-6">
+          <CardHeader className="flex flex-col items-start px-6 pt-6">
+            <h2 className="text-lg font-semibold">Menu Visibility</h2>
+            <p className="text-sm text-default-500 mt-1">
+              Choose which sections appear in your sidebar
+            </p>
+          </CardHeader>
+          <Divider />
+          <CardBody className="px-6 py-6">
+            {menuLoading ? (
+              <div className="flex justify-center py-4">
+                <Spinner size="sm" />
+              </div>
+            ) : (
+              <div className="grid gap-8 md:grid-cols-2">
+                <div>
+                  <h3 className="text-sm font-semibold text-default-600 mb-3">Personal Menu</h3>
+                  <div className="space-y-2">
+                    {PERSONAL_MENU_OPTIONS.map(option => (
+                      <Checkbox
+                        key={`personal-${option.key}`}
+                        isSelected={menuSettings.personal.includes(option.key)}
+                        onValueChange={() => toggleMenuItem('personal', option.key)}
+                      >
+                        <span className="text-default-600">{option.label || 'Dashboard'}</span>
+                      </Checkbox>
+                    ))}
+                  </div>
+                </div>
+                <div>
+                  <h3 className="text-sm font-semibold text-default-600 mb-3">Business Menu</h3>
+                  <div className="space-y-2">
+                    {BUSINESS_MENU_OPTIONS.map(option => (
+                      <Checkbox
+                        key={`business-${option.key}`}
+                        isSelected={menuSettings.business.includes(option.key)}
+                        onValueChange={() => toggleMenuItem('business', option.key)}
+                      >
+                        <span className="text-default-600">{option.label || 'Dashboard'}</span>
+                      </Checkbox>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            <Divider className="my-6" />
+
+            <div className="flex justify-end">
+              <Button
+                color="primary"
+                onPress={saveMenuSettings}
+                isLoading={savingMenus}
+              >
+                Save Menu Settings
               </Button>
             </div>
           </CardBody>

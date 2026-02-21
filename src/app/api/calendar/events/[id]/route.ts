@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@supabase/supabase-js'
+import { createServerClient } from '@supabase/ssr'
+import { cookies } from 'next/headers'
 import { exec } from 'child_process'
 import { promisify } from 'util'
 
@@ -10,18 +12,42 @@ const supabaseAdmin = createClient(
   process.env.SUPABASE_SERVICE_ROLE_KEY!
 )
 
+// Get authenticated user from request
+async function getAuthUser() {
+  const cookieStore = await cookies()
+  const supabase = createServerClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+    {
+      cookies: {
+        getAll() {
+          return cookieStore.getAll()
+        },
+      },
+    }
+  )
+  const { data: { user } } = await supabase.auth.getUser()
+  return user
+}
+
 // GET - Get single event
 export async function GET(
   request: NextRequest,
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const user = await getAuthUser()
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const { id } = await params
     
     const { data: event, error } = await supabaseAdmin
       .from('calendar_events')
       .select('*')
       .eq('id', id)
+      .eq('created_by', user.id)
       .single()
     
     if (error) {
@@ -45,6 +71,11 @@ export async function PUT(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const user = await getAuthUser()
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const { id } = await params
     const body = await request.json()
     
@@ -53,6 +84,7 @@ export async function PUT(
       .from('calendar_events')
       .select('*')
       .eq('id', id)
+      .eq('created_by', user.id)
       .single()
     
     if (fetchError) {
@@ -100,6 +132,7 @@ export async function PUT(
         last_synced_at: lastSyncedAt,
       })
       .eq('id', id)
+      .eq('created_by', user.id)
       .select()
       .single()
     
@@ -121,6 +154,11 @@ export async function DELETE(
   { params }: { params: Promise<{ id: string }> }
 ) {
   try {
+    const user = await getAuthUser()
+    if (!user) {
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    }
+
     const { id } = await params
     
     // Get event first to get apple_event_id
@@ -128,6 +166,7 @@ export async function DELETE(
       .from('calendar_events')
       .select('*')
       .eq('id', id)
+      .eq('created_by', user.id)
       .single()
     
     if (fetchError) {
@@ -152,6 +191,7 @@ export async function DELETE(
       .from('calendar_events')
       .delete()
       .eq('id', id)
+      .eq('created_by', user.id)
     
     if (error) {
       return NextResponse.json({ error: error.message }, { status: 500 })

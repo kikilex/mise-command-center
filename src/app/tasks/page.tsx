@@ -256,6 +256,9 @@ function TasksPageContent() {
       // (excludes tasks I created but delegated to others)
       if (viewMode === 'mine') {
         query = query.or(`assignee_id.eq.${authUser.id},and(assignee_id.is.null,created_by.eq.${authUser.id})`)
+      } else if (!isAdmin) {
+        // Non-admin users should only see their own tasks
+        query = query.or(`assignee_id.eq.${authUser.id},created_by.eq.${authUser.id}`)
       }
       
       if (localSpaceId && localSpaceId !== 'all') {
